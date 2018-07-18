@@ -101,6 +101,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #include	"x_errors_events.h"
 #include	"x_retarget.h"
 #include	"x_utilities.h"
+#include	"crc.h"
 
 #include	"hal_timer.h"
 
@@ -199,6 +200,7 @@ void	vSyslogDeInit(void) {
  */
 void	vSyslogSetPriority(uint32_t Priority) { SyslogMinSevLev = Priority % 8 ; }
 
+#if 0
 /**
  * xvSyslog writes an RFC formatted message to syslog host
  * \brief		if syslog not up and running, write to stdout
@@ -224,7 +226,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 
 	cprintf_lock() ;
 	int32_t xLen = cprintf(syslogSET_FG "%!R: %s %s ", SyslogColors[Priority & 0x07], halTIMER_ReadRunMicros(), ProcID, MsgID) ;
-	vcprintf(format, vArgs) ;
+	xLen += vcprintf(format, vArgs) ;
 	xLen += cprintf(syslogRST_FG "\n") ;
 	cprintf_unlock() ;
 	if (((Priority & 0x07) > SyslogMinSevLev) || (xRtosCheckStatus(flagNET_L5_SYSLOG) == 0)) {
@@ -246,6 +248,83 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	xUtilUnlockResource(&SyslogMutex) ;
 	return xLen ;
 }
+#else
+
+static	uint8_t	CurCRC ;
+static	uint8_t	LstCRC ;
+static	uint32_t RptCRC ;
+
+/**
+ * xvSyslog writes an RFC formatted message to syslog host
+ * \brief		if syslog not up and running, write to stdout
+ * \brief		avoid using malloc{} or similar since also called from error/crash handlers
+ * \param[in]	Priority, ProcID and MsgID as defined by RFC
+ * \param[in]	format string and parameters as per normal vprintf()
+ * \param[out]	none
+ * \return		number of characters displayed(if only to console) or send(if to server)
+ */
+int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_list vArgs) {
+	myASSERT((Priority < 192) && INRANGE_MEM(MsgID) && INRANGE_MEM(format)) ;
+	char *	ProcID ;
+	if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED) {
+#if		(tskKERNEL_VERSION_MAJOR < 9)
+		ProcID = pcTaskGetTaskName(NULL) ;							// FreeRTOS pre v9.0.0 uses long form function name
+#else
+		ProcID = pcTaskGetName(NULL) ;								// FreeRTOS v9.0.0 onwards uses short form function name
+#endif
+		myASSERT(INRANGE_SRAM(ProcID)) ;
+	} else {
+		ProcID = "preX" ;
+	}
+
+	xUtilLockResource(&SyslogMutex, portMAX_DELAY) ;
+	// build the message into the buffer
+	int32_t xLen1, xLen2 ;
+	int32_t xLen = xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, syslogSET_FG "%!R: %s ",
+							SyslogColors[Priority & 0x07], halTIMER_ReadRunMicros(), ProcID) ;
+	xLen1	= xLen ;				// save start of CRC area
+	xLen += xsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, "%s ", MsgID) ;
+	xLen += xvsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, format, vArgs) ;
+	xLen2	= xLen ;				// save end of CRC area
+	xLen += xsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, syslogRST_FG "\n") ;
+
+	// calculate the CurCRC, then compare against LstCRC
+	CurCRC = CalculaCheckSum((uint8_t *) &SyslogBuffer[xLen1], xLen2 - xLen1) ;
+	if (CurCRC == LstCRC) {								// Same as previous message ?
+		++RptCRC ;										// Yes, increment the repeat counter
+		xUtilUnlockResource(&SyslogMutex) ;
+		return xLen ;									// REPEAT message, not going to send...
+	} else {
+		if (RptCRC > 0) {								// if we have skipped messages
+			cprintf("%d Identical messages skipped\n", RptCRC) ;
+			RptCRC = 0 ;
+		}
+		LstCRC = CurCRC ;
+	}
+
+	cprintf(SyslogBuffer) ;								// new message so show it...
+
+	if (((Priority & 0x07) > SyslogMinSevLev) || (xRtosCheckStatus(flagNET_L5_SYSLOG) == 0)) {
+		xUtilUnlockResource(&SyslogMutex) ;
+		return xLen ;									// filter out higher levels, not going to syslog host...
+	}
+
+	// Now start building the message in RFCxxxx format for host....
+	xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %Z %s %s %s - %s ",
+							Priority, &sTSZ, idSTA, ProcID, MsgID, SyslogLevel[Priority & 0x07]) ;
+
+	xLen += xvsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, format, vArgs) ;
+	sSyslogCtx.maxTx = xLen > sSyslogCtx.maxTx ? xLen : sSyslogCtx.maxTx ;
+
+	// writing directly to socket, not via xNetWrite() to avoid recursing
+	if (sendto(sSyslogCtx.sd, SyslogBuffer, xLen, 0, &sSyslogCtx.sa, sizeof(sSyslogCtx.sa_in)) != xLen) {
+		// Any error messages here ignored, obviously from IDF or lower levels...
+		vRtosClearStatus(flagNET_L5_SYSLOG) ;
+	}
+	xUtilUnlockResource(&SyslogMutex) ;
+	return xLen ;
+}
+#endif
 
 /**
  * xSyslog writes an RFC formatted message to syslog host
