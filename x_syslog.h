@@ -92,16 +92,16 @@ extern "C" {
 
 // ############################## Syslog formatting/calling macros #################################
 
-#define	SL_CHECK(x)						if (x < erSUCCESS) xSyslog(SL_MOD2LOCAL(SL_SEV_ERROR), NULL, __FUNCTION__, "()=%d", x)
+#define	SL_MOD2LOCAL(SEV)				((SL_FAC_LOGAUDIT << 3) | SEV)
 
-/* If a MODCODE is defined in the source file we use the top 4 bit as a
- * facility code offset/index from the LOGALERT value. If no MODCODE defined
- * then we simply set the facility to LOGAUDIT */
-#if 	defined(MODCODE)
-	#define	SL_MOD2LOCAL(SEV)			((((MODCODE >> 12) + SL_FAC_LOGALERT) << 3) | SEV)
-#else
-	#define	SL_MOD2LOCAL(SEV)			((SL_FAC_LOGAUDIT << 3) | SEV)
-#endif
+#define	SL_EMER(FORMAT, ...)			xSyslog(SL_MOD2LOCAL(SL_SEV_EMERGENCY),	__FUNCTION__, FORMAT, ##__VA_ARGS__)
+#define	SL_ALRT(FORMAT, ...)			xSyslog(SL_MOD2LOCAL(SL_SEV_ALERT),		__FUNCTION__, FORMAT, ##__VA_ARGS__)
+#define	SL_CRIT(FORMAT, ...)			xSyslog(SL_MOD2LOCAL(SL_SEV_CRITICAL),	__FUNCTION__, FORMAT, ##__VA_ARGS__)
+#define	SL_ERR(FORMAT, ...)				xSyslog(SL_MOD2LOCAL(SL_SEV_ERROR),		__FUNCTION__, FORMAT, ##__VA_ARGS__)
+#define	SL_WARN(FORMAT, ...)			xSyslog(SL_MOD2LOCAL(SL_SEV_WARNING),	__FUNCTION__, FORMAT, ##__VA_ARGS__)
+#define	SL_NOT(FORMAT, ...)				xSyslog(SL_MOD2LOCAL(SL_SEV_NOTICE), 	__FUNCTION__, FORMAT, ##__VA_ARGS__)
+#define	SL_INFO(FORMAT, ...)			xSyslog(SL_MOD2LOCAL(SL_SEV_INFO), 		__FUNCTION__, FORMAT, ##__VA_ARGS__)
+#define	SL_DBG(FORMAT, ...)				xSyslog(SL_MOD2LOCAL(SL_SEV_DEBUG),		__FUNCTION__, FORMAT, ##__VA_ARGS__)
 
 #define	IF_SL_EMER(x, FORMAT, ...)		if (x) SL_EMER(FORMAT, ##__VA_ARGS__)
 #define	IF_SL_ALRT(x, FORMAT, ...)		if (x) SL_ALRT(FORMAT, ##__VA_ARGS__)
@@ -112,14 +112,7 @@ extern "C" {
 #define	IF_SL_INFO(x, FORMAT, ...)		if (x) SL_INFO(FORMAT, ##__VA_ARGS__)
 #define	IF_SL_DBG(x, FORMAT, ...)		if (x) SL_DBG(FORMAT, ##__VA_ARGS__)
 
-#define	SL_EMER(FORMAT,...)				xSyslog(SL_MOD2LOCAL(SL_SEV_EMERGENCY),	__FUNCTION__, FORMAT, ##__VA_ARGS__)
-#define	SL_ALRT(FORMAT,...)				xSyslog(SL_MOD2LOCAL(SL_SEV_ALERT),		__FUNCTION__, FORMAT, ##__VA_ARGS__)
-#define	SL_CRIT(FORMAT,...)				xSyslog(SL_MOD2LOCAL(SL_SEV_CRITICAL),	__FUNCTION__, FORMAT, ##__VA_ARGS__)
-#define	SL_ERR(FORMAT,...)				xSyslog(SL_MOD2LOCAL(SL_SEV_ERROR),		__FUNCTION__, FORMAT, ##__VA_ARGS__)
-#define	SL_WARN(FORMAT,...)				xSyslog(SL_MOD2LOCAL(SL_SEV_WARNING),	__FUNCTION__, FORMAT, ##__VA_ARGS__)
-#define	SL_NOT(FORMAT,...)				xSyslog(SL_MOD2LOCAL(SL_SEV_NOTICE), 	__FUNCTION__, FORMAT, ##__VA_ARGS__)
-#define	SL_INFO(FORMAT , ...)			xSyslog(SL_MOD2LOCAL(SL_SEV_INFO), 		__FUNCTION__, FORMAT, ##__VA_ARGS__)
-#define	SL_DBG(FORMAT , ...)			xSyslog(SL_MOD2LOCAL(SL_SEV_DEBUG),		__FUNCTION__, FORMAT, ##__VA_ARGS__)
+#define	SL_CHECK(x)						if (x < erSUCCESS) xSyslog(SL_MOD2LOCAL(SL_SEV_ERROR), NULL, __FUNCTION__, "()=%d", x)
 
 // ###################################### Global variables #########################################
 
@@ -132,7 +125,7 @@ void	vSyslogInit(const char * pHostName)  ;
 void  	vSyslogDeInit(void) ;
 int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_list args) ;
 int32_t	xSyslog(uint32_t Priority, const char * MsgID, const char * format, ...) ;
-void	vSyslogReport(void) ;
+void	vSyslogReport(int32_t Handle) ;
 
 #ifdef __cplusplus
 }
