@@ -103,6 +103,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #include	"x_utilities.h"
 #include	"crc.h"
 
+#include	"hal_network.h"
 #include	"hal_timer.h"
 
 #include	"esp_log.h"
@@ -243,16 +244,15 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 			xUtilUnlockResource(&SyslogMutex) ;
 		}
 		return xLen ;									// REPEAT message, not going to send...
-	} else {
-		if (RptCRC > 0) {								// if we have skipped messages
-			if (FRflag) {
-				xprintf("syslog: %d Identical messages skipped\n", RptCRC) ;
-			} else {
-				cprintf_noblock("syslog: %d Identical messages skipped\n", RptCRC) ;
-			}
-			RptCRC = 0 ;
+	}
+	LstCRC = CurCRC ;
+	if (RptCRC > 0) {									// if we have skipped messages
+		if (FRflag) {
+			xprintf("syslog: %d Identical messages skipped\n", RptCRC) ;
+		} else {
+			cprintf_noblock("syslog: %d Identical messages skipped\n", RptCRC) ;
 		}
-		LstCRC = CurCRC ;
+		RptCRC = 0 ;
 	}
 
 	if (FRflag) {
