@@ -29,6 +29,8 @@
 #include	"x_definitions.h"
 #include	"x_utilities.h"								// shared buffer & mutex/spinlock support
 
+#include	<stdarg.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
