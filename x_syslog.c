@@ -311,6 +311,6 @@ int32_t	xSyslog(uint32_t Priority, const char * MsgID, const char * format, ...)
 void	vSyslogReport(int32_t Handle) {
 	if (xRtosCheckStatus(flagNET_L5_SYSLOG)) {
 		xNetReport(Handle, &sSyslogCtx, __FUNCTION__, 0, 0, 0) ;
-		xdprintf(Handle, "\t\tmaxTX=%u  maxRX=%u\n", sSyslogCtx.maxTx, sSyslogCtx.maxRx) ;
+		xdprintf(Handle, "\t\t\tmaxTX=%u  maxRX=%u\n", sSyslogCtx.maxTx, sSyslogCtx.maxRx) ;
 	}
 }
