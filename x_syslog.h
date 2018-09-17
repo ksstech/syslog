@@ -137,13 +137,10 @@ extern "C" {
 
 // ###################################### Global variables #########################################
 
-extern	sock_ctx_t		sSyslogCtx ;
 
 // ###################################### function prototypes ######################################
 
 void 	vSyslogSetPriority(uint32_t Priority) ;
-void	vSyslogInit(const char * pHostName)  ;
-void  	vSyslogDeInit(void) ;
 int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_list args) ;
 int32_t	xSyslog(uint32_t Priority, const char * MsgID, const char * format, ...) ;
 void	vSyslogReport(int32_t Handle) ;

@@ -110,7 +110,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 
 #include	<string.h>
 
-#define	debugFLAG				0x0001
+#define	debugFLAG				0x0000
 #define	debugPARAM				(debugFLAG & 0x0001)
 #define	debugTRACK				(debugFLAG & 0x0002)
 
@@ -123,19 +123,17 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 
 // ###################################### Global variables #########################################
 
-sock_ctx_t	sSyslogCtx ;
-uint32_t	SyslogMinSevLev = SL_SEV_DEBUG ;
-char		SyslogBuffer[configSYSLOG_BUFSIZE] ;
-SemaphoreHandle_t	SyslogMutex = NULL ;
-static	uint8_t	CurCRC ;
-static	uint8_t	LstCRC ;
-static	uint32_t RptCRC ;
+static	sock_ctx_t	sSyslogCtx ;
+static	char		SyslogBuffer[configSYSLOG_BUFSIZE] ;
+SemaphoreHandle_t	SyslogMutex ;
+static	uint8_t		CurCRC, LstCRC ;
+static	uint32_t 	CurRpt, MsgCnt, TotRpt ;
 
+static	uint32_t	SyslogMinSevLev = SL_SEV_DEBUG ;
+static char * SyslogLevel[8] = { "EMER", "ALERT", "CRIT", "ERROR", "WARN", "NOTICE", "INFO", "DEBUG" } ;
 char	SyslogColors[8] = {
 // 0 = Emergency	1 = Alert	2 = Critical	3 = Error		4 = Warning		5 = Notice		6 = Info		7 = Debug
 	colourFG_RED, colourFG_RED, colourFG_RED, colourFG_RED, colourFG_MAGENTA, colourFG_GREEN,	colourFG_WHITE,	colourFG_YELLOW } ;
-
-static char * SyslogLevel[8] = { "EMER", "ALERT", "CRIT", "ERROR", "WARN", "NOTICE", "INFO", "DEBUG" } ;
 
 // ###################################### Public functions #########################################
 
@@ -148,7 +146,6 @@ static char * SyslogLevel[8] = { "EMER", "ALERT", "CRIT", "ERROR", "WARN", "NOTI
  */
 void	vSyslogInit(const char * pHostName) {
 	IF_myASSERT(debugPARAM, pHostName) ;
-	memset(&sSyslogCtx, 0, sizeof(sock_ctx_t)) ;
 	sSyslogCtx.pHost			= pHostName ;
 	sSyslogCtx.sa_in.sin_family = AF_INET ;
 #if		(buildSYSLOG_USE_UDP == 1)
@@ -159,15 +156,18 @@ void	vSyslogInit(const char * pHostName) {
 	sSyslogCtx.sa_in.sin_port   = htons(IP_PORT_SYSLOG_TLS) ;
 #endif
 	sSyslogCtx.type				= SOCK_DGRAM ;
+	sSyslogCtx.d_flags			= 0 ;
 	sSyslogCtx.d_ndebug			= 1 ;					// disable debug in x_sockets.c
 	if (xNetGetHostByName(&sSyslogCtx) < erSUCCESS) {
 		return ;
 	}
 	if ((sSyslogCtx.sd = socket(sSyslogCtx.sa_in.sin_family, sSyslogCtx.type, IPPROTO_IP)) < erSUCCESS) {
+		sSyslogCtx.sd = -1 ;
 		return ;
 	}
 	if (connect(sSyslogCtx.sd, &sSyslogCtx.sa, sizeof(struct sockaddr_in)) < erSUCCESS) {
 		close(sSyslogCtx.sd) ;
+		sSyslogCtx.sd = -1 ;
 		return ;
 	}
    	xNetSetNonBlocking(&sSyslogCtx, flagXNET_NONBLOCK) ;
@@ -211,6 +211,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	IF_myASSERT(debugPARAM, (Priority < 192) && INRANGE_MEM(MsgID) && INRANGE_MEM(format)) ;
 	int32_t	FRflag ;
 	char *	ProcID ;
+	// Step 1: handle state of scheduler, and obtain the task name and secure exclusive access to buffer
 	if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
 		FRflag = 1 ;
 #if		(tskKERNEL_VERSION_MAJOR < 9)
@@ -227,7 +228,8 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	if (FRflag) {
 		xUtilLockResource(&SyslogMutex, portMAX_DELAY) ;
 	}
-	// build the message into the buffer
+
+	// Step 2: build the console formatted message into the buffer
 	uint64_t LogTime = halTIMER_ReadRunMicros() ;
 	int32_t xLen = xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, syslogSET_FG "%!R: %s ", SyslogColors[Priority & 0x07], LogTime, ProcID) ;
 	int32_t yLen = xLen ;							// save start of CRC area
@@ -236,25 +238,29 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	int32_t zLen = xLen ;							// save end of CRC area
 	xLen += xsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, syslogRST_FG "\n") ;
 
+	// Step 3: Check if this is a sequential repeat message, if so, count but dont display
 	CurCRC = CalculaCheckSum((uint8_t *) &SyslogBuffer[yLen], zLen - yLen) ;
 	if (CurCRC == LstCRC) {								// CRC same as previous message ?
-		++RptCRC ;										// Yes, increment the repeat counter
+		++CurRpt ;										// Yes, increment the repeat counter
+		++TotRpt ;
 		if (FRflag) {
 			xUtilUnlockResource(&SyslogMutex) ;
 		}
 		return xLen ;									// REPEAT message, not going to send...
 	}
-	// At this point we have a message that is different from the previous message, so...
-	if (RptCRC > 0) {									// if we have skipped messages
-#define	syslogSKIP_FORMAT	"%!R: %s xvSyslog Identical messages (%d) skipped\n"
+
+	// Step 4: we have a new/different message, handle earlier suppressed duplicates
+	if (CurRpt > 0) {									// if we have skipped messages
+	#define	syslogSKIP_FORMAT	"%!R: %s xvSyslog Identical messages (%d) skipped\n"
 		if (FRflag) {									// indicate number of repetitions in the log...
-			xprintf(syslogSKIP_FORMAT, LogTime, ProcID, RptCRC) ;
+			xprintf(syslogSKIP_FORMAT, LogTime, ProcID, CurRpt) ;
 		} else {
-			cprintf_noblock(syslogSKIP_FORMAT, LogTime, ProcID, RptCRC) ;
+			cprintf_noblock(syslogSKIP_FORMAT, LogTime, ProcID, CurRpt) ;
 		}
-		RptCRC = 0 ;
+		CurRpt = 0 ;
 	}
-	// new message so show it...
+
+	// Step 5: show the new message to the console...
 	LstCRC = CurCRC ;
 	if (FRflag) {
 		xprintf(SyslogBuffer) ;
@@ -262,30 +268,34 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 		cprintf_noblock(SyslogBuffer) ;
 	}
 
-	// filter out higher levels, not going to syslog host...
-	if ((FRflag == 0) || ((Priority & 0x07) > SyslogMinSevLev)) {
-		if (FRflag) {
-			xUtilUnlockResource(&SyslogMutex) ;
-		}
-		return xLen ;
-	}
-	if (xRtosCheckStatus(flagNET_L5_SYSLOG) == 0) {
+	// Step 6: filter out reasons why message should not go to syslog host...
+	if ((xRtosCheckStatus(flagNET_L3_UP) == 0) || (FRflag == 0) || ((Priority & 0x07) > SyslogMinSevLev)) {
 		if (FRflag) {
 			xUtilUnlockResource(&SyslogMutex) ;
 		}
 		return xLen ;
 	}
 
-	// Now start building the message in RFCxxxx format for host....
+	// Step 7: If not connected to host, try to connect
+	if (xRtosCheckStatus(flagNET_L5_SYSLOG) == 0) {
+		vSyslogInit(configSYSLOG_HOSTNAME) ;
+	}
+	if (xRtosCheckStatus(flagNET_L5_SYSLOG) == 0) {
+		xUtilUnlockResource(&SyslogMutex) ;
+		return xLen ;
+	}
+	// Step 8: Now start building the message in RFCxxxx format for host....
 	xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %+Z %s %s %s - %s ",
 							Priority, &sTSZ, idSTA, ProcID, MsgID, SyslogLevel[Priority & 0x07]) ;
 
 	xLen += xvsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, format, vArgs) ;
 	sSyslogCtx.maxTx = (xLen > sSyslogCtx.maxTx) ? xLen : sSyslogCtx.maxTx ;
 
-	// writing directly to socket, not via xNetWrite() to avoid recursing
+	// Step 9: write message directly to socket, not via xNetWrite() to avoid recursing
 	if (sendto(sSyslogCtx.sd, SyslogBuffer, xLen, 0, &sSyslogCtx.sa, sizeof(sSyslogCtx.sa_in)) != xLen) {
-		vRtosClearStatus(flagNET_L5_SYSLOG) ;	// Any error messages here ignored, obviously from IDF or lower levels...
+		vSyslogDeInit() ;
+	} else {
+		++MsgCnt ;
 	}
 	xUtilUnlockResource(&SyslogMutex) ;
 	return xLen ;
@@ -311,6 +321,6 @@ int32_t	xSyslog(uint32_t Priority, const char * MsgID, const char * format, ...)
 void	vSyslogReport(int32_t Handle) {
 	if (xRtosCheckStatus(flagNET_L5_SYSLOG)) {
 		xNetReport(Handle, &sSyslogCtx, __FUNCTION__, 0, 0, 0) ;
-		xdprintf(Handle, "\t\t\tmaxTX=%u  maxRX=%u\n", sSyslogCtx.maxTx, sSyslogCtx.maxRx) ;
+		xdprintf(Handle, "\t\t\tmaxTX=%u  CurRpt=%d  TotRpt=%d  TxMsg=%d\n", sSyslogCtx.maxTx, CurRpt, TotRpt, MsgCnt) ;
 	}
 }
