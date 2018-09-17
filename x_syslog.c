@@ -201,7 +201,7 @@ void	vSyslogSetPriority(uint32_t Priority) { SyslogMinSevLev = Priority % 8 ; }
 /**
  * xvSyslog writes an RFC formatted message to syslog host
  * \brief		if syslog not up and running, write to stdout
- * \brief		avoid using malloc{} or similar since also called from error/crash handlers
+ * \brief		avoid using malloc or similar since also called from error/crash handlers
  * \param[in]	Priority, ProcID and MsgID as defined by RFC
  * \param[in]	format string and parameters as per normal vprintf()
  * \param[out]	none
@@ -261,8 +261,9 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	} else {
 		cprintf_noblock(SyslogBuffer) ;
 	}
-	if ((FRflag == 0) || ((Priority & 0x07) > SyslogMinSevLev)) {
+
 	// filter out higher levels, not going to syslog host...
+	if ((FRflag == 0) || ((Priority & 0x07) > SyslogMinSevLev)) {
 		if (FRflag) {
 			xUtilUnlockResource(&SyslogMutex) ;
 		}
@@ -284,8 +285,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 
 	// writing directly to socket, not via xNetWrite() to avoid recursing
 	if (sendto(sSyslogCtx.sd, SyslogBuffer, xLen, 0, &sSyslogCtx.sa, sizeof(sSyslogCtx.sa_in)) != xLen) {
-		// Any error messages here ignored, obviously from IDF or lower levels...
-		vRtosClearStatus(flagNET_L5_SYSLOG) ;
+		vRtosClearStatus(flagNET_L5_SYSLOG) ;	// Any error messages here ignored, obviously from IDF or lower levels...
 	}
 	xUtilUnlockResource(&SyslogMutex) ;
 	return xLen ;

@@ -94,6 +94,7 @@ extern "C" {
 
 // ############################## Syslog formatting/calling macros #################################
 
+#define	SL_CHECK(x)						if (x < erSUCCESS) xSyslog(SL_MOD2LOCAL(SL_SEV_ERROR), NULL, __FUNCTION__, "()=%d", x)
 #define	SL_MOD2LOCAL(SEV)				((SL_FAC_LOGAUDIT << 3) | SEV)
 
 #define	SL_EMER(FORMAT, ...)			xSyslog(SL_MOD2LOCAL(SL_SEV_EMERGENCY),	__FUNCTION__, FORMAT, ##__VA_ARGS__)
@@ -114,7 +115,25 @@ extern "C" {
 #define	IF_SL_INFO(x, FORMAT, ...)		if (x) SL_INFO(FORMAT, ##__VA_ARGS__)
 #define	IF_SL_DBG(x, FORMAT, ...)		if (x) SL_DBG(FORMAT, ##__VA_ARGS__)
 
-#define	SL_CHECK(x)						if (x < erSUCCESS) xSyslog(SL_MOD2LOCAL(SL_SEV_ERROR), NULL, __FUNCTION__, "()=%d", x)
+#define	CL_MOD2LOCAL(SEV)				((SL_FAC_LOCAL0 << 3) | SEV)
+
+#define	CL_EMER(FORMAT, ...)			xSyslog(CL_MOD2LOCAL(SL_SEV_EMERGENCY),	__FUNCTION__, FORMAT, ##__VA_ARGS__)
+#define	CL_ALRT(FORMAT, ...)			xSyslog(CL_MOD2LOCAL(SL_SEV_ALERT),		__FUNCTION__, FORMAT, ##__VA_ARGS__)
+#define	CL_CRIT(FORMAT, ...)			xSyslog(CL_MOD2LOCAL(SL_SEV_CRITICAL),	__FUNCTION__, FORMAT, ##__VA_ARGS__)
+#define	CL_ERR(FORMAT, ...)				xSyslog(CL_MOD2LOCAL(SL_SEV_ERROR),		__FUNCTION__, FORMAT, ##__VA_ARGS__)
+#define	CL_WARN(FORMAT, ...)			xSyslog(CL_MOD2LOCAL(SL_SEV_WARNING),	__FUNCTION__, FORMAT, ##__VA_ARGS__)
+#define	CL_NOT(FORMAT, ...)				xSyslog(CL_MOD2LOCAL(SL_SEV_NOTICE), 	__FUNCTION__, FORMAT, ##__VA_ARGS__)
+#define	CL_INFO(FORMAT, ...)			xSyslog(CL_MOD2LOCAL(SL_SEV_INFO), 		__FUNCTION__, FORMAT, ##__VA_ARGS__)
+#define	CL_DBG(FORMAT, ...)				xSyslog(CL_MOD2LOCAL(SL_SEV_DEBUG),		__FUNCTION__, FORMAT, ##__VA_ARGS__)
+
+#define	IF_CL_EMER(x, FORMAT, ...)		if (x) CL_EMER(FORMAT, ##__VA_ARGS__)
+#define	IF_CL_ALRT(x, FORMAT, ...)		if (x) CL_ALRT(FORMAT, ##__VA_ARGS__)
+#define	IF_CL_CRIT(x, FORMAT, ...)		if (x) CL_CRIT(FORMAT, ##__VA_ARGS__)
+#define	IF_CL_ERR(x, FORMAT, ...)		if (x) CL_ERR(FORMAT, ##__VA_ARGS__)
+#define	IF_CL_WARN(x, FORMAT, ...)		if (x) CL_WARN(FORMAT, ##__VA_ARGS__)
+#define	IF_CL_NOT(x, FORMAT, ...)		if (x) CL_NOT(FORMAT, ##__VA_ARGS__)
+#define	IF_CL_INFO(x, FORMAT, ...)		if (x) CL_INFO(FORMAT, ##__VA_ARGS__)
+#define	IF_CL_DBG(x, FORMAT, ...)		if (x) CL_DBG(FORMAT, ##__VA_ARGS__)
 
 // ###################################### Global variables #########################################
 
