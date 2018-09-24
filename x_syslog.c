@@ -171,8 +171,8 @@ void	vSyslogInit(const char * pHostName) {
 		return ;
 	}
    	xNetSetNonBlocking(&sSyslogCtx, flagXNET_NONBLOCK) ;
-   	vRtosSetStatus(flagNET_L5_SYSLOG) ;
-   	IF_DEBUGPRINT_ERR(debugTRACK, "init") ;
+   	vRtosSetStatus(flagNET_SYSLOG) ;
+   	IF_CPRINT(debugTRACK, "init") ;
 }
 
 /**
@@ -183,10 +183,10 @@ void	vSyslogInit(const char * pHostName) {
  * \return		none
  */
 void	vSyslogDeInit(void) {
-	vRtosClearStatus(flagNET_L5_SYSLOG) ;
+	vRtosClearStatus(flagNET_SYSLOG) ;
 	close(sSyslogCtx.sd) ;
 	sSyslogCtx.sd = -1 ;
-	IF_DEBUGPRINT_ERR(debugTRACK, "deinit") ;
+	IF_CPRINT(debugTRACK, "deinit") ;
 }
 
 /**
@@ -269,7 +269,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	}
 
 	// Step 6: filter out reasons why message should not go to syslog host...
-	if ((xRtosCheckStatus(flagNET_L3_UP) == 0) || (FRflag == 0) || ((Priority & 0x07) > SyslogMinSevLev)) {
+	if ((ipSTA == 0) || (xRtosCheckStatus(flagNET_L3) == 0) || (FRflag == 0) || ((Priority & 0x07) > SyslogMinSevLev)) {
 		if (FRflag) {
 			xUtilUnlockResource(&SyslogMutex) ;
 		}
@@ -277,13 +277,14 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	}
 
 	// Step 7: If not connected to host, try to connect
-	if (xRtosCheckStatus(flagNET_L5_SYSLOG) == 0) {
-		vSyslogInit(configSYSLOG_HOSTNAME) ;
+	if (xRtosCheckStatus(flagNET_SYSLOG) == 0) {		// syslog not connected ?
+		vSyslogInit(configSYSLOG_HOSTNAME) ;			// try to connect...
+		if (xRtosCheckStatus(flagNET_SYSLOG) == 0) {	// successful?
+			xUtilUnlockResource(&SyslogMutex) ;			// no, free up locked buffer
+			return xLen ;								// and return
+		}
 	}
-	if (xRtosCheckStatus(flagNET_L5_SYSLOG) == 0) {
-		xUtilUnlockResource(&SyslogMutex) ;
-		return xLen ;
-	}
+
 	// Step 8: Now start building the message in RFCxxxx format for host....
 	xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %+Z %s %s %s - %s ",
 							Priority, &sTSZ, idSTA, ProcID, MsgID, SyslogLevel[Priority & 0x07]) ;
@@ -319,7 +320,7 @@ int32_t	xSyslog(uint32_t Priority, const char * MsgID, const char * format, ...)
 }
 
 void	vSyslogReport(int32_t Handle) {
-	if (xRtosCheckStatus(flagNET_L5_SYSLOG)) {
+	if (xRtosCheckStatus(flagNET_SYSLOG)) {
 		xNetReport(Handle, &sSyslogCtx, __FUNCTION__, 0, 0, 0) ;
 		xdprintf(Handle, "\t\t\tmaxTX=%u  CurRpt=%d  TotRpt=%d  TxMsg=%d\n", sSyslogCtx.maxTx, CurRpt, TotRpt, MsgCnt) ;
 	}
