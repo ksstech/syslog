@@ -23,8 +23,6 @@
 
 #pragma once
 
-#include	"application.h"								// needed for DEV_FIRMWARE
-
 #include	"x_sockets.h"
 #include	"x_definitions.h"
 #include	"x_utilities.h"								// shared buffer & mutex/spinlock support
@@ -37,7 +35,6 @@ extern "C" {
 
 // ############################################ macros ############################################
 
-#define	configSYSLOG_APPL_NAME					DEV_FIRMWARE
 
 // ###################################### BUILD : CONFIG definitions ##############################
 
