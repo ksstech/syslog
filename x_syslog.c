@@ -130,7 +130,7 @@ static	uint8_t		CurCRC, LstCRC ;
 static	uint32_t 	CurRpt, MsgCnt, TotRpt ;
 
 static	uint32_t	SyslogMinSevLev = SL_SEV_DEBUG ;
-static char * SyslogLevel[8] = { "EMER", "ALERT", "CRIT", "ERROR", "WARN", "NOTICE", "INFO", "DEBUG" } ;
+static const char * SyslogLevel[8] = { "EMER", "ALERT", "CRIT", "ERROR", "WARN", "NOTICE", "INFO", "DEBUG" } ;
 char	SyslogColors[8] = {
 // 0 = Emergency	1 = Alert	2 = Critical	3 = Error		4 = Warning		5 = Notice		6 = Info		7 = Debug
 	colourFG_RED, colourFG_RED, colourFG_RED, colourFG_RED, colourFG_MAGENTA, colourFG_GREEN,	colourFG_WHITE,	colourFG_YELLOW } ;
@@ -145,7 +145,7 @@ char	SyslogColors[8] = {
  * \return		none
  */
 void	vSyslogInit(const char * pHostName) {
-	IF_myASSERT(debugPARAM, pHostName) ;
+	IF_myASSERT(debugPARAM, INRANGE_FLASH(pHostName)) ;
 	sSyslogCtx.pHost			= pHostName ;
 	sSyslogCtx.sa_in.sin_family = AF_INET ;
 #if		(buildSYSLOG_USE_UDP == 1)
@@ -222,7 +222,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 		IF_myASSERT(debugPARAM, INRANGE_SRAM(ProcID)) ;
 	} else {
 		FRflag = 0 ;
-		ProcID = "preX" ;
+		ProcID = (char *) "preX" ;
 	}
 
 	if (FRflag) {
@@ -253,7 +253,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	if (CurRpt > 0) {									// if we have skipped messages
 	#define	syslogSKIP_FORMAT	"%!R: %s xvSyslog Identical messages (%d) skipped\n"
 		if (FRflag) {									// indicate number of repetitions in the log...
-			xprintf(syslogSKIP_FORMAT, LogTime, ProcID, CurRpt) ;
+			xdprintf(1, syslogSKIP_FORMAT, LogTime, ProcID, CurRpt) ;
 		} else {
 			cprintf_noblock(syslogSKIP_FORMAT, LogTime, ProcID, CurRpt) ;
 		}
@@ -263,13 +263,13 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	// Step 5: show the new message to the console...
 	LstCRC = CurCRC ;
 	if (FRflag) {
-		xprintf(SyslogBuffer) ;
+		xdprintf(1, SyslogBuffer) ;
 	} else {
 		cprintf_noblock(SyslogBuffer) ;
 	}
 
 	// Step 6: filter out reasons why message should not go to syslog host...
-	if ((ipSTA == 0) || (xRtosCheckStatus(flagNET_L3) == 0) || (FRflag == 0) || ((Priority & 0x07) > SyslogMinSevLev)) {
+	if ((nvsWifi.ipSTA == 0) || (xRtosCheckStatus(flagNET_L3) == 0) || (FRflag == 0) || ((Priority & 0x07) > SyslogMinSevLev)) {
 		if (FRflag) {
 			xUtilUnlockResource(&SyslogMutex) ;
 		}
@@ -278,7 +278,11 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 
 	// Step 7: If not connected to host, try to connect
 	if (xRtosCheckStatus(flagNET_SYSLOG) == 0) {		// syslog not connected ?
-		vSyslogInit(configSYSLOG_HOSTNAME) ;			// try to connect...
+#if	defined(syslogHOSTNAME)
+		vSyslogInit(syslogHOSTNAME) ;					// try to connect...
+#else
+		vSyslogInit(HostInfo[nvsVars.HostSLOG].pName) ;		// try to connect...
+#endif
 		if (xRtosCheckStatus(flagNET_SYSLOG) == 0) {	// successful?
 			xUtilUnlockResource(&SyslogMutex) ;			// no, free up locked buffer
 			return xLen ;								// and return
@@ -287,7 +291,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 
 	// Step 8: Now start building the message in RFCxxxx format for host....
 	xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %+Z %s %s %s - %s ",
-							Priority, &sTSZ, idSTA, ProcID, MsgID, SyslogLevel[Priority & 0x07]) ;
+							Priority, &nvsVars.sTSZ, idSTA, ProcID, MsgID, SyslogLevel[Priority & 0x07]) ;
 
 	xLen += xvsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, format, vArgs) ;
 	sSyslogCtx.maxTx = (xLen > sSyslogCtx.maxTx) ? xLen : sSyslogCtx.maxTx ;

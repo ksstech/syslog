@@ -35,6 +35,7 @@ extern "C" {
 
 // ############################################ macros ############################################
 
+//#define	syslogHOSTNAME					"host.domain.tld"
 
 // ###################################### BUILD : CONFIG definitions ##############################
 
@@ -47,10 +48,6 @@ extern "C" {
  */
 #if		MORETHAN1of3(buildSYSLOG_USE_UDP, buildSYSLOG_USE_TCP, buildSYSLOG_USE_TLS)
 	#error	"More than 1 option of UDP vs TCP selected !!!"
-#endif
-
-#ifndef		configSYSLOG_HOSTNAME
-	#error	" SYSLOG : Host name undefined, normally in x_config.h in application directory"
 #endif
 
 // ############################# Facilities & Severities definitions ###############################
