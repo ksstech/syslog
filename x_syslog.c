@@ -281,7 +281,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 #if	defined(syslogHOSTNAME)
 		vSyslogInit(syslogHOSTNAME) ;					// try to connect...
 #else
-		vSyslogInit(HostInfo[nvsVars.HostSLOG].pName) ;		// try to connect...
+		vSyslogInit(HostInfo[nvsVars.HostSLOG].pName) ;	// try to connect...
 #endif
 		if (xRtosCheckStatus(flagNET_SYSLOG) == 0) {	// successful?
 			xUtilUnlockResource(&SyslogMutex) ;			// no, free up locked buffer
@@ -291,7 +291,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 
 	// Step 8: Now start building the message in RFCxxxx format for host....
 	xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %+Z %s %s %s - %s ",
-							Priority, &nvsVars.sTSZ, idSTA, ProcID, MsgID, SyslogLevel[Priority & 0x07]) ;
+							Priority, &sTSZ, idSTA, ProcID, MsgID, SyslogLevel[Priority & 0x07]) ;
 
 	xLen += xvsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, format, vArgs) ;
 	sSyslogCtx.maxTx = (xLen > sSyslogCtx.maxTx) ? xLen : sSyslogCtx.maxTx ;
