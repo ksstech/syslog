@@ -116,9 +116,6 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 
 // ########################################## macros ###############################################
 
-#define	syslogSET_FG			"\033[0;%dm"
-#define	syslogRST_FG			"\033[0m"
-
 #define	configSYSLOG_BUFSIZE	2048
 
 // ###################################### Global variables #########################################
@@ -127,13 +124,13 @@ static	sock_ctx_t	sSyslogCtx ;
 static	char		SyslogBuffer[configSYSLOG_BUFSIZE] ;
 SemaphoreHandle_t	SyslogMutex ;
 static	uint8_t		CurCRC, LstCRC ;
-static	uint32_t 	CurRpt, MsgCnt, TotRpt ;
+static	uint32_t 	CurRpt, MsgCnt, TotRpt, LstSec ;
 
 static	uint32_t	SyslogMinSevLev = SL_SEV_DEBUG ;
 static const char * SyslogLevel[8] = { "EMER", "ALERT", "CRIT", "ERROR", "WARN", "NOTICE", "INFO", "DEBUG" } ;
 char	SyslogColors[8] = {
 // 0 = Emergency	1 = Alert	2 = Critical	3 = Error		4 = Warning		5 = Notice		6 = Info		7 = Debug
-	colourFG_RED, colourFG_RED, colourFG_RED, colourFG_RED, colourFG_MAGENTA, colourFG_GREEN,	colourFG_WHITE,	colourFG_YELLOW } ;
+	colourFG_RED, colourFG_RED, colourBG_BLUE, colourFG_MAGENTA, colourFG_YELLOW, colourFG_CYAN,	colourFG_GREEN,	colourFG_WHITE } ;
 
 // ###################################### Public functions #########################################
 
@@ -231,18 +228,15 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 
 	// Step 2: build the console formatted message into the buffer
 	uint64_t LogTime = halTIMER_ReadRunMicros() ;
-	int32_t xLen = xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, syslogSET_FG "%!R: %s ", SyslogColors[Priority & 0x07], LogTime, ProcID) ;
-	int32_t yLen = xLen ;							// save start of CRC area
-	xLen += xsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, "%s ", MsgID) ;
+	int32_t xLen = xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "%s %s ", ProcID, MsgID) ;
 	xLen += xvsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, format, vArgs) ;
-	int32_t zLen = xLen ;							// save end of CRC area
-	xLen += xsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, syslogRST_FG "\n") ;
 
-	// Step 3: Check if this is a sequential repeat message, if so, count but dont display
-	CurCRC = CalculaCheckSum((uint8_t *) &SyslogBuffer[yLen], zLen - yLen) ;
+	// Step 3: Check if this is a sequential repeat message, if so count but don't display
+	CurCRC = CalculaCheckSum((uint8_t *) SyslogBuffer, xLen) ;
 	if (CurCRC == LstCRC) {								// CRC same as previous message ?
 		++CurRpt ;										// Yes, increment the repeat counter
 		++TotRpt ;
+		LstSec = xTimeStampAsSeconds(LogTime) ;			// save the last timestamp
 		if (FRflag) {
 			xUtilUnlockResource(&SyslogMutex) ;
 		}
@@ -251,25 +245,27 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 
 	// Step 4: we have a new/different message, handle earlier suppressed duplicates
 	if (CurRpt > 0) {									// if we have skipped messages
-	#define	syslogSKIP_FORMAT	"%!R: %s xvSyslog Identical messages (%d) skipped\n"
+		#define	syslogSKIP_FORMAT	"%!R: Last of %d (skipped) Identical messages\n"
+		uint64_t	LastTime = xTimeMakeTimestamp(LstSec, 0) ;
 		if (FRflag) {									// indicate number of repetitions in the log...
-			xdprintf(1, syslogSKIP_FORMAT, LogTime, ProcID, CurRpt) ;
+			xdprintf(1, syslogSKIP_FORMAT, LastTime, CurRpt) ;
 		} else {
-			cprintf_noblock(syslogSKIP_FORMAT, LogTime, ProcID, CurRpt) ;
+			cprintf_noblock(syslogSKIP_FORMAT, LastTime, CurRpt) ;
 		}
 		CurRpt = 0 ;
 	}
 
 	// Step 5: show the new message to the console...
 	LstCRC = CurCRC ;
+	#define	syslogFMT_CONSOLE	"%C%!R: %s%C\n"
 	if (FRflag) {
-		xdprintf(1, SyslogBuffer) ;
+		xdprintf(1, syslogFMT_CONSOLE, MK_SGR(SyslogColors[Priority & 0x07],0,0,0), LogTime, SyslogBuffer, MK_SGR(colourFG_WHITE,0,0,0)) ;
 	} else {
-		cprintf_noblock(SyslogBuffer) ;
+		cprintf_noblock(syslogFMT_CONSOLE, MK_SGR(SyslogColors[Priority & 0x07],0,0,0), LogTime, SyslogBuffer, MK_SGR(colourFG_WHITE,0,0,0)) ;
 	}
 
 	// Step 6: filter out reasons why message should not go to syslog host...
-	if ((nvsWifi.ipSTA == 0) || (xRtosCheckStatus(flagNET_L3) == 0) || (FRflag == 0) || ((Priority & 0x07) > SyslogMinSevLev)) {
+	if (((Priority & 0x07) > SyslogMinSevLev) || (nvsWifi.ipSTA == 0) || (xRtosCheckStatus(flagNET_L3) == 0) || (FRflag == 0)) {
 		if (FRflag) {
 			xUtilUnlockResource(&SyslogMutex) ;
 		}
