@@ -232,7 +232,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	xLen += xvsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, format, vArgs) ;
 
 	// Step 3: Check if this is a sequential repeat message, if so count but don't display
-	CurCRC = CalculaCheckSum((uint8_t *) SyslogBuffer, xLen) ;
+	CurCRC = F_CRC_CalculaCheckSum((uint8_t *) SyslogBuffer, xLen) ;
 	if (CurCRC == LstCRC) {								// CRC same as previous message ?
 		++CurRpt ;										// Yes, increment the repeat counter
 		++TotRpt ;
@@ -259,9 +259,9 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	LstCRC = CurCRC ;
 	#define	syslogFMT_CONSOLE	"%C%!R: %s%C\n"
 	if (FRflag) {
-		xdprintf(1, syslogFMT_CONSOLE, MK_SGR(SyslogColors[Priority & 0x07],0,0,0), LogTime, SyslogBuffer, MK_SGR(colourFG_WHITE,0,0,0)) ;
+		xdprintf(1, syslogFMT_CONSOLE, xpfSGR(SyslogColors[Priority & 0x07],0,0,0), LogTime, SyslogBuffer, xpfSGR(colourFG_WHITE,0,0,0)) ;
 	} else {
-		cprintf_noblock(syslogFMT_CONSOLE, MK_SGR(SyslogColors[Priority & 0x07],0,0,0), LogTime, SyslogBuffer, MK_SGR(colourFG_WHITE,0,0,0)) ;
+		cprintf_noblock(syslogFMT_CONSOLE, xpfSGR(SyslogColors[Priority & 0x07],0,0,0), LogTime, SyslogBuffer, xpfSGR(colourFG_WHITE,0,0,0)) ;
 	}
 
 	// Step 6: filter out reasons why message should not go to syslog host...
@@ -277,6 +277,9 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 #if	defined(syslogHOSTNAME)
 		vSyslogInit(syslogHOSTNAME) ;					// try to connect...
 #else
+	#if 	(configPRODUCTION == 0)
+		nvsVars.HostSLOG = hostDEV ;
+	#endif
 		vSyslogInit(HostInfo[nvsVars.HostSLOG].pName) ;	// try to connect...
 #endif
 		if (xRtosCheckStatus(flagNET_SYSLOG) == 0) {	// successful?
