@@ -111,8 +111,10 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #include	<string.h>
 
 #define	debugFLAG				0x0000
-#define	debugPARAM				(debugFLAG & 0x0001)
-#define	debugTRACK				(debugFLAG & 0x0002)
+
+#define	debugTRACK				(debugFLAG & 0x2000)
+#define	debugPARAM				(debugFLAG & 0x4000)
+#define	debugRESULT				(debugFLAG & 0x8000)
 
 // ########################################## macros ###############################################
 
