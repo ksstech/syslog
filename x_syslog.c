@@ -285,9 +285,10 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 		vSyslogInit(syslogHOSTNAME) ;					// try to connect...
 #else
 	#if 	(configPRODUCTION == 0)
-		nvsVars.HostSLOG = hostDEV ;
-	#endif
+		vSyslogInit(HostInfo[hostDEV].pName) ;			// try to connect...
+	#else
 		vSyslogInit(HostInfo[nvsVars.HostSLOG].pName) ;	// try to connect...
+	#endif
 #endif
 		if (xRtosCheckStatus(flagNET_SYSLOG) == 0) {	// successful?
 			xUtilUnlockResource(&SyslogMutex) ;			// no, free up locked buffer
