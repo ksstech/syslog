@@ -217,6 +217,13 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 		ProcID = pcTaskGetName(NULL) ;								// FreeRTOS v9.0.0 onwards uses short form function name
 #endif
 		IF_myASSERT(debugPARAM, INRANGE_SRAM(ProcID)) ;
+		char * pcTmp  = ProcID ;
+		while (*pcTmp) {
+			if (*pcTmp == CHR_SPACE) {
+				*pcTmp = CHR_UNDERSCORE ;
+			}
+			++pcTmp ;
+		}
 	} else {
 		FRflag = 0 ;
 		ProcID = (char *) "preX" ;
