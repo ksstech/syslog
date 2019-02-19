@@ -127,7 +127,6 @@ static	uint8_t		CurCRC, LstCRC ;
 static	uint32_t 	CurRpt, MsgCnt, TotRpt, LstSec ;
 
 static	uint32_t	SyslogMinSevLev = SL_SEV_DEBUG ;
-static const char * SyslogLevel[8] = { "EMER", "ALERT", "CRIT", "ERROR", "WARN", "NOTICE", "INFO", "DEBUG" } ;
 char	SyslogColors[8] = {
 // 0 = Emergency	1 = Alert	2 = Critical	3 = Error		4 = Warning		5 = Notice		6 = Info		7 = Debug
 	colourFG_RED, colourFG_RED, colourBG_BLUE, colourFG_MAGENTA, colourFG_YELLOW, colourFG_CYAN,	colourFG_GREEN,	colourFG_WHITE } ;
@@ -296,9 +295,8 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 		}
 	}
 
-	// Step 8: Now start building the message in RFCxxxx format for host....
-	xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %+Z %s %s %s - %s ",
-							Priority, &sTSZ, idSTA, ProcID, MsgID, SyslogLevel[Priority & 0x07]) ;
+	// Step 8: Now start building the message in RFCxxxx format for host.... (fake APPNAME & no SD)
+	xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %+Z %s IRMACS %s %s - ", Priority, &sTSZ, idSTA, ProcID, MsgID) ;
 
 	xLen += xvsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, format, vArgs) ;
 	sSyslogCtx.maxTx = (xLen > sSyslogCtx.maxTx) ? xLen : sSyslogCtx.maxTx ;
