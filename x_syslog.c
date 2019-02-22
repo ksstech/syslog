@@ -298,7 +298,8 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	}
 
 	// Step 8: Now start building the message in RFCxxxx format for host.... (fake APPNAME & no SD)
-	xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %+Z %s IRMACS %s %s - ", Priority, &sTSZ, idSTA, ProcID, MsgID) ;
+//	xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %+Z %s IRMACS %s %s - ", Priority, &sTSZ, idSTA, ProcID, MsgID) ;
+	xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %R %s IRMACS %s %s - ", Priority, sTSZ.usecs, idSTA, ProcID, MsgID) ;
 
 	xLen += xvsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, format, vArgs) ;
 	sSyslogCtx.maxTx = (xLen > sSyslogCtx.maxTx) ? xLen : sSyslogCtx.maxTx ;
