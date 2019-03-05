@@ -125,7 +125,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 static	sock_ctx_t	sSyslogCtx ;
 static	char		SyslogBuffer[configSYSLOG_BUFSIZE] ;
 SemaphoreHandle_t	SyslogMutex ;
-static	uint8_t		CurCRC, LstCRC ;
+static	uint8_t		CurCRC, LstCRC, RptPRI ;
 static	uint32_t 	CurRpt, MsgCnt, TotRpt, LstSec ;
 
 static	uint32_t	SyslogMinSevLev = SL_SEV_DEBUG ;
@@ -206,7 +206,8 @@ void	vSyslogSetPriority(uint32_t Priority) { SyslogMinSevLev = Priority % 8 ; }
  * \return		number of characters displayed(if only to console) or send(if to server)
  */
 int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_list vArgs) {
-	IF_myASSERT(debugPARAM, (Priority < 192) && INRANGE_MEM(MsgID) && INRANGE_MEM(format)) ;
+	IF_myASSERT(debugPARAM, INRANGE_MEM(MsgID) && INRANGE_MEM(format)) ;
+	uint8_t	CurPRI = Priority % 256 ;
 	int32_t	FRflag ;
 	char *	ProcID ;
 	// Step 1: handle state of scheduler, and obtain the task name and secure exclusive access to buffer
@@ -241,7 +242,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 
 	// Step 3: Check if this is a sequential repeat message, if so count but don't display
 	CurCRC = F_CRC_CalculaCheckSum((uint8_t *) SyslogBuffer, xLen) ;
-	if (CurCRC == LstCRC) {								// CRC same as previous message ?
+	if ((CurCRC == LstCRC) && (CurPRI == RptPRI)) {		// CRC & PRI same as previous message ?
 		++CurRpt ;										// Yes, increment the repeat counter
 		++TotRpt ;
 		LstSec = xTimeStampAsSeconds(LogTime) ;			// save the last timestamp
@@ -265,6 +266,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 
 	// Step 5: show the new message to the console...
 	LstCRC = CurCRC ;
+	RptPRI = CurPRI ;
 	#define	syslogFMT_CONSOLE	"%C%!R: %s%C\n"
 	if (FRflag) {
 		xdprintf(1, syslogFMT_CONSOLE, xpfSGR(SyslogColors[Priority & 0x07],0,0,0), LogTime, SyslogBuffer, xpfSGR(colourFG_WHITE,0,0,0)) ;
@@ -273,7 +275,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	}
 
 	// Step 6: filter out reasons why message should not go to syslog host...
-	if (((Priority & 0x07) > SyslogMinSevLev) || (nvsWifi.ipSTA == 0) || (xRtosCheckStatus(flagNET_L3) == 0) || (FRflag == 0)) {
+	if (((CurPRI & 0x07) > SyslogMinSevLev) || (nvsWifi.ipSTA == 0) || (xRtosCheckStatus(flagNET_L3) == 0) || (FRflag == 0)) {
 		if (FRflag) {
 			xUtilUnlockResource(&SyslogMutex) ;
 		}
@@ -298,8 +300,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	}
 
 	// Step 8: Now start building the message in RFCxxxx format for host.... (fake APPNAME & no SD)
-//	xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %+Z %s IRMACS %s %s - ", Priority, &sTSZ, idSTA, ProcID, MsgID) ;
-	xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %R %s IRMACS %s %s - ", Priority, sTSZ.usecs, idSTA, ProcID, MsgID) ;
+	xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %R %s IRMACS %s %s - ", CurPRI, sTSZ.usecs, nameSTA, ProcID, MsgID) ;
 
 	xLen += xvsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, format, vArgs) ;
 	sSyslogCtx.maxTx = (xLen > sSyslogCtx.maxTx) ? xLen : sSyslogCtx.maxTx ;
