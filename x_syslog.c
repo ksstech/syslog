@@ -101,12 +101,15 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #include	"x_errors_events.h"
 #include	"x_retarget.h"
 #include	"x_utilities.h"
-#include	"crc.h"
+#include	"x_systiming.h"
 
 #include	"hal_network.h"
 #include	"hal_timer.h"
 
 #include	"esp_log.h"
+
+#include	"rom/crc.h"									// ESP32 ROM routine
+#include	"crc-barr.h"								// Barr group CRC
 
 #include	<string.h>
 
@@ -241,8 +244,12 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	int32_t xLen = xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "%s %s ", ProcID, MsgID) ;
 	xLen += xvsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, format, vArgs) ;
 
-	// Step 3: Check if this is a sequential repeat message, if so count but don't display
-	CurCRC = F_CRC_CalculaCheckSum((uint8_t *) SyslogBuffer, xLen) ;
+	// Step 3: Calc CRC to check for repeat message, if so count but don't display
+#if		(ESP32_PLATFORM == 1)							// use ROM based CRC lookup table
+	CurCRC = crc32_le(0, (uint8_t *) SyslogBuffer, xLen) ;
+#else													// use fastest of external libraries
+	CurCRC = crcSlow((uint8_t *) SyslogBuffer, xLen) ;
+#endif
 	if ((CurCRC == LstCRC) && (CurPRI == RptPRI)) {		// CRC & PRI same as previous message ?
 		++CurRpt ;										// Yes, increment the repeat counter
 		++TotRpt ;
@@ -341,4 +348,38 @@ void	vSyslogReport(int32_t Handle) {
 		xNetReport(Handle, &sSyslogCtx, __FUNCTION__, 0, 0, 0) ;
 	}
 	xdprintf(Handle, "SLOG Stats\tmaxTX=%u  CurRpt=%d  TotRpt=%d  TxMsg=%d\n", sSyslogCtx.maxTx, CurRpt, TotRpt, MsgCnt) ;
+}
+
+// #################################### Test and benchmark routines ################################
+
+#include	"crc.h"										// private component
+
+void	vSyslogBenchmark(void) {
+	char Test1[] = "SNTP vSntpTask ntp1.meraka.csir.co.za  2019-03-05T10:56:58.901Z  tOFF=78,873,521uS  tRTD=11,976uS" ;
+	char Test2[] = "01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz 01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" ;
+
+	uint32_t	crc1, crc2, crc3, crc4, crc5, crc6 ;
+	vSysTimerReset(1 << systimerSLOG, systimerCLOCKS, "SLOG", myUS_TO_CLOCKS(10), myUS_TO_CLOCKS(1000)) ;
+	xSysTimerStart(systimerSLOG) ;
+	crc1 = F_CRC_CalculaCheckSum((uint8_t *) Test1, sizeof(Test1)-1) ;
+	crc4 = F_CRC_CalculaCheckSum((uint8_t *) Test2, sizeof(Test2)-1) ;
+	xSysTimerStop(systimerSLOG) ;
+	vSysTimerShow(1, 1 << systimerSLOG) ;
+
+	vSysTimerReset(1 << systimerSLOG, systimerCLOCKS, "SLOG", myUS_TO_CLOCKS(10), myUS_TO_CLOCKS(1000)) ;
+	xSysTimerStart(systimerSLOG) ;
+	crc2 = crc32_le(0, (uint8_t *) Test1, sizeof(Test1)-1) ;
+	crc5 = crc32_le(0, (uint8_t *) Test2, sizeof(Test2)-1) ;
+	xSysTimerStop(systimerSLOG) ;
+	vSysTimerShow(1, 1 << systimerSLOG) ;
+
+	vSysTimerReset(1 << systimerSLOG, systimerCLOCKS, "SLOG", myUS_TO_CLOCKS(10), myUS_TO_CLOCKS(1000)) ;
+	xSysTimerStart(systimerSLOG) ;
+	crc3 = crcSlow((uint8_t *) Test1, sizeof(Test1)-1) ;
+	crc6 = crcSlow((uint8_t *) Test2, sizeof(Test2)-1) ;
+	xSysTimerStop(systimerSLOG) ;
+	vSysTimerShow(1, 1 << systimerSLOG) ;
+
+	xprintf("CRC #1=%u  #2=%u  #3=%u\n", crc1, crc2, crc3) ;
+	xprintf("CRC #4=%u  #5=%u  #6=%u\n", crc4, crc5, crc6) ;
 }
