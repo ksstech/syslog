@@ -210,7 +210,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	uint8_t	CurPRI = Priority % 256 ;
 	int32_t	FRflag ;
 	char *	ProcID ;
-	// Step 1: handle state of scheduler, and obtain the task name and secure exclusive access to buffer
+	// Step 0: handle state of scheduler and obtain the task name
 	if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
 		FRflag = 1 ;
 #if		(tskKERNEL_VERSION_MAJOR < 9)
@@ -231,6 +231,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 		ProcID = (char *) "preX" ;
 	}
 
+	// Step 1: if scheduler running secure exclusive access to buffer
 	if (FRflag) {
 		xUtilLockResource(&SyslogMutex, portMAX_DELAY) ;
 	}
