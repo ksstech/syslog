@@ -254,13 +254,15 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	}
 
 	// Step 4: we have a new/different message, handle earlier suppressed duplicates
+	uint32_t	xSGRb = xpfSGR(colourFG_WHITE,0,0,0) ;
 	if (CurRpt > 0) {									// if we have skipped messages
-		#define	syslogSKIP_FORMAT	"%!R: Last of %d (skipped) Identical messages\n"
+		#define	syslogSKIP_FORMAT	"%C%!R: Last of %d (skipped) Identical messages%C\n"
+		uint32_t	xSGRa = xpfSGR(SyslogColors[RptPRI & 0x07],0,0,0) ;
 		uint64_t	LastTime = xTimeMakeTimestamp(LstSec, 0) ;
 		if (FRflag) {									// indicate number of repetitions in the log...
-			xdprintf(1, syslogSKIP_FORMAT, LastTime, CurRpt) ;
+			xdprintf(1, syslogSKIP_FORMAT, xSGRa, LastTime, CurRpt, xSGRb) ;
 		} else {
-			cprintf_noblock(syslogSKIP_FORMAT, LastTime, CurRpt) ;
+			cprintf_noblock(syslogSKIP_FORMAT, xSGRa, LastTime, CurRpt, xSGRb) ;
 		}
 		CurRpt = 0 ;
 	}
@@ -269,10 +271,11 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	LstCRC = CurCRC ;
 	RptPRI = CurPRI ;
 	#define	syslogFMT_CONSOLE	"%C%!R: %s%C\n"
+	uint32_t	xSGRa = xpfSGR(SyslogColors[CurPRI & 0x07],0,0,0) ;
 	if (FRflag) {
-		xdprintf(1, syslogFMT_CONSOLE, xpfSGR(SyslogColors[Priority & 0x07],0,0,0), LogTime, SyslogBuffer, xpfSGR(colourFG_WHITE,0,0,0)) ;
+		xdprintf(1, syslogFMT_CONSOLE, xSGRa, LogTime, SyslogBuffer, xSGRb) ;
 	} else {
-		cprintf_noblock(syslogFMT_CONSOLE, xpfSGR(SyslogColors[Priority & 0x07],0,0,0), LogTime, SyslogBuffer, xpfSGR(colourFG_WHITE,0,0,0)) ;
+		cprintf_noblock(syslogFMT_CONSOLE, xSGRa, LogTime, SyslogBuffer, xSGRb) ;
 	}
 
 	// Step 6: filter out reasons why message should not go to syslog host...
