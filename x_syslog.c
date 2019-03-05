@@ -260,17 +260,21 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 		return xLen ;									// REPEAT message, not going to send...
 	}
 
-	// Step 4: we have a new/different message, handle earlier suppressed duplicates
+	// Step 4: we have a new/different message, handle suppressed duplicates
 	uint32_t	xSGRb = xpfSGR(colourFG_WHITE,0,0,0) ;
 	if (CurRpt > 0) {									// if we have skipped messages
 		#define	syslogSKIP_FORMAT	"%C%!R: Last of %d (skipped) Identical messages%C\n"
 		uint32_t	xSGRa = xpfSGR(SyslogColors[RptPRI & 0x07],0,0,0) ;
 		uint64_t	LastTime = xTimeMakeTimestamp(LstSec, 0) ;
+#if 0
 		if (FRflag) {									// indicate number of repetitions in the log...
 			xdprintf(1, syslogSKIP_FORMAT, xSGRa, LastTime, CurRpt, xSGRb) ;
 		} else {
 			cprintf_noblock(syslogSKIP_FORMAT, xSGRa, LastTime, CurRpt, xSGRb) ;
 		}
+#else
+		xprintf(syslogSKIP_FORMAT, xSGRa, LastTime, CurRpt, xSGRb) ;
+#endif
 		CurRpt = 0 ;
 	}
 
@@ -279,12 +283,15 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	RptPRI = CurPRI ;
 	#define	syslogFMT_CONSOLE	"%C%!R: %s%C\n"
 	uint32_t	xSGRa = xpfSGR(SyslogColors[CurPRI & 0x07],0,0,0) ;
+#if 0
 	if (FRflag) {
 		xdprintf(1, syslogFMT_CONSOLE, xSGRa, LogTime, SyslogBuffer, xSGRb) ;
 	} else {
 		cprintf_noblock(syslogFMT_CONSOLE, xSGRa, LogTime, SyslogBuffer, xSGRb) ;
 	}
-
+#else
+	xprintf(syslogFMT_CONSOLE, xSGRa, LogTime, SyslogBuffer, xSGRb) ;
+#endif
 	// Step 6: filter out reasons why message should not go to syslog host...
 	if (((CurPRI & 0x07) > SyslogMinSevLev) || (nvsWifi.ipSTA == 0) || (xRtosCheckStatus(flagNET_L3) == 0) || (FRflag == 0)) {
 		if (FRflag) {
@@ -347,7 +354,7 @@ void	vSyslogReport(int32_t Handle) {
 	if (xRtosCheckStatus(flagNET_SYSLOG)) {
 		xNetReport(Handle, &sSyslogCtx, __FUNCTION__, 0, 0, 0) ;
 	}
-	xdprintf(Handle, "SLOG Stats\tmaxTX=%u  CurRpt=%d  TotRpt=%d  TxMsg=%d\n", sSyslogCtx.maxTx, CurRpt, TotRpt, MsgCnt) ;
+	xdprintf(Handle, "SLOG Stats\tmaxTX=%u  CurRpt=%d  TotRpt=%d  TxMsg=%d\n\n", sSyslogCtx.maxTx, CurRpt, TotRpt, MsgCnt) ;
 }
 
 // #################################### Test and benchmark routines ################################
