@@ -137,7 +137,7 @@ extern "C" {
 void 	vSyslogSetPriority(uint32_t Priority) ;
 int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_list args) ;
 int32_t	xSyslog(uint32_t Priority, const char * MsgID, const char * format, ...) ;
-void	vSyslogReport(int32_t Handle) ;
+void	vSyslogReport(void) ;
 
 #ifdef __cplusplus
 }

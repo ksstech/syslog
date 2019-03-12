@@ -350,11 +350,11 @@ int32_t	xSyslog(uint32_t Priority, const char * MsgID, const char * format, ...)
     return iRV ;
 }
 
-void	vSyslogReport(int32_t Handle) {
+void	vSyslogReport(void) {
 	if (xRtosCheckStatus(flagNET_SYSLOG)) {
-		xNetReport(Handle, &sSyslogCtx, __FUNCTION__, 0, 0, 0) ;
+		xNetReport(&sSyslogCtx, __FUNCTION__, 0, 0, 0) ;
 	}
-	xdprintf(Handle, "SLOG Stats\tmaxTX=%u  CurRpt=%d  TotRpt=%d  TxMsg=%d\n\n", sSyslogCtx.maxTx, CurRpt, TotRpt, MsgCnt) ;
+	xprintf("SLOG Stats\tmaxTX=%u  CurRpt=%d  TotRpt=%d  TxMsg=%d\n\n", sSyslogCtx.maxTx, CurRpt, TotRpt, MsgCnt) ;
 }
 
 // #################################### Test and benchmark routines ################################
@@ -371,21 +371,21 @@ void	vSyslogBenchmark(void) {
 	crc1 = F_CRC_CalculaCheckSum((uint8_t *) Test1, sizeof(Test1)-1) ;
 	crc4 = F_CRC_CalculaCheckSum((uint8_t *) Test2, sizeof(Test2)-1) ;
 	xSysTimerStop(systimerSLOG) ;
-	vSysTimerShow(1, 1 << systimerSLOG) ;
+	vSysTimerShow(1 << systimerSLOG) ;
 
 	vSysTimerReset(1 << systimerSLOG, systimerCLOCKS, "SLOG", myUS_TO_CLOCKS(10), myUS_TO_CLOCKS(1000)) ;
 	xSysTimerStart(systimerSLOG) ;
 	crc2 = crc32_le(0, (uint8_t *) Test1, sizeof(Test1)-1) ;
 	crc5 = crc32_le(0, (uint8_t *) Test2, sizeof(Test2)-1) ;
 	xSysTimerStop(systimerSLOG) ;
-	vSysTimerShow(1, 1 << systimerSLOG) ;
+	vSysTimerShow(1 << systimerSLOG) ;
 
 	vSysTimerReset(1 << systimerSLOG, systimerCLOCKS, "SLOG", myUS_TO_CLOCKS(10), myUS_TO_CLOCKS(1000)) ;
 	xSysTimerStart(systimerSLOG) ;
 	crc3 = crcSlow((uint8_t *) Test1, sizeof(Test1)-1) ;
 	crc6 = crcSlow((uint8_t *) Test2, sizeof(Test2)-1) ;
 	xSysTimerStop(systimerSLOG) ;
-	vSysTimerShow(1, 1 << systimerSLOG) ;
+	vSysTimerShow(1 << systimerSLOG) ;
 
 	xprintf("CRC #1=%u  #2=%u  #3=%u\n", crc1, crc2, crc3) ;
 	xprintf("CRC #4=%u  #5=%u  #6=%u\n", crc4, crc5, crc6) ;
