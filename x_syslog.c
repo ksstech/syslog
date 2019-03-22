@@ -106,10 +106,12 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #include	"hal_network.h"
 #include	"hal_timer.h"
 
-#include	"esp_log.h"
-
-#include	"rom/crc.h"									// ESP32 ROM routine
-#include	"crc-barr.h"								// Barr group CRC
+#if		(ESP32_PLATFORM == 1)
+	#include	"esp_log.h"
+	#include	"rom/crc.h"								// ESP32 ROM routine
+#else
+	#include	"crc-barr.h"							// Barr group CRC
+#endif
 
 #include	<string.h>
 
@@ -373,6 +375,7 @@ void	vSyslogReport(void) {
 
 // #################################### Test and benchmark routines ################################
 
+#if 0
 #include	"crc.h"										// private component
 
 void	vSyslogBenchmark(void) {
@@ -404,3 +407,4 @@ void	vSyslogBenchmark(void) {
 	xprintf("CRC #1=%u  #2=%u  #3=%u\n", crc1, crc2, crc3) ;
 	xprintf("CRC #4=%u  #5=%u  #6=%u\n", crc4, crc5, crc6) ;
 }
+#endif
