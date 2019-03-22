@@ -144,13 +144,15 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 static	sock_ctx_t	sSyslogCtx ;
 static	char		SyslogBuffer[configSYSLOG_BUFSIZE] ;
 SemaphoreHandle_t	SyslogMutex ;
-static	uint8_t		CurCRC, LstCRC, RptPRI ;
-static	uint32_t 	CurRpt, MsgCnt, TotRpt, LstSec ;
-
 static	uint32_t	SyslogMinSevLev = SL_SEV_DEBUG ;
-char	SyslogColors[8] = {
+static	char		SyslogColors[8] = {
 // 0 = Emergency	1 = Alert	2 = Critical	3 = Error		4 = Warning		5 = Notice		6 = Info		7 = Debug
 	colourFG_RED, colourFG_RED, colourBG_BLUE, colourFG_MAGENTA, colourFG_YELLOW, colourFG_CYAN,	colourFG_GREEN,	colourFG_WHITE } ;
+#if		(syslogSUPPRESS_REPEATS == 1)
+	static	uint32_t 	RptCRC, RptCNT ;
+	static	uint64_t	RptRUN, RptUTC ;
+	static	uint8_t		RptPRI ;
+#endif
 
 // ###################################### Public functions #########################################
 
@@ -225,6 +227,29 @@ void	vSyslogDeInit(void) {
  */
 void	vSyslogSetPriority(uint32_t Priority) { SyslogMinSevLev = Priority % 8 ; }
 
+int32_t	xSyslogSendMessage(char * pcBuffer, int32_t xLen) {
+	// If running as AP it is for config only, no upstream SLOG connection available
+	if (wifi_mode != WIFI_MODE_STA || xRtosCheckStatus(flagNET_L3) == 0) {
+		return 0 ;
+	}
+	if (xRtosCheckStatus(flagNET_SYSLOG) == 0) {		// syslog connected ?
+		if (xSyslogInit() == false) {					// no, try to connect. Failed ?
+			return 0 ;
+		}
+	}
+	int32_t iRV = erFAILURE ;
+	if (xRtosCheckStatus(flagNET_SYSLOG)) {
+		// write directly to socket, not via xNetWrite(), to avoid recursing
+		iRV = sendto(sSyslogCtx.sd, pcBuffer, xLen, 0, &sSyslogCtx.sa, sizeof(sSyslogCtx.sa_in)) ;
+		if (iRV == xLen) {
+			sSyslogCtx.maxTx = (xLen > sSyslogCtx.maxTx) ? xLen : sSyslogCtx.maxTx ;
+		} else {
+			vSyslogDeInit() ;
+		}
+	}
+	return iRV ;
+}
+
 /**
  * xvSyslog writes an RFC formatted message to syslog host
  * \brief		if syslog not up and running, write to stdout
@@ -236,8 +261,8 @@ void	vSyslogSetPriority(uint32_t Priority) { SyslogMinSevLev = Priority % 8 ; }
  */
 int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_list vArgs) {
 	IF_myASSERT(debugPARAM, INRANGE_MEM(MsgID) && INRANGE_MEM(format)) ;
-	uint8_t	CurPRI = Priority % 256 ;
-	int32_t	FRflag ;
+	uint8_t	MsgPRI = Priority % 256 ;
+	bool	FRflag ;
 	char *	ProcID ;
 	// Step 0: handle state of scheduler and obtain the task name
 	if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
@@ -259,103 +284,66 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 		FRflag = 0 ;
 		ProcID = (char *) "preX" ;
 	}
-
 	// Step 1: if scheduler running secure exclusive access to buffer
 	if (FRflag) {
 		xUtilLockResource(&SyslogMutex, portMAX_DELAY) ;
 	}
 
 	// Step 2: build the console formatted message into the buffer
-	uint64_t LogTime = halTIMER_ReadRunMicros() ;
 	int32_t xLen = xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "%s %s ", ProcID, MsgID) ;
 	xLen += xvsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, format, vArgs) ;
 
-	// Step 3: Calc CRC to check for repeat message, if so count but don't display
-#if		(ESP32_PLATFORM == 1)							// use ROM based CRC lookup table
-	CurCRC = crc32_le(0, (uint8_t *) SyslogBuffer, xLen) ;
-#else													// use fastest of external libraries
-	CurCRC = crcSlow((uint8_t *) SyslogBuffer, xLen) ;
-#endif
-	if ((CurCRC == LstCRC) && (CurPRI == RptPRI)) {		// CRC & PRI same as previous message ?
-		++CurRpt ;										// Yes, increment the repeat counter
-		++TotRpt ;
-		LstSec = xTimeStampAsSeconds(LogTime) ;			// save the last timestamp
-		if (FRflag) {
-			xUtilUnlockResource(&SyslogMutex) ;
-		}
-		return xLen ;									// REPEAT message, not going to send...
-	}
-
-	// Step 4: we have a new/different message, handle suppressed duplicates
-	uint32_t	xSGRb = xpfSGR(colourFG_WHITE,0,0,0) ;
-	if (CurRpt > 0) {									// if we have skipped messages
-		#define	syslogSKIP_FORMAT	"%C%!R: Last of %d (skipped) Identical messages%C\n"
-		uint32_t	xSGRa = xpfSGR(SyslogColors[RptPRI & 0x07],0,0,0) ;
-		uint64_t	LastTime = xTimeMakeTimestamp(LstSec, 0) ;
-#if 0
-		if (FRflag) {									// indicate number of repetitions in the log...
-			xdprintf(1, syslogSKIP_FORMAT, xSGRa, LastTime, CurRpt, xSGRb) ;
-		} else {
-			cprintf_noblock(syslogSKIP_FORMAT, xSGRa, LastTime, CurRpt, xSGRb) ;
-		}
-#else
-		xprintf(syslogSKIP_FORMAT, xSGRa, LastTime, CurRpt, xSGRb) ;
-#endif
-		CurRpt = 0 ;
-	}
-
-	// Step 5: show the new message to the console...
-	LstCRC = CurCRC ;
-	RptPRI = CurPRI ;
-	#define	syslogFMT_CONSOLE	"%C%!R: %s%C\n"
-	uint32_t	xSGRa = xpfSGR(SyslogColors[CurPRI & 0x07],0,0,0) ;
-#if 0
-	if (FRflag) {
-		xdprintf(1, syslogFMT_CONSOLE, xSGRa, LogTime, SyslogBuffer, xSGRb) ;
-	} else {
-		cprintf_noblock(syslogFMT_CONSOLE, xSGRa, LogTime, SyslogBuffer, xSGRb) ;
-	}
-#else
-	xprintf(syslogFMT_CONSOLE, xSGRa, LogTime, SyslogBuffer, xSGRb) ;
-#endif
-	// Step 6: filter out reasons why message should not go to syslog host...
-	if (((CurPRI & 0x07) > SyslogMinSevLev) || (nvsWifi.ipSTA == 0) || (xRtosCheckStatus(flagNET_L3) == 0) || (FRflag == 0)) {
-		if (FRflag) {
-			xUtilUnlockResource(&SyslogMutex) ;
-		}
-		return xLen ;
-	}
-
-	// Step 7: If not connected to host, try to connect
-	if (xRtosCheckStatus(flagNET_SYSLOG) == 0) {		// syslog not connected ?
-#if	defined(syslogHOSTNAME)
-		vSyslogInit(syslogHOSTNAME) ;					// try to connect...
-#else
-	#if 	(configPRODUCTION == 0)
-		vSyslogInit(HostInfo[hostDEV].pName) ;			// try to connect...
-	#else
-		vSyslogInit(HostInfo[nvsVars.HostSLOG].pName) ;	// try to connect...
+#if		(syslogSUPPRESS_REPEATS == 1)
+	// Calc CRC to check for repeat message, handle accordingly
+	#if		(ESP32_PLATFORM == 1)						// use ROM based CRC lookup table
+	uint32_t MsgCRC = crc32_le(0, (uint8_t *) SyslogBuffer, xLen) ;
+	#else												// use fastest of external libraries
+	uint32_t MsgCRC = crcSlow((uint8_t *) SyslogBuffer, xLen) ;
 	#endif
-#endif
-		if (xRtosCheckStatus(flagNET_SYSLOG) == 0) {	// successful?
-			xUtilUnlockResource(&SyslogMutex) ;			// no, free up locked buffer
-			return xLen ;								// and return
+	if (MsgCRC == RptCRC && MsgPRI == RptPRI) {			// CRC & PRI same as previous message ?
+		++RptCNT ;										// Yes, increment the repeat counter
+		RptRUN = halTIMER_ReadRunMicros() ;				// save timestamps of latest repeat
+		RptUTC = sTSZ.usecs ;
+		goto cleanup ;									// REPEAT message, not going to send...
+	} else {
+		// we have a new/different message, handle suppressed duplicates
+		RptCRC = MsgCRC ;
+		RptPRI = MsgPRI ;
+		if (RptCNT > 0) {								// if we have skipped messages
+			xprintf("%C%!R: Last of %d (skipped) Identical messages%C\n",
+					xpfSGR(SyslogColors[RptPRI & 0x07],0,0,0), RptRUN, RptCNT, xpfSGR(colourFG_WHITE,0,0,0)) ;
+
+			// build & send skipped message to host
+			xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %R %s IRMACS %s %s - ", RptPRI, RptUTC, nameSTA, ProcID, MsgID) ;
+			xLen += xsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, "Last of %d (skipped) Identical messages", RptCNT) ;
+			xLen = xSyslogSendMessage(SyslogBuffer, xLen) ;
+
+			// rebuild the new (different) console message
+			xLen = xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "%s %s ", ProcID, MsgID) ;
+			xLen += xvsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, format, vArgs) ;
+
+			// and reset the counter
+			RptCNT = 0 ;
 		}
 	}
+#endif
 
-	// Step 8: Now start building the message in RFCxxxx format for host.... (fake APPNAME & no SD)
-	xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %R %s IRMACS %s %s - ", CurPRI, sTSZ.usecs, nameSTA, ProcID, MsgID) ;
+	// show the new message to the console...
+	xprintf("%C%!R: %s%C\n", xpfSGR(SyslogColors[MsgPRI & 0x07],0,0,0), RunTime, SyslogBuffer, xpfSGR(colourFG_WHITE,0,0,0)) ;
 
-	xLen += xvsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, format, vArgs) ;
-	sSyslogCtx.maxTx = (xLen > sSyslogCtx.maxTx) ? xLen : sSyslogCtx.maxTx ;
-
-	// Step 9: write message directly to socket, not via xNetWrite() to avoid recursing
-	if (sendto(sSyslogCtx.sd, SyslogBuffer, xLen, 0, &sSyslogCtx.sa, sizeof(sSyslogCtx.sa_in)) != xLen) {
-		vSyslogDeInit() ;
-	} else {
-		++MsgCnt ;
+	// filter out reasons why message should not go to syslog host, then build and send
+	if ((MsgPRI & 0x07) <= SyslogMinSevLev && nvsWifi.ipSTA && xRtosCheckStatus(flagNET_L3) && FRflag) {
+		xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %R %s IRMACS %s %s - ", MsgPRI, sTSZ.usecs, nameSTA, ProcID, MsgID) ;
+		xLen += xvsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, format, vArgs) ;
+		xLen = xSyslogSendMessage(SyslogBuffer, xLen) ;
 	}
-	xUtilUnlockResource(&SyslogMutex) ;
+
+#if		(syslogSUPPRESS_REPEATS == 1)
+cleanup:
+#endif
+	if (FRflag) {
+		xUtilUnlockResource(&SyslogMutex) ;
+	}
 	return xLen ;
 }
 
