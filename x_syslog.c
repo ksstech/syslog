@@ -161,9 +161,18 @@ char	SyslogColors[8] = {
  * \param[out]	none
  * \return		none
  */
-void	vSyslogInit(const char * pHostName) {
-	IF_myASSERT(debugPARAM, INRANGE_FLASH(pHostName)) ;
-	sSyslogCtx.pHost			= pHostName ;
+int32_t	xSyslogInit(void) {
+
+#if		defined(syslogHOSTNAME)
+	sSyslogCtx.pHost = syslogHOSTNAME ;
+#else
+	#if (configPRODUCTION == 0)
+	sSyslogCtx.pHost = HostInfo[hostDEV].pName ;
+	#else
+	sSyslogCtx.pHost = HostInfo[nvsVars.HostSLOG].pName ;
+	#endif
+#endif
+
 	sSyslogCtx.sa_in.sin_family = AF_INET ;
 #if		(buildSYSLOG_USE_UDP == 1)
 	sSyslogCtx.sa_in.sin_port   = htons(IP_PORT_SYSLOG_UDP) ;
@@ -176,20 +185,21 @@ void	vSyslogInit(const char * pHostName) {
 	sSyslogCtx.d_flags			= 0 ;
 	sSyslogCtx.d_ndebug			= 1 ;					// disable debug in x_sockets.c
 	if (xNetGetHostByName(&sSyslogCtx) < erSUCCESS) {
-		return ;
+		return false ;
 	}
 	if ((sSyslogCtx.sd = socket(sSyslogCtx.sa_in.sin_family, sSyslogCtx.type, IPPROTO_IP)) < erSUCCESS) {
 		sSyslogCtx.sd = -1 ;
-		return ;
+		return false ;
 	}
 	if (connect(sSyslogCtx.sd, &sSyslogCtx.sa, sizeof(struct sockaddr_in)) < erSUCCESS) {
 		close(sSyslogCtx.sd) ;
 		sSyslogCtx.sd = -1 ;
-		return ;
+		return false ;
 	}
    	xNetSetNonBlocking(&sSyslogCtx, flagXNET_NONBLOCK) ;
    	vRtosSetStatus(flagNET_SYSLOG) ;
    	IF_CPRINT(debugTRACK, "init") ;
+   	return true ;
 }
 
 /**
@@ -370,7 +380,11 @@ void	vSyslogReport(void) {
 	if (xRtosCheckStatus(flagNET_SYSLOG)) {
 		xNetReport(&sSyslogCtx, __FUNCTION__, 0, 0, 0) ;
 	}
-	xprintf("SLOG Stats\tmaxTX=%u  CurRpt=%d  TotRpt=%d  TxMsg=%d\n\n", sSyslogCtx.maxTx, CurRpt, TotRpt, MsgCnt) ;
+#if		(syslogSUPPRESS_REPEATS == 1)
+	xprintf("SLOG Stats\tmaxTX=%u  CurRpt=%d\n\n", sSyslogCtx.maxTx, RptCNT) ;
+#else
+	xprintf("SLOG Stats\tmaxTX=%u\n\n", sSyslogCtx.maxTx) ;
+#endif
 }
 
 // #################################### Test and benchmark routines ################################
