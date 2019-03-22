@@ -119,6 +119,20 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #define	debugPARAM				(debugFLAG & 0x4000)
 #define	debugRESULT				(debugFLAG & 0x8000)
 
+// ###################################### BUILD : CONFIG definitions ##############################
+
+#define	buildSYSLOG_USE_UDP						1
+#define	buildSYSLOG_USE_TCP						0
+#define	buildSYSLOG_USE_TLS						0
+#define	syslogSUPPRESS_REPEATS					1
+
+/**
+ * Compile time system checks
+ */
+#if		MORETHAN1of3(buildSYSLOG_USE_UDP, buildSYSLOG_USE_TCP, buildSYSLOG_USE_TLS)
+	#error	"More than 1 option of UDP vs TCP selected !!!"
+#endif
+
 // ########################################## macros ###############################################
 
 #define	configSYSLOG_BUFSIZE	2048

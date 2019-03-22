@@ -37,19 +37,6 @@ extern "C" {
 
 //#define	syslogHOSTNAME					"host.domain.tld"
 
-// ###################################### BUILD : CONFIG definitions ##############################
-
-#define	buildSYSLOG_USE_UDP						1
-#define	buildSYSLOG_USE_TCP						0
-#define	buildSYSLOG_USE_TLS						0
-
-/**
- * Compile time system checks
- */
-#if		MORETHAN1of3(buildSYSLOG_USE_UDP, buildSYSLOG_USE_TCP, buildSYSLOG_USE_TLS)
-	#error	"More than 1 option of UDP vs TCP selected !!!"
-#endif
-
 // ############################# Facilities & Severities definitions ###############################
 
 #define		SL_FAC_KERNEL				0			// kernel messages
