@@ -261,7 +261,6 @@ int32_t	xSyslogSendMessage(char * pcBuffer, int32_t xLen) {
  */
 int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_list vArgs) {
 	IF_myASSERT(debugPARAM, INRANGE_MEM(MsgID) && INRANGE_MEM(format)) ;
-	uint8_t	MsgPRI = Priority % 256 ;
 	bool	FRflag ;
 	char *	ProcID ;
 	// Step 0: handle state of scheduler and obtain the task name
@@ -288,6 +287,9 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	if (FRflag) {
 		xUtilLockResource(&SyslogMutex, portMAX_DELAY) ;
 	}
+	uint64_t	MsgRUN = halTIMER_ReadRunMicros() ;
+	uint64_t	MsgUTC = sTSZ.usecs ;
+	uint8_t		MsgPRI = Priority % 256 ;
 
 	// Step 2: build the console formatted message into the buffer
 	int32_t xLen = xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "%s %s ", ProcID, MsgID) ;
@@ -302,8 +304,8 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	#endif
 	if (MsgCRC == RptCRC && MsgPRI == RptPRI) {			// CRC & PRI same as previous message ?
 		++RptCNT ;										// Yes, increment the repeat counter
-		RptRUN = halTIMER_ReadRunMicros() ;				// save timestamps of latest repeat
-		RptUTC = sTSZ.usecs ;
+		RptRUN = MsgRUN ;								// save timestamps of latest repeat
+		RptUTC = MsgUTC ;
 		goto cleanup ;									// REPEAT message, not going to send...
 	} else {
 		// we have a new/different message, handle suppressed duplicates
@@ -329,11 +331,11 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 #endif
 
 	// show the new message to the console...
-	xprintf("%C%!R: %s%C\n", xpfSGR(SyslogColors[MsgPRI & 0x07],0,0,0), RunTime, SyslogBuffer, xpfSGR(colourFG_WHITE,0,0,0)) ;
+	xprintf("%C%!R: %s%C\n", xpfSGR(SyslogColors[MsgPRI & 0x07],0,0,0), MsgRUN, SyslogBuffer, xpfSGR(colourFG_WHITE,0,0,0)) ;
 
 	// filter out reasons why message should not go to syslog host, then build and send
 	if ((MsgPRI & 0x07) <= SyslogMinSevLev && nvsWifi.ipSTA && xRtosCheckStatus(flagNET_L3) && FRflag) {
-		xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %R %s IRMACS %s %s - ", MsgPRI, sTSZ.usecs, nameSTA, ProcID, MsgID) ;
+		xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %R %s IRMACS %s %s - ", MsgPRI, MsgUTC, nameSTA, ProcID, MsgID) ;
 		xLen += xvsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, format, vArgs) ;
 		xLen = xSyslogSendMessage(SyslogBuffer, xLen) ;
 	}
