@@ -105,10 +105,11 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 
 #include	"hal_network.h"
 #include	"hal_timer.h"
+#include	"hal_nvic.h"
 
 #if		(ESP32_PLATFORM == 1)
 	#include	"esp_log.h"
-	#include	"rom/crc.h"								// ESP32 ROM routine
+	#include	"esp32/rom/crc.h"								// ESP32 ROM routine
 #else
 	#include	"crc-barr.h"							// Barr group CRC
 #endif
@@ -290,6 +291,12 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	uint64_t	MsgRUN = halTIMER_ReadRunMicros() ;
 	uint64_t	MsgUTC = sTSZ.usecs ;
 	uint8_t		MsgPRI = Priority % 256 ;
+	int (* xPrintFunc)(const char *, ...) ;
+	if ((halNVIC_CalledFromISR() == 0) && (FRflag == 1)) {
+		xPrintFunc = &xprintf ;
+	} else {
+		xPrintFunc = &xprintf_nolock ;
+	}
 
 	// Step 2: build the console formatted message into the buffer
 	int32_t xLen = xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "%s %s ", ProcID, MsgID) ;
@@ -312,8 +319,8 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 		RptCRC = MsgCRC ;
 		RptPRI = MsgPRI ;
 		if (RptCNT > 0) {								// if we have skipped messages
-			xprintf("%C%!R: Last of %d (skipped) Identical messages%C\n",
-					xpfSGR(SyslogColors[RptPRI & 0x07],0,0,0), RptRUN, RptCNT, xpfSGR(colourFG_WHITE,0,0,0)) ;
+			xPrintFunc("%C%!R: Last of %d (skipped) Identical messages%C\n",
+					xpfSGR(attrRESET, SyslogColors[RptPRI & 0x07],0,0), RptRUN, RptCNT, attrRESET) ;
 
 			// build & send skipped message to host
 			xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %R %s IRMACS %s %s - ", RptPRI, RptUTC, nameSTA, ProcID, MsgID) ;
@@ -331,7 +338,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 #endif
 
 	// show the new message to the console...
-	xprintf("%C%!R: %s%C\n", xpfSGR(SyslogColors[MsgPRI & 0x07],0,0,0), MsgRUN, SyslogBuffer, xpfSGR(colourFG_WHITE,0,0,0)) ;
+	xPrintFunc("%C%!R: %s%C\n", xpfSGR(attrRESET, SyslogColors[MsgPRI & 0x07],0,0), MsgRUN, SyslogBuffer, attrRESET) ;
 
 	// filter out reasons why message should not go to syslog host, then build and send
 	if ((MsgPRI & 0x07) <= SyslogMinSevLev && nvsWifi.ipSTA && xRtosCheckStatus(flagNET_L3) && FRflag) {
