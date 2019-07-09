@@ -264,6 +264,9 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	IF_myASSERT(debugPARAM, INRANGE_MEM(MsgID) && INRANGE_MEM(format)) ;
 	bool	FRflag ;
 	char *	ProcID ;
+#if		(ESP32_PLATFORM == 1) && !defined(CONFIG_FREERTOS_UNICORE)
+	int32_t	McuID = xPortGetCoreID() ;
+#endif
 	// Step 0: handle state of scheduler and obtain the task name
 	if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
 		FRflag = 1 ;
@@ -319,11 +322,20 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 		RptCRC = MsgCRC ;
 		RptPRI = MsgPRI ;
 		if (RptCNT > 0) {								// if we have skipped messages
+#if		(ESP32_PLATFORM == 1) && !defined(CONFIG_FREERTOS_UNICORE)
+			xPrintFunc("%C%!R: #%d Last of %d (skipped) Identical messages%C\n",
+					xpfSGR(attrRESET, SyslogColors[RptPRI & 0x07],0,0), RptRUN, McuID, RptCNT, attrRESET) ;
+#else
 			xPrintFunc("%C%!R: Last of %d (skipped) Identical messages%C\n",
 					xpfSGR(attrRESET, SyslogColors[RptPRI & 0x07],0,0), RptRUN, RptCNT, attrRESET) ;
+#endif
 
 			// build & send skipped message to host
-			xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %R %s IRMACS %s %s - ", RptPRI, RptUTC, nameSTA, ProcID, MsgID) ;
+#if		(ESP32_PLATFORM == 1) && !defined(CONFIG_FREERTOS_UNICORE)
+			xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %R %s #%d %s %s - ", RptPRI, RptUTC, nameSTA, McuID, ProcID, MsgID) ;
+#else
+			xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %R %s - %s %s - ", RptPRI, RptUTC, nameSTA, ProcID, MsgID) ;
+#endif
 			xLen += xsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, "Last of %d (skipped) Identical messages", RptCNT) ;
 			xLen = xSyslogSendMessage(SyslogBuffer, xLen) ;
 
@@ -338,11 +350,19 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 #endif
 
 	// show the new message to the console...
+#if		(ESP32_PLATFORM == 1) && !defined(CONFIG_FREERTOS_UNICORE)
+	xPrintFunc("%C%!R: #%d %s%C\n", xpfSGR(attrRESET, SyslogColors[MsgPRI & 0x07],0,0), MsgRUN, McuID, SyslogBuffer, attrRESET) ;
+#else
 	xPrintFunc("%C%!R: %s%C\n", xpfSGR(attrRESET, SyslogColors[MsgPRI & 0x07],0,0), MsgRUN, SyslogBuffer, attrRESET) ;
+#endif
 
 	// filter out reasons why message should not go to syslog host, then build and send
 	if ((MsgPRI & 0x07) <= SyslogMinSevLev && nvsWifi.ipSTA && xRtosCheckStatus(flagNET_L3) && FRflag) {
-		xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %R %s IRMACS %s %s - ", MsgPRI, MsgUTC, nameSTA, ProcID, MsgID) ;
+#if		(ESP32_PLATFORM == 1) && !defined(CONFIG_FREERTOS_UNICORE)
+		xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %R %s #%d %s %s - ", MsgPRI, MsgUTC, nameSTA, McuID, ProcID, MsgID) ;
+#else
+		xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %R %s - %s %s - ", MsgPRI, MsgUTC, nameSTA, ProcID, MsgID) ;
+#endif
 		xLen += xvsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, format, vArgs) ;
 		xLen = xSyslogSendMessage(SyslogBuffer, xLen) ;
 	}
