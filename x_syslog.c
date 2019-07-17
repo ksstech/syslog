@@ -164,7 +164,7 @@ static	char		SyslogColors[8] = {
  * \param[out]	none
  * \return		none
  */
-int32_t	xSyslogInit(void) {
+int32_t	IRAM_ATTR xSyslogInit(void) {
 
 #if		defined(syslogHOSTNAME)
 	sSyslogCtx.pHost = syslogHOSTNAME ;
@@ -212,7 +212,7 @@ int32_t	xSyslogInit(void) {
  * \param[out]	none
  * \return		none
  */
-void	vSyslogDeInit(void) {
+void	IRAM_ATTR vSyslogDeInit(void) {
 	vRtosClearStatus(flagNET_SYSLOG) ;
 	close(sSyslogCtx.sd) ;
 	sSyslogCtx.sd = -1 ;
