@@ -142,10 +142,14 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 
 // ###################################### Global variables #########################################
 
-static	sock_ctx_t	sSyslogCtx ;
+/* In the case where the log level is set to DEBUG in ESP-IDF the volume of messages being generated
+ * could flood the IP stack and cause watchdog timeouts. Even if the timeout is changed from 5 to 10
+ * seconds the crash can still occur. In order to minimise load on the IP stack the minimum severity
+ * level should be set to NOTICE. */
+static	uint32_t	SyslogMinSevLev = SL_SEV_NOTICE ;
+static	netx_t	sSyslogCtx ;
 static	char		SyslogBuffer[configSYSLOG_BUFSIZE] ;
 SemaphoreHandle_t	SyslogMutex ;
-static	uint32_t	SyslogMinSevLev = SL_SEV_DEBUG ;
 static	char		SyslogColors[8] = {
 // 0 = Emergency	1 = Alert	2 = Critical	3 = Error		4 = Warning		5 = Notice		6 = Info		7 = Debug
 	colourFG_RED, colourFG_RED, colourBG_BLUE, colourFG_MAGENTA, colourFG_YELLOW, colourFG_CYAN,	colourFG_GREEN,	colourFG_WHITE } ;
