@@ -95,6 +95,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #include	"FreeRTOS_Support.h"
 
 #include	"x_debug.h"
+#include	"x_printf.h"
 #include	"x_syslog.h"
 #include	"x_time.h"
 #include	"x_terminal.h"
@@ -268,9 +269,13 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	IF_myASSERT(debugPARAM, INRANGE_MEM(MsgID) && INRANGE_MEM(format)) ;
 	bool	FRflag ;
 	char *	ProcID ;
+
 #if		(ESP32_PLATFORM == 1) && !defined(CONFIG_FREERTOS_UNICORE)
 	int32_t	McuID = xPortGetCoreID() ;
+#else
+	int32_t	McuID = 0 ;									// default in case not ESP32 or scheduler not running
 #endif
+
 	// Step 0: handle state of scheduler and obtain the task name
 	if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
 		FRflag = 1 ;
@@ -326,23 +331,15 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 		RptCRC = MsgCRC ;
 		RptPRI = MsgPRI ;
 		if (RptCNT > 0) {								// if we have skipped messages
-#if		(ESP32_PLATFORM == 1) && !defined(CONFIG_FREERTOS_UNICORE)
 			xPrintFunc("%C%!R: #%d Last of %d (skipped) Identical messages%C\n",
 					xpfSGR(attrRESET, SyslogColors[RptPRI & 0x07],0,0), RptRUN, McuID, RptCNT, attrRESET) ;
-#else
-			xPrintFunc("%C%!R: Last of %d (skipped) Identical messages%C\n",
-					xpfSGR(attrRESET, SyslogColors[RptPRI & 0x07],0,0), RptRUN, RptCNT, attrRESET) ;
-#endif
 
 			// build & send skipped message to host
-#if		(ESP32_PLATFORM == 1) && !defined(CONFIG_FREERTOS_UNICORE)
-			xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %R %s #%d %s %s - ", RptPRI, RptUTC, nameSTA, McuID, ProcID, MsgID) ;
-#else
-			xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %R %s - %s %s - ", RptPRI, RptUTC, nameSTA, ProcID, MsgID) ;
-#endif
-			xLen += xsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, "Last of %d (skipped) Identical messages", RptCNT) ;
-			xLen = xSyslogSendMessage(SyslogBuffer, xLen) ;
-
+			if (FRflag) {
+				xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %R %s #%d %s %s - ", RptPRI, RptUTC, nameSTA, McuID, ProcID, MsgID) ;
+				xLen += xsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, "Last of %d (skipped) Identical messages", RptCNT) ;
+				xLen = xSyslogSendMessage(SyslogBuffer, xLen) ;
+			}
 			// rebuild the new (different) console message
 			xLen = xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "%s %s ", ProcID, MsgID) ;
 			xLen += xvsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, format, vArgs) ;
@@ -354,19 +351,11 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 #endif
 
 	// show the new message to the console...
-#if		(ESP32_PLATFORM == 1) && !defined(CONFIG_FREERTOS_UNICORE)
 	xPrintFunc("%C%!R: #%d %s%C\n", xpfSGR(attrRESET, SyslogColors[MsgPRI & 0x07],0,0), MsgRUN, McuID, SyslogBuffer, attrRESET) ;
-#else
-	xPrintFunc("%C%!R: %s%C\n", xpfSGR(attrRESET, SyslogColors[MsgPRI & 0x07],0,0), MsgRUN, SyslogBuffer, attrRESET) ;
-#endif
 
 	// filter out reasons why message should not go to syslog host, then build and send
-	if ((MsgPRI & 0x07) <= SyslogMinSevLev && nvsWifi.ipSTA && xRtosCheckStatus(flagNET_L3) && FRflag) {
-#if		(ESP32_PLATFORM == 1) && !defined(CONFIG_FREERTOS_UNICORE)
+	if (FRflag && xRtosCheckStatus(flagNET_L3) && (MsgPRI & 0x07) <= SyslogMinSevLev && nvsWifi.ipSTA) {
 		xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %R %s #%d %s %s - ", MsgPRI, MsgUTC, nameSTA, McuID, ProcID, MsgID) ;
-#else
-		xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %R %s - %s %s - ", MsgPRI, MsgUTC, nameSTA, ProcID, MsgID) ;
-#endif
 		xLen += xvsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, format, vArgs) ;
 		xLen = xSyslogSendMessage(SyslogBuffer, xLen) ;
 	}
@@ -402,7 +391,7 @@ void	vSyslogReport(void) {
 		xNetReport(&sSyslogCtx, __FUNCTION__, 0, 0, 0) ;
 	}
 #if		(syslogSUPPRESS_REPEATS == 1)
-	xprintf("SLOG Stats\tmaxTX=%u  CurRpt=%d\n\n", sSyslogCtx.maxTx, RptCNT) ;
+	xprintf("\t\tmaxTX=%u  CurRpt=%d\n", sSyslogCtx.maxTx, RptCNT) ;
 #else
 	xprintf("SLOG Stats\tmaxTX=%u\n\n", sSyslogCtx.maxTx) ;
 #endif
