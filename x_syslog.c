@@ -110,7 +110,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 
 #if		(ESP32_PLATFORM == 1)
 	#include	"esp_log.h"
-	#include	"esp32/rom/crc.h"								// ESP32 ROM routine
+	#include	"esp32/rom/crc.h"						// ESP32 ROM routine
 #else
 	#include	"crc-barr.h"							// Barr group CRC
 #endif
@@ -151,11 +151,9 @@ SemaphoreHandle_t	SyslogMutex ;
 static	char		SyslogColors[8] = {
 // 0 = Emergency	1 = Alert	2 = Critical	3 = Error		4 = Warning		5 = Notice		6 = Info		7 = Debug
 	colourFG_RED, colourFG_RED, colourBG_BLUE, colourFG_MAGENTA, colourFG_YELLOW, colourFG_CYAN,	colourFG_GREEN,	colourFG_WHITE } ;
-#if		(syslogSUPPRESS_REPEATS == 1)
-	static	uint32_t 	RptCRC, RptCNT ;
-	static	uint64_t	RptRUN, RptUTC ;
-	static	uint8_t		RptPRI ;
-#endif
+static	uint32_t 	RptCRC, RptCNT ;
+static	uint64_t	RptRUN, RptUTC ;
+static	uint8_t		RptPRI ;
 
 // ###################################### Public functions #########################################
 
