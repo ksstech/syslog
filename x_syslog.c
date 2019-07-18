@@ -206,7 +206,7 @@ int32_t	IRAM_ATTR xSyslogInit(void) {
 	}
    	xNetSetNonBlocking(&sSyslogCtx, flagXNET_NONBLOCK) ;
    	vRtosSetStatus(flagNET_SYSLOG) ;
-   	IF_CPRINT(debugTRACK, "init") ;
+   	IF_PRINT(debugTRACK, "init") ;
    	return true ;
 }
 
@@ -221,7 +221,7 @@ void	IRAM_ATTR vSyslogDeInit(void) {
 	vRtosClearStatus(flagNET_SYSLOG) ;
 	close(sSyslogCtx.sd) ;
 	sSyslogCtx.sd = -1 ;
-	IF_CPRINT(debugTRACK, "deinit") ;
+	IF_PRINT(debugTRACK, "deinit") ;
 }
 
 /**
@@ -302,9 +302,9 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	uint8_t		MsgPRI = Priority % 256 ;
 	int (* xPrintFunc)(const char *, ...) ;
 	if ((halNVIC_CalledFromISR() == 0) && (FRflag == 1)) {
-		xPrintFunc = &xprintf ;
+		xPrintFunc = &printfx ;
 	} else {
-		xPrintFunc = &xprintf_nolock ;
+		xPrintFunc = &rprintfx ;
 	}
 	#if	(ESP32_PLATFORM == 1) && !defined(CONFIG_FREERTOS_UNICORE)
 	int32_t	McuID = xPortGetCoreID() ;
@@ -313,8 +313,8 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	#endif
 
 	// Step 2: build the console formatted message into the buffer
-	int32_t xLen = xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "%s %s ", ProcID, MsgID) ;
-	xLen += xvsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, format, vArgs) ;
+	int32_t xLen = snprintfx(SyslogBuffer, syslogBUFSIZE, "%s %s ", ProcID, MsgID) ;
+	xLen += vsnprintfx(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
 
 #if		(syslogSUPPRESS_REPEATS == 1)
 	// Calc CRC to check for repeat message, handle accordingly
@@ -338,13 +338,13 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 
 			// build & send skipped message to host
 			if (FRflag) {
-				xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %R %s #%d %s %s - ", RptPRI, RptUTC, nameSTA, McuID, ProcID, MsgID) ;
-				xLen += xsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, "Last of %d (skipped) Identical messages", RptCNT) ;
+				xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %R %s #%d %s %s - ", RptPRI, RptUTC, nameSTA, McuID, ProcID, MsgID) ;
+				xLen += snprintfx(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, "Last of %d (skipped) Identical messages", RptCNT) ;
 				xLen = xSyslogSendMessage(SyslogBuffer, xLen) ;
 			}
 			// rebuild the new (different) console message
-			xLen = xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "%s %s ", ProcID, MsgID) ;
-			xLen += xvsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, format, vArgs) ;
+			xLen = snprintfx(SyslogBuffer, syslogBUFSIZE, "%s %s ", ProcID, MsgID) ;
+			xLen += vsnprintfx(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
 
 			// and reset the counter
 			RptCNT = 0 ;
@@ -357,8 +357,8 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 
 	// filter out reasons why message should not go to syslog host, then build and send
 	if (FRflag && xRtosCheckStatus(flagNET_L3) && (MsgPRI & 0x07) <= SyslogMinSevLev && nvsWifi.ipSTA) {
-		xLen =	xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "<%u>1 %R %s #%d %s %s - ", MsgPRI, MsgUTC, nameSTA, McuID, ProcID, MsgID) ;
-		xLen += xvsnprintf(&SyslogBuffer[xLen], configSYSLOG_BUFSIZE - xLen, format, vArgs) ;
+		xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %R %s #%d %s %s - ", MsgPRI, MsgUTC, nameSTA, McuID, ProcID, MsgID) ;
+		xLen += vsnprintfx(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
 		xLen = xSyslogSendMessage(SyslogBuffer, xLen) ;
 	}
 
@@ -393,10 +393,9 @@ void	vSyslogReport(void) {
 		xNetReport(&sSyslogCtx, __FUNCTION__, 0, 0, 0) ;
 	}
 #if		(syslogSUPPRESS_REPEATS == 1)
-	xprintf("\t\tmaxTX=%u  CurRpt=%d\n", sSyslogCtx.maxTx, RptCNT) ;
 #else
-	xprintf("\t\tmaxTX=%u\n\n", sSyslogCtx.maxTx) ;
 #endif
+	printfx("\t\tmaxTX=%u  CurRpt=%d\n", sSyslogCtx.maxTx, RptCNT) ;
 }
 
 // #################################### Test and benchmark routines ################################
@@ -430,7 +429,7 @@ void	vSyslogBenchmark(void) {
 	xSysTimerStop(systimerSLOG) ;
 	vSysTimerShow(1 << systimerSLOG) ;
 
-	xprintf("CRC #1=%u  #2=%u  #3=%u\n", crc1, crc2, crc3) ;
-	xprintf("CRC #4=%u  #5=%u  #6=%u\n", crc4, crc5, crc6) ;
+	printfx("CRC #1=%u  #2=%u  #3=%u\n", crc1, crc2, crc3) ;
+	printfx("CRC #4=%u  #5=%u  #6=%u\n", crc4, crc5, crc6) ;
 }
 #endif
