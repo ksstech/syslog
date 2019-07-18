@@ -316,7 +316,6 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	int32_t xLen = snprintfx(SyslogBuffer, syslogBUFSIZE, "%s %s ", ProcID, MsgID) ;
 	xLen += vsnprintfx(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
 
-#if		(syslogSUPPRESS_REPEATS == 1)
 	// Calc CRC to check for repeat message, handle accordingly
 	#if		(ESP32_PLATFORM == 1)						// use ROM based CRC lookup table
 	uint32_t MsgCRC = crc32_le(0, (uint8_t *) SyslogBuffer, xLen) ;
@@ -350,7 +349,6 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 			RptCNT = 0 ;
 		}
 	}
-#endif
 
 	// show the new message to the console...
 	xPrintFunc("%C%!R: #%d %s%C\n", xpfSGR(attrRESET, SyslogColors[MsgPRI & 0x07],0,0), MsgRUN, McuID, SyslogBuffer, attrRESET) ;
@@ -362,9 +360,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 		xLen = xSyslogSendMessage(SyslogBuffer, xLen) ;
 	}
 
-#if		(syslogSUPPRESS_REPEATS == 1)
 cleanup:
-#endif
 	if (FRflag) {
 		xUtilUnlockResource(&SyslogMutex) ;
 	}
@@ -392,9 +388,6 @@ void	vSyslogReport(void) {
 	if (xRtosCheckStatus(flagNET_SYSLOG)) {
 		xNetReport(&sSyslogCtx, __FUNCTION__, 0, 0, 0) ;
 	}
-#if		(syslogSUPPRESS_REPEATS == 1)
-#else
-#endif
 	printfx("\t\tmaxTX=%u  CurRpt=%d\n", sSyslogCtx.maxTx, RptCNT) ;
 }
 
