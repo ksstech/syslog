@@ -148,7 +148,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
  * seconds the crash can still occur. In order to minimise load on the IP stack the minimum severity
  * level should be set to NOTICE. */
 static	uint32_t	SyslogMinSevLev = SL_SEV_NOTICE ;
-static	netx_t	sSyslogCtx ;
+static	netx_t		sSyslogCtx ;
 static	char		SyslogBuffer[configSYSLOG_BUFSIZE] ;
 SemaphoreHandle_t	SyslogMutex ;
 static	char		SyslogColors[8] = {
@@ -395,7 +395,7 @@ void	vSyslogReport(void) {
 #if		(syslogSUPPRESS_REPEATS == 1)
 	xprintf("\t\tmaxTX=%u  CurRpt=%d\n", sSyslogCtx.maxTx, RptCNT) ;
 #else
-	xprintf("SLOG Stats\tmaxTX=%u\n\n", sSyslogCtx.maxTx) ;
+	xprintf("\t\tmaxTX=%u\n\n", sSyslogCtx.maxTx) ;
 #endif
 }
 
