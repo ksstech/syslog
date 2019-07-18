@@ -267,24 +267,18 @@ int32_t	xSyslogSendMessage(char * pcBuffer, int32_t xLen) {
  */
 int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_list vArgs) {
 	IF_myASSERT(debugPARAM, INRANGE_MEM(MsgID) && INRANGE_MEM(format)) ;
-	bool	FRflag ;
-	char *	ProcID ;
-
-#if		(ESP32_PLATFORM == 1) && !defined(CONFIG_FREERTOS_UNICORE)
-	int32_t	McuID = xPortGetCoreID() ;
-#else
-	int32_t	McuID = 0 ;									// default in case not ESP32 or scheduler not running
-#endif
 
 	// Step 0: handle state of scheduler and obtain the task name
+	bool	FRflag ;
+	char *	ProcID ;
 	if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
 		xUtilLockResource(&SyslogMutex, portMAX_DELAY) ;
 		FRflag = 1 ;
-#if		(tskKERNEL_VERSION_MAJOR < 9)
-		ProcID = pcTaskGetTaskName(NULL) ;							// FreeRTOS pre v9.0.0 uses long form function name
-#else
-		ProcID = pcTaskGetName(NULL) ;								// FreeRTOS v9.0.0 onwards uses short form function name
-#endif
+		#if	(tskKERNEL_VERSION_MAJOR < 9)
+		ProcID = pcTaskGetTaskName(NULL) ;				// FreeRTOS pre v9.0.0 uses long form function name
+		#else
+		ProcID = pcTaskGetName(NULL) ;					// FreeRTOS v9.0.0 onwards uses short form function name
+		#endif
 		IF_myASSERT(debugPARAM, INRANGE_SRAM(ProcID)) ;
 		char * pcTmp  = ProcID ;
 		while (*pcTmp) {
@@ -297,7 +291,13 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 		FRflag = 0 ;
 		ProcID = (char *) "preX" ;
 	}
-	uint64_t	MsgRUN = halTIMER_ReadRunMicros() ;
+
+	// Step 1: setup time, priority and related variables
+	#if	(ESP32_PLATFORM == 1)
+	uint64_t	MsgRUN = esp_log_timestamp() * 1000 ;	// mSec to uSec
+	#else
+	uint64_t	MsgRUN = RunTime ;
+	#endif
 	uint64_t	MsgUTC = sTSZ.usecs ;
 	uint8_t		MsgPRI = Priority % 256 ;
 	int (* xPrintFunc)(const char *, ...) ;
@@ -306,6 +306,11 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	} else {
 		xPrintFunc = &xprintf_nolock ;
 	}
+	#if	(ESP32_PLATFORM == 1) && !defined(CONFIG_FREERTOS_UNICORE)
+	int32_t	McuID = xPortGetCoreID() ;
+	#else
+	int32_t	McuID = 0 ;									// default in case not ESP32 or scheduler not running
+	#endif
 
 	// Step 2: build the console formatted message into the buffer
 	int32_t xLen = xsnprintf(SyslogBuffer, configSYSLOG_BUFSIZE, "%s %s ", ProcID, MsgID) ;
