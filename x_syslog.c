@@ -278,6 +278,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 
 	// Step 0: handle state of scheduler and obtain the task name
 	if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
+		xUtilLockResource(&SyslogMutex, portMAX_DELAY) ;
 		FRflag = 1 ;
 #if		(tskKERNEL_VERSION_MAJOR < 9)
 		ProcID = pcTaskGetTaskName(NULL) ;							// FreeRTOS pre v9.0.0 uses long form function name
@@ -295,10 +296,6 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	} else {
 		FRflag = 0 ;
 		ProcID = (char *) "preX" ;
-	}
-	// Step 1: if scheduler running secure exclusive access to buffer
-	if (FRflag) {
-		xUtilLockResource(&SyslogMutex, portMAX_DELAY) ;
 	}
 	uint64_t	MsgRUN = halTIMER_ReadRunMicros() ;
 	uint64_t	MsgUTC = sTSZ.usecs ;
