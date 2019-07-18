@@ -125,21 +125,18 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 
 // ###################################### BUILD : CONFIG definitions ##############################
 
-#define	buildSYSLOG_USE_UDP						1
-#define	buildSYSLOG_USE_TCP						0
-#define	buildSYSLOG_USE_TLS						0
-#define	syslogSUPPRESS_REPEATS					1
+#define	syslogBUFSIZE			512	//2048
+
+#define	syslogUSE_UDP			1
+#define	syslogUSE_TCP			0
+#define	syslogUSE_TLS			0
 
 /**
  * Compile time system checks
  */
-#if		MORETHAN1of3(buildSYSLOG_USE_UDP, buildSYSLOG_USE_TCP, buildSYSLOG_USE_TLS)
+#if		MORETHAN1of3(syslogUSE_UDP, syslogUSE_TCP, syslogUSE_TLS)
 	#error	"More than 1 option of UDP vs TCP selected !!!"
 #endif
-
-// ########################################## macros ###############################################
-
-#define	configSYSLOG_BUFSIZE	2048
 
 // ###################################### Global variables #########################################
 
@@ -149,7 +146,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
  * level should be set to NOTICE. */
 static	uint32_t	SyslogMinSevLev = SL_SEV_NOTICE ;
 static	netx_t		sSyslogCtx ;
-static	char		SyslogBuffer[configSYSLOG_BUFSIZE] ;
+static	char		SyslogBuffer[syslogBUFSIZE] ;
 SemaphoreHandle_t	SyslogMutex ;
 static	char		SyslogColors[8] = {
 // 0 = Emergency	1 = Alert	2 = Critical	3 = Error		4 = Warning		5 = Notice		6 = Info		7 = Debug
@@ -182,11 +179,11 @@ int32_t	IRAM_ATTR xSyslogInit(void) {
 #endif
 
 	sSyslogCtx.sa_in.sin_family = AF_INET ;
-#if		(buildSYSLOG_USE_UDP == 1)
+#if		(syslogUSE_UDP == 1)
 	sSyslogCtx.sa_in.sin_port   = htons(IP_PORT_SYSLOG_UDP) ;
-#elif		(buildSYSLOG_USE_TCP == 1) && (IP_PORT_SYSLOG_TLS == 0)
+#elif		(syslogUSE_TCP == 1) && (IP_PORT_SYSLOG_TLS == 0)
 	sSyslogCtx.sa_in.sin_port   = htons(IP_PORT_SYSLOG_TCP) ;
-#elif		(buildSYSLOG_USE_TCP == 1) && (IP_PORT_SYSLOG_TLS == 1)
+#elif		(syslogUSE_TCP == 1) && (IP_PORT_SYSLOG_TLS == 1)
 	sSyslogCtx.sa_in.sin_port   = htons(IP_PORT_SYSLOG_TLS) ;
 #endif
 	sSyslogCtx.type				= SOCK_DGRAM ;
