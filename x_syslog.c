@@ -288,13 +288,6 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	}
 
 	// Step 1: setup time, priority and related variables
-	#if	(ESP32_PLATFORM == 1)
-	uint64_t	MsgRUN = esp_log_timestamp() * 1000 ;	// mSec to uSec
-	#else
-	uint64_t	MsgRUN = RunTime ;
-	#endif
-	uint64_t	MsgUTC = sTSZ.usecs ;
-	uint8_t		MsgPRI = Priority % 256 ;
 	int (* xPrintFunc)(const char *, ...) ;
 	if ((halNVIC_CalledFromISR() == 0) && (FRflag == 1)) {
 		xPrintFunc = &printfx ;
@@ -303,8 +296,16 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	}
 	#if	(ESP32_PLATFORM == 1) && !defined(CONFIG_FREERTOS_UNICORE)
 	int32_t	McuID = xPortGetCoreID() ;
+	uint8_t		MsgPRI = Priority % 256 ;
+	uint64_t	MsgUTC = sTSZ.usecs ;
+	#if	(ESP32_PLATFORM == 1)
+	uint64_t	MsgRUN = esp_log_timestamp() * 1000 ;	// mSec to uSec
+	#if	!defined(CONFIG_FREERTOS_UNICORE)
+	int32_t		McuID = xPortGetCoreID() ;
+	#endif
 	#else
-	int32_t	McuID = 0 ;									// default in case not ESP32 or scheduler not running
+	uint64_t	MsgRUN = RunTime ;
+	int32_t		McuID = 0 ;								// default in case not ESP32 or scheduler not running
 	#endif
 
 	// Step 2: build the console formatted message into the buffer
