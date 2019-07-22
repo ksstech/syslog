@@ -317,6 +317,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	#else												// use fastest of external libraries
 	uint32_t MsgCRC = crcSlow((uint8_t *) SyslogBuffer, xLen) ;
 	#endif
+
 	if (MsgCRC == RptCRC && MsgPRI == RptPRI) {			// CRC & PRI same as previous message ?
 		++RptCNT ;										// Yes, increment the repeat counter
 		RptRUN = MsgRUN ;								// save timestamps of latest repeat
@@ -330,7 +331,6 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 					xpfSGR(attrRESET, SyslogColors[RptPRI & 0x07],0,0), RptRUN, McuID, RptCNT, attrRESET) ;
 
 			// build & send skipped message to host
-			if (FRflag) {
 			if (FRflag && xRtosCheckStatus(flagNET_L3) && (MsgPRI & 0x07) <= SyslogMinSevLev) {
 				xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %R %s #%d %s %s - ", RptPRI, RptUTC, nameSTA, McuID, ProcID, MsgID) ;
 				xLen += snprintfx(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, "Last of %d (skipped) Identical messages", RptCNT) ;
@@ -343,18 +343,15 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 			// and reset the counter
 			RptCNT = 0 ;
 		}
-	}
+		// show the new message to the console...
+		xPrintFunc("%C%!R: #%d %s%C\n", xpfSGR(attrRESET, SyslogColors[MsgPRI & 0x07],0,0), MsgRUN, McuID, SyslogBuffer, attrRESET) ;
 
-	// show the new message to the console...
-	xPrintFunc("%C%!R: #%d %s%C\n", xpfSGR(attrRESET, SyslogColors[MsgPRI & 0x07],0,0), MsgRUN, McuID, SyslogBuffer, attrRESET) ;
-
-	// filter out reasons why message should not go to syslog host, then build and send
-	if (FRflag && xRtosCheckStatus(flagNET_L3) && (MsgPRI & 0x07) <= SyslogMinSevLev && nvsWifi.ipSTA) {
-		xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %R %s #%d %s %s - ", MsgPRI, MsgUTC, nameSTA, McuID, ProcID, MsgID) ;
-		xLen += vsnprintfx(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
-		xLen = xSyslogSendMessage(SyslogBuffer, xLen) ;
-	}
-
+		// filter out reasons why message should not go to syslog host, then build and send
+		if (FRflag && xRtosCheckStatus(flagNET_L3) && (MsgPRI & 0x07) <= SyslogMinSevLev) {
+			xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %R %s #%d %s %s - ", MsgPRI, MsgUTC, nameSTA, McuID, ProcID, MsgID) ;
+			xLen += vsnprintfx(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
+			xLen = xSyslogSendMessage(SyslogBuffer, xLen) ;
+		}
 	}
 	xUtilUnlockResource(&SyslogMutex) ;
 	return xLen ;
