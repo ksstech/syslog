@@ -123,6 +123,11 @@ extern "C" {
 void 	vSyslogSetPriority(uint32_t Priority) ;
 int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_list args) ;
 int32_t	xSyslog(uint32_t Priority, const char * MsgID, const char * format, ...) ;
+
+int32_t	xvLog(const char * format, va_list vArgs) ;
+int32_t	xLog(const char * format, ...) ;
+int32_t	xLogFunc(int32_t (*F)(uint8_t *, size_t)) ;
+
 void	vSyslogReport(void) ;
 
 #ifdef __cplusplus

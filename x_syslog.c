@@ -375,6 +375,58 @@ int32_t	xSyslog(uint32_t Priority, const char * MsgID, const char * format, ...)
     return iRV ;
 }
 
+/**
+ * xvLog() and xLog() - perform printfx() like output to a buffer and then to the console
+ * @param	format
+ * @param	vArgs or Args
+ * @return	number of characters written to the buffer and then console
+ */
+int32_t	xvLog(const char * format, va_list vArgs) {
+	IF_myASSERT(debugPARAM, INRANGE_MEM(format)) ;
+
+	// Step 0: handle state of scheduler
+	xUtilLockResource(&SyslogMutex, portMAX_DELAY) ;
+
+	// Step 1: setup time, priority and related variables
+	int (* xPrintFunc)(const char *, ...) ;
+	if ((halNVIC_CalledFromISR() == 0) && (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING)) {
+		xPrintFunc = &printfx ;
+	} else {
+		xPrintFunc = &rprintfx ;
+	}
+
+	// Step 2: build the console formatted message into buffer & display
+	int32_t xLen = vsnprintfx(SyslogBuffer, syslogBUFSIZE, format, vArgs) ;
+	int32_t iRV = xPrintFunc(SyslogBuffer) ;
+	if (iRV == xLen) {
+		sSyslogCtx.maxTx = (xLen > sSyslogCtx.maxTx) ? xLen : sSyslogCtx.maxTx ;
+	}
+	xUtilUnlockResource(&SyslogMutex) ;
+	return xLen ;
+}
+
+int32_t	xLog(const char * format, ...) {
+    va_list vaList ;
+    va_start(vaList, format) ;
+	int32_t iRV = xvLog(format, vaList) ;
+    va_end(vaList) ;
+    return iRV ;
+}
+
+int32_t	xLogFunc(int32_t (*F)(uint8_t *, size_t)) {
+	IF_myASSERT(debugPARAM, INRANGE_FLASH(F)) ;
+	xUtilLockResource(&SyslogMutex, portMAX_DELAY) ;
+	int32_t iRV = F(SyslogBuffer, syslogBUFSIZE) ;
+	if (iRV > 0) {
+		sSyslogCtx.maxTx = (iRV > sSyslogCtx.maxTx) ? iRV : sSyslogCtx.maxTx ;
+	}
+	xUtilUnlockResource(&SyslogMutex) ;
+    return iRV ;
+}
+
+/**
+ * vSyslogReport() - report x[v]Syslog() related information
+ */
 void	vSyslogReport(void) {
 	if (xRtosCheckStatus(flagNET_SYSLOG)) {
 		xNetReport(&sSyslogCtx, __FUNCTION__, 0, 0, 0) ;
