@@ -266,8 +266,8 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	// Step 0: handle state of scheduler and obtain the task name
 	bool	FRflag ;
 	char *	ProcID ;
+	xUtilLockResource(&SyslogMutex, portMAX_DELAY) ;
 	if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
-		xUtilLockResource(&SyslogMutex, portMAX_DELAY) ;
 		FRflag = 1 ;
 		#if	(tskKERNEL_VERSION_MAJOR < 9)
 		ProcID = pcTaskGetTaskName(NULL) ;				// FreeRTOS pre v9.0.0 uses long form function name
@@ -321,7 +321,6 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 		++RptCNT ;										// Yes, increment the repeat counter
 		RptRUN = MsgRUN ;								// save timestamps of latest repeat
 		RptUTC = MsgUTC ;
-		goto cleanup ;									// REPEAT message, not going to send...
 	} else {
 		// we have a new/different message, handle suppressed duplicates
 		RptCRC = MsgCRC ;
@@ -355,10 +354,8 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 		xLen = xSyslogSendMessage(SyslogBuffer, xLen) ;
 	}
 
-cleanup:
-	if (FRflag) {
-		xUtilUnlockResource(&SyslogMutex) ;
 	}
+	xUtilUnlockResource(&SyslogMutex) ;
 	return xLen ;
 }
 
