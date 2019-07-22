@@ -94,15 +94,10 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 
 #include	"FreeRTOS_Support.h"
 
-#include	"x_debug.h"
-#include	"x_printf.h"
 #include	"x_syslog.h"
-#include	"x_time.h"
-#include	"x_terminal.h"
+#include	"x_debug.h"
 #include	"x_errors_events.h"
-#include	"x_retarget.h"
 #include	"x_utilities.h"
-#include	"x_systiming.h"
 
 #include	"hal_network.h"
 #include	"hal_timer.h"
