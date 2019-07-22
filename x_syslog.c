@@ -333,8 +333,8 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 
 			// build & send skipped message to host
 			if (FRflag && xRtosCheckStatus(flagNET_L3) && (MsgPRI & 0x07) <= SyslogMinSevLev) {
-				xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %R %s #%d %s %s - ", RptPRI, RptUTC, nameSTA, McuID, ProcID, MsgID) ;
-				xLen += snprintfx(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, "Last of %d (skipped) Identical messages", RptCNT) ;
+				xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %R %s #%d %s %s - Last of %d (skipped) Identical messages",
+						RptPRI, RptUTC, nameSTA, McuID, ProcID, MsgID, RptCNT) ;
 				xLen = xSyslogSendMessage(SyslogBuffer, xLen) ;
 			}
 			// rebuild the new (different) console message
