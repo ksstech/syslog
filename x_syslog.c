@@ -164,7 +164,7 @@ static	uint8_t		RptPRI ;
  * \param[out]	none
  * \return		none
  */
-int32_t	IRAM_ATTR xSyslogInit(void) {
+int32_t	xSyslogInit(void) {
 
 #if		defined(syslogHOSTNAME)
 	sSyslogCtx.pHost = syslogHOSTNAME ;
@@ -212,7 +212,7 @@ int32_t	IRAM_ATTR xSyslogInit(void) {
  * \param[out]	none
  * \return		none
  */
-void	IRAM_ATTR vSyslogDeInit(void) {
+void	vSyslogDeInit(void) {
 	vRtosClearStatus(flagNET_SYSLOG) ;
 	close(sSyslogCtx.sd) ;
 	sSyslogCtx.sd = -1 ;
