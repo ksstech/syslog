@@ -125,7 +125,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 
 // ###################################### BUILD : CONFIG definitions ##############################
 
-#define	syslogBUFSIZE			512	//2048
+#define	syslogBUFSIZE			2048
 
 #define	syslogUSE_UDP			1
 #define	syslogUSE_TCP			0
@@ -289,13 +289,15 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 
 	// Step 1: setup time, priority and related variables
 	int (* xPrintFunc)(const char *, ...) ;
+#if 0
 	if ((halNVIC_CalledFromISR() == 0) && (FRflag == 1)) {
 		xPrintFunc = &printfx ;
 	} else {
 		xPrintFunc = &rprintfx ;
 	}
-	#if	(ESP32_PLATFORM == 1) && !defined(CONFIG_FREERTOS_UNICORE)
-	int32_t	McuID = xPortGetCoreID() ;
+#else
+	xPrintFunc = &printfx ;
+#endif
 	uint8_t		MsgPRI = Priority % 256 ;
 	uint64_t	MsgUTC = sTSZ.usecs ;
 	#if	(ESP32_PLATFORM == 1)
