@@ -410,7 +410,7 @@ int32_t	xLog(const char * format, ...) {
     return iRV ;
 }
 
-int32_t	xLogFunc(int32_t (*F)(uint8_t *, size_t)) {
+int32_t	xLogFunc(int32_t (*F)(char *, size_t)) {
 	IF_myASSERT(debugPARAM, INRANGE_FLASH(F)) ;
 	xUtilLockResource(&SyslogMutex, portMAX_DELAY) ;
 	int32_t iRV = F(SyslogBuffer, syslogBUFSIZE) ;
