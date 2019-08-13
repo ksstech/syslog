@@ -95,10 +95,10 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #include	"FreeRTOS_Support.h"
 
 #include	"x_syslog.h"
-#include	"x_debug.h"
 #include	"x_errors_events.h"
 #include	"x_utilities.h"
 
+#include	"hal_debug.h"
 #include	"hal_network.h"
 #include	"hal_timer.h"
 #include	"hal_nvic.h"
@@ -428,7 +428,7 @@ void	vSyslogReport(void) {
 	if (xRtosCheckStatus(flagNET_SYSLOG)) {
 		xNetReport(&sSyslogCtx, __FUNCTION__, 0, 0, 0) ;
 	}
-	printfx("\t\tmaxTX=%u  CurRpt=%d\n", sSyslogCtx.maxTx, RptCNT) ;
+	PRINT("\t\tmaxTX=%u  CurRpt=%d\n", sSyslogCtx.maxTx, RptCNT) ;
 }
 
 // #################################### Test and benchmark routines ################################
@@ -462,7 +462,7 @@ void	vSyslogBenchmark(void) {
 	xSysTimerStop(systimerSLOG) ;
 	vSysTimerShow(1 << systimerSLOG) ;
 
-	printfx("CRC #1=%u  #2=%u  #3=%u\n", crc1, crc2, crc3) ;
-	printfx("CRC #4=%u  #5=%u  #6=%u\n", crc4, crc5, crc6) ;
+	PRINT("CRC #1=%u  #2=%u  #3=%u\n", crc1, crc2, crc3) ;
+	PRINT("CRC #4=%u  #5=%u  #6=%u\n", crc4, crc5, crc6) ;
 }
 #endif
