@@ -292,7 +292,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 		xPrintFunc = &rprintfx ;
 	}
 #else
-	xPrintFunc = &printfx ;
+	xPrintFunc = &bprintfx ;
 #endif
 	uint8_t		MsgPRI = Priority % 256 ;
 	uint64_t	MsgUTC = sTSZ.usecs ;
@@ -385,26 +385,11 @@ int32_t	xSyslog(uint32_t Priority, const char * MsgID, const char * format, ...)
  */
 int32_t	xvLog(const char * format, va_list vArgs) {
 	IF_myASSERT(debugPARAM, INRANGE_MEM(format)) ;
-
-	// Step 0: handle state of scheduler
 	xUtilLockResource(&SyslogMutex, portMAX_DELAY) ;
-
-	// Step 1: setup time, priority and related variables
-	int (* xPrintFunc)(const char *, ...) ;
-	if ((halNVIC_CalledFromISR() == 0) && (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING)) {
-		xPrintFunc = &printfx ;
-	} else {
-		xPrintFunc = &rprintfx ;
-	}
-
-	// Step 2: build the console formatted message into buffer & display
-	int32_t xLen = vsnprintfx(SyslogBuffer, syslogBUFSIZE, format, vArgs) ;
-	int32_t iRV = xPrintFunc(SyslogBuffer) ;
-	if (iRV == xLen) {
-		sSyslogCtx.maxTx = (xLen > sSyslogCtx.maxTx) ? xLen : sSyslogCtx.maxTx ;
-	}
+	int32_t iRV = bprintfx(format, vArgs) ;
+	sSyslogCtx.maxTx = (iRV > sSyslogCtx.maxTx) ? iRV : sSyslogCtx.maxTx ;
 	xUtilUnlockResource(&SyslogMutex) ;
-	return xLen ;
+	return iRV ;
 }
 
 int32_t	xLog(const char * format, ...) {
