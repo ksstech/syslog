@@ -97,6 +97,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #include	"x_syslog.h"
 #include	"x_errors_events.h"
 #include	"x_utilities.h"
+#include	"x_retarget.h"
 
 #include	"hal_debug.h"
 #include	"hal_network.h"
@@ -325,8 +326,10 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 		RptCRC = MsgCRC ;
 		RptPRI = MsgPRI ;
 		if (RptCNT > 0) {								// if we have skipped messages
+			xStdOutLock(portMAX_DELAY) ;
 			xPrintFunc("%C%!R: #%d Last of %d (skipped) Identical messages%C\n",
 					xpfSGR(attrRESET, SyslogColors[RptPRI & 0x07],0,0), RptRUN, McuID, RptCNT, attrRESET) ;
+			xStdOutUnLock() ;
 
 			// build & send skipped message to host
 			if (FRflag && xRtosCheckStatus(flagNET_L3) && (MsgPRI & 0x07) <= SyslogMinSevLev) {
@@ -342,7 +345,9 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 			RptCNT = 0 ;
 		}
 		// show the new message to the console...
+		xStdOutLock(portMAX_DELAY) ;
 		xPrintFunc("%C%!R: #%d %s%C\n", xpfSGR(attrRESET, SyslogColors[MsgPRI & 0x07],0,0), MsgRUN, McuID, SyslogBuffer, attrRESET) ;
+		xStdOutUnLock() ;
 
 		// filter out reasons why message should not go to syslog host, then build and send
 		if (FRflag && xRtosCheckStatus(flagNET_L3) && (MsgPRI & 0x07) <= SyslogMinSevLev) {
