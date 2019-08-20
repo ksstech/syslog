@@ -284,16 +284,6 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	}
 
 	// Step 1: setup time, priority and related variables
-	int (* xPrintFunc)(const char *, ...) ;
-#if 0
-	if ((halNVIC_CalledFromISR() == 0) && (FRflag == 1)) {
-		xPrintFunc = &printfx ;
-	} else {
-		xPrintFunc = &rprintfx ;
-	}
-#else
-	xPrintFunc = &bprintfx ;
-#endif
 	uint8_t		MsgPRI = Priority % 256 ;
 	uint64_t	MsgUTC = sTSZ.usecs ;
 	#if	(ESP32_PLATFORM == 1)
@@ -327,7 +317,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 		RptPRI = MsgPRI ;
 		if (RptCNT > 0) {								// if we have skipped messages
 			xStdOutLock(portMAX_DELAY) ;
-			xPrintFunc("%C%!R: #%d Last of %d (skipped) Identical messages%C\n",
+			bprintfx("%C%!R: #%d Last of %d (skipped) Identical messages%C\n",
 					xpfSGR(attrRESET, SyslogColors[RptPRI & 0x07],0,0), RptRUN, McuID, RptCNT, attrRESET) ;
 			xStdOutUnLock() ;
 
@@ -346,7 +336,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 		}
 		// show the new message to the console...
 		xStdOutLock(portMAX_DELAY) ;
-		xPrintFunc("%C%!R: #%d %s%C\n", xpfSGR(attrRESET, SyslogColors[MsgPRI & 0x07],0,0), MsgRUN, McuID, SyslogBuffer, attrRESET) ;
+		bprintfx("%C%!R: #%d %s%C\n", xpfSGR(attrRESET, SyslogColors[MsgPRI & 0x07],0,0), MsgRUN, McuID, SyslogBuffer, attrRESET) ;
 		xStdOutUnLock() ;
 
 		// filter out reasons why message should not go to syslog host, then build and send
