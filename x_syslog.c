@@ -297,7 +297,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	uint8_t		MsgPRI = Priority % 256 ;
 	uint64_t	MsgUTC = sTSZ.usecs ;
 	#if	(ESP32_PLATFORM == 1)
-	uint64_t	MsgRUN = esp_log_timestamp() * 1000 ;	// mSec to uSec
+	uint64_t	MsgRUN = (uint64_t) esp_log_timestamp() * 1000ULL ;	// mSec to uSec
 	#if	!defined(CONFIG_FREERTOS_UNICORE)
 	int32_t		McuID = xPortGetCoreID() ;
 	#endif
