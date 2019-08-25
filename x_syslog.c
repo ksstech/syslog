@@ -92,8 +92,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
  *
  */
 
-#include	"FreeRTOS_Support.h"
-
+#include	"x_config.h"
 #include	"x_syslog.h"
 #include	"x_errors_events.h"
 #include	"x_utilities.h"
@@ -197,7 +196,7 @@ int32_t	xSyslogInit(void) {
 	}
    	xNetSetNonBlocking(&sSyslogCtx, flagXNET_NONBLOCK) ;
    	vRtosSetStatus(flagNET_SYSLOG) ;
-   	IF_PRINT(debugTRACK, "init") ;
+   	IF_TRACK(debugTRACK, "init") ;
    	return true ;
 }
 
@@ -212,7 +211,7 @@ void	vSyslogDeInit(void) {
 	vRtosClearStatus(flagNET_SYSLOG) ;
 	close(sSyslogCtx.sd) ;
 	sSyslogCtx.sd = -1 ;
-	IF_PRINT(debugTRACK, "deinit") ;
+	IF_TRACK(debugTRACK, "deinit") ;
 }
 
 /**
