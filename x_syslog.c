@@ -95,7 +95,6 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #include	"x_config.h"
 #include	"x_syslog.h"
 #include	"x_errors_events.h"
-#include	"x_utilities.h"
 #include	"x_retarget.h"
 
 #include	"hal_debug.h"
@@ -261,7 +260,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	// Step 0: handle state of scheduler and obtain the task name
 	bool	FRflag ;
 	char *	ProcID ;
-	xUtilLockResource(&SyslogMutex, portMAX_DELAY) ;
+	xRtosSemaphoreTake(&SyslogMutex, portMAX_DELAY) ;
 	if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
 		FRflag = 1 ;
 		#if	(tskKERNEL_VERSION_MAJOR < 9)
@@ -341,7 +340,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 			xLen = xSyslogSendMessage(SyslogBuffer, xLen) ;
 		}
 	}
-	xUtilUnlockResource(&SyslogMutex) ;
+	xRtosSemaphoreGive(&SyslogMutex) ;
 	return xLen ;
 }
 
@@ -370,10 +369,10 @@ int32_t	xSyslog(uint32_t Priority, const char * MsgID, const char * format, ...)
  */
 int32_t	xvLog(const char * format, va_list vArgs) {
 	IF_myASSERT(debugPARAM, INRANGE_MEM(format)) ;
-	xUtilLockResource(&SyslogMutex, portMAX_DELAY) ;
+	xRtosSemaphoreTake(&SyslogMutex, portMAX_DELAY) ;
 	int32_t iRV = bprintfx(format, vArgs) ;
 	sSyslogCtx.maxTx = (iRV > sSyslogCtx.maxTx) ? iRV : sSyslogCtx.maxTx ;
-	xUtilUnlockResource(&SyslogMutex) ;
+	xRtosSemaphoreGive(&SyslogMutex) ;
 	return iRV ;
 }
 
@@ -387,12 +386,12 @@ int32_t	xLog(const char * format, ...) {
 
 int32_t	xLogFunc(int32_t (*F)(char *, size_t)) {
 	IF_myASSERT(debugPARAM, INRANGE_FLASH(F)) ;
-	xUtilLockResource(&SyslogMutex, portMAX_DELAY) ;
+	xRtosSemaphoreTake(&SyslogMutex, portMAX_DELAY) ;
 	int32_t iRV = F(SyslogBuffer, syslogBUFSIZE) ;
 	if (iRV > 0) {
 		sSyslogCtx.maxTx = (iRV > sSyslogCtx.maxTx) ? iRV : sSyslogCtx.maxTx ;
 	}
-	xUtilUnlockResource(&SyslogMutex) ;
+	xRtosSemaphoreGive(&SyslogMutex) ;
     return iRV ;
 }
 
