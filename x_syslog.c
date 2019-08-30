@@ -315,10 +315,8 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 		RptCRC = MsgCRC ;
 		RptPRI = MsgPRI ;
 		if (RptCNT > 0) {								// if we have skipped messages
-			xStdOutLock(portMAX_DELAY) ;
-			bprintfx("%C%!R: #%d Last of %d (skipped) Identical messages%C\n",
+			lbprintfx("%C%!R: #%d Last of %d (skipped) Identical messages%C\n",
 					xpfSGR(attrRESET, SyslogColors[RptPRI & 0x07],0,0), RptRUN, McuID, RptCNT, attrRESET) ;
-			xStdOutUnLock() ;
 
 			// build & send skipped message to host
 			if (FRflag && xRtosCheckStatus(flagNET_L3) && (MsgPRI & 0x07) <= SyslogMinSevLev) {
@@ -334,9 +332,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 			RptCNT = 0 ;
 		}
 		// show the new message to the console...
-		xStdOutLock(portMAX_DELAY) ;
-		bprintfx("%C%!R: #%d %s%C\n", xpfSGR(attrRESET, SyslogColors[MsgPRI & 0x07],0,0), MsgRUN, McuID, SyslogBuffer, attrRESET) ;
-		xStdOutUnLock() ;
+		lbprintfx("%C%!R: #%d %s%C\n", xpfSGR(attrRESET, SyslogColors[MsgPRI & 0x07],0,0), MsgRUN, McuID, SyslogBuffer, attrRESET) ;
 
 		// filter out reasons why message should not go to syslog host, then build and send
 		if (FRflag && xRtosCheckStatus(flagNET_L3) && (MsgPRI & 0x07) <= SyslogMinSevLev) {
