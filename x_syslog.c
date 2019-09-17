@@ -286,17 +286,14 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	}
 
 	// Step 1: setup time, priority and related variables
-	uint8_t		MsgPRI = Priority % 256 ;
-	uint64_t	MsgUTC = sTSZ.usecs ;
-	#if	(ESP32_PLATFORM == 1)
-	uint64_t	MsgRUN = xTimeMakeTimestamp(esp_log_timestamp(), 0) ;	// mSec to uSec
-	#if	!defined(CONFIG_FREERTOS_UNICORE)
-	int32_t		McuID = xPortGetCoreID() ;
-	#endif
-	#else
-	uint64_t	MsgRUN = RunTime ;
-	int32_t		McuID = 0 ;								// default in case not ESP32 or scheduler not running
-	#endif
+	uint8_t		MsgPRI	= Priority % 256 ;
+	uint64_t	MsgUTC	= sTSZ.usecs ;
+	uint64_t	MsgRUN	= RunTime ;
+#if	(ESP32_PLATFORM == 1) && !defined(CONFIG_FREERTOS_UNICORE)
+	int32_t		McuID	= xPortGetCoreID() ;
+#else
+	int32_t		McuID	= 0 ;							// default in case not ESP32 or scheduler not running
+#endif
 
 	// Step 2: build the console formatted message into the buffer
 	int32_t xLen = snprintfx(SyslogBuffer, syslogBUFSIZE, "%s %s ", ProcID, MsgID) ;
