@@ -223,10 +223,6 @@ void	vSyslogDeInit(void) {
 void	vSyslogSetPriority(uint32_t Priority) { SyslogMinSevLev = Priority % 8 ; }
 
 int32_t	xSyslogSendMessage(char * pcBuffer, int32_t xLen) {
-	// If running as AP it is for config only, no upstream SLOG connection available
-	if (wifi_mode != WIFI_MODE_STA || xRtosCheckStatus(flagNET_L3) == 0) {
-		return 0 ;
-	}
 	if (xRtosCheckStatus(flagNET_SYSLOG) == 0) {		// syslog connected ?
 		if (xSyslogInit() == false) {					// no, try to connect. Failed ?
 			return 0 ;
@@ -243,6 +239,14 @@ int32_t	xSyslogSendMessage(char * pcBuffer, int32_t xLen) {
 		}
 	}
 	return iRV ;
+}
+
+bool bSyslogCheckStatus(uint8_t MsgPRI) {
+	// If running as AP it is for config only, no upstream SLOG connection available
+	if (wifi_mode == WIFI_MODE_STA && xRtosCheckStatus(flagNET_L3) && (MsgPRI & 0x07) <= SyslogMinSevLev) {
+		return true ;
+	}
+	return false ;
 }
 
 /**
@@ -318,7 +322,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 					xpfSGR(attrRESET, SyslogColors[RptPRI & 0x07],0,0), RptRUN, McuID, RptCNT, attrRESET) ;
 
 			// build & send skipped message to host
-			if (FRflag && xRtosCheckStatus(flagNET_L3) && (MsgPRI & 0x07) <= SyslogMinSevLev) {
+			if (FRflag && bSyslogCheckStatus(MsgPRI)) {
 				xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %R %s #%d %s %s - Last of %d (skipped) Identical messages",
 						RptPRI, RptUTC, nameSTA, McuID, ProcID, MsgID, RptCNT) ;
 				xLen = xSyslogSendMessage(SyslogBuffer, xLen) ;
@@ -334,7 +338,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 		lbprintfx("%C%!R: #%d %s%C\n", xpfSGR(attrRESET, SyslogColors[MsgPRI & 0x07],0,0), MsgRUN, McuID, SyslogBuffer, attrRESET) ;
 
 		// filter out reasons why message should not go to syslog host, then build and send
-		if (FRflag && xRtosCheckStatus(flagNET_L3) && (MsgPRI & 0x07) <= SyslogMinSevLev) {
+		if (FRflag && bSyslogCheckStatus(MsgPRI)) {
 			xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %R %s #%d %s %s - ", MsgPRI, MsgUTC, nameSTA, McuID, ProcID, MsgID) ;
 			xLen += vsnprintfx(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
 			xLen = xSyslogSendMessage(SyslogBuffer, xLen) ;
