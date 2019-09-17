@@ -300,18 +300,17 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	xLen += vsnprintfx(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
 
 	// Calc CRC to check for repeat message, handle accordingly
-	#if		(ESP32_PLATFORM == 1)						// use ROM based CRC lookup table
+#if		(ESP32_PLATFORM == 1)						// use ROM based CRC lookup table
 	uint32_t MsgCRC = crc32_le(0, (uint8_t *) SyslogBuffer, xLen) ;
-	#else												// use fastest of external libraries
+#else												// use fastest of external libraries
 	uint32_t MsgCRC = crcSlow((uint8_t *) SyslogBuffer, xLen) ;
-	#endif
+#endif
 
 	if (MsgCRC == RptCRC && MsgPRI == RptPRI) {			// CRC & PRI same as previous message ?
 		++RptCNT ;										// Yes, increment the repeat counter
 		RptRUN = MsgRUN ;								// save timestamps of latest repeat
 		RptUTC = MsgUTC ;
-	} else {
-		// we have a new/different message, handle suppressed duplicates
+	} else {											// new/different message, handle suppressed duplicates
 		RptCRC = MsgCRC ;
 		RptPRI = MsgPRI ;
 		if (RptCNT > 0) {								// if we have skipped messages
