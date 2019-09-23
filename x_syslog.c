@@ -397,9 +397,9 @@ int32_t	xLogFunc(int32_t (*F)(char *, size_t)) {
  */
 void	vSyslogReport(void) {
 	if (xRtosCheckStatus(flagNET_SYSLOG)) {
-		xNetReport(&sSyslogCtx, __FUNCTION__, 0, 0, 0) ;
+		xNetReport(&sSyslogCtx, "SLOG", 0, 0, 0) ;
 	}
-	PRINT("\t\tmaxTX=%u  CurRpt=%d\n", sSyslogCtx.maxTx, RptCNT) ;
+	PRINT("\tmaxTX=%u  CurRpt=%d\n", sSyslogCtx.maxTx, RptCNT) ;
 }
 
 // #################################### Test and benchmark routines ################################
