@@ -314,9 +314,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 		RptCRC = MsgCRC ;
 		RptPRI = MsgPRI ;
 		if (RptCNT > 0) {								// if we have skipped messages
-			lbprintfx("%C%!R: #%d Last of %d (skipped) Identical messages%C\n",
-					xpfSGR(attrRESET, SyslogColors[RptPRI & 0x07],0,0), RptRUN, McuID, RptCNT, attrRESET) ;
-
+			PRINT("%C%!R: #%d Last of %d (skipped) Identical messages%C\n", xpfSGR(attrRESET, SyslogColors[RptPRI & 0x07],0,0), RptRUN, McuID, RptCNT, attrRESET) ;
 			// build & send skipped message to host
 			if (FRflag && bSyslogCheckStatus(MsgPRI)) {
 				xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %R %s #%d %s %s - Last of %d (skipped) Identical messages",
@@ -331,8 +329,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 			RptCNT = 0 ;
 		}
 		// show the new message to the console...
-		lbprintfx("%C%!R: #%d %s%C\n", xpfSGR(attrRESET, SyslogColors[MsgPRI & 0x07],0,0), MsgRUN, McuID, SyslogBuffer, attrRESET) ;
-
+		PRINT("%C%!R: #%d %s%C\n", xpfSGR(attrRESET, SyslogColors[MsgPRI & 0x07],0,0), MsgRUN, McuID, SyslogBuffer, attrRESET) ;
 		// filter out reasons why message should not go to syslog host, then build and send
 		if (FRflag && bSyslogCheckStatus(MsgPRI)) {
 			xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %R %s #%d %s %s - ", MsgPRI, MsgUTC, nameSTA, McuID, ProcID, MsgID) ;
@@ -370,7 +367,7 @@ int32_t	xSyslog(uint32_t Priority, const char * MsgID, const char * format, ...)
 int32_t	xvLog(const char * format, va_list vArgs) {
 	IF_myASSERT(debugPARAM, INRANGE_MEM(format)) ;
 	xRtosSemaphoreTake(&SyslogMutex, portMAX_DELAY) ;
-	int32_t iRV = bprintfx(format, vArgs) ;
+	int32_t iRV = PRINT(format, vArgs) ;
 	sSyslogCtx.maxTx = (iRV > sSyslogCtx.maxTx) ? iRV : sSyslogCtx.maxTx ;
 	xRtosSemaphoreGive(&SyslogMutex) ;
 	return iRV ;
