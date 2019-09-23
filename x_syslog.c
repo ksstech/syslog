@@ -159,7 +159,6 @@ static	uint8_t		RptPRI ;
  * \return		none
  */
 int32_t	xSyslogInit(void) {
-
 #if		defined(syslogHOSTNAME)
 	sSyslogCtx.pHost = syslogHOSTNAME ;
 #else
@@ -194,7 +193,7 @@ int32_t	xSyslogInit(void) {
 		return false ;
 	}
    	xNetSetNonBlocking(&sSyslogCtx, flagXNET_NONBLOCK) ;
-   	vRtosSetStatus(flagNET_SYSLOG) ;
+   	xRtosSetStatus(flagNET_SYSLOG) ;
    	IF_TRACK(debugTRACK, "init") ;
    	return true ;
 }
@@ -207,7 +206,7 @@ int32_t	xSyslogInit(void) {
  * \return		none
  */
 void	vSyslogDeInit(void) {
-	vRtosClearStatus(flagNET_SYSLOG) ;
+	xRtosClearStatus(flagNET_SYSLOG) ;
 	close(sSyslogCtx.sd) ;
 	sSyslogCtx.sd = -1 ;
 	IF_TRACK(debugTRACK, "deinit") ;
