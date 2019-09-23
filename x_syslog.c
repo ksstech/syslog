@@ -243,7 +243,7 @@ int32_t	xSyslogSendMessage(char * pcBuffer, int32_t xLen) {
 
 bool bSyslogCheckStatus(uint8_t MsgPRI) {
 	// If running as AP it is for config only, no upstream SLOG connection available
-	if (wifi_mode == WIFI_MODE_STA && xRtosCheckStatus(flagNET_L3) && (MsgPRI & 0x07) <= SyslogMinSevLev) {
+	if ((wifi_mode & WIFI_MODE_STA) && xRtosCheckStatus(flagL3_STA) && (MsgPRI & 0x07) <= SyslogMinSevLev) {
 		return true ;
 	}
 	return false ;
