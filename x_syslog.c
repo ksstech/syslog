@@ -111,7 +111,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 
 #include	<string.h>
 
-#define	debugFLAG				0x0000
+#define	debugFLAG				0x4000
 
 #define	debugTRACK				(debugFLAG & 0x2000)
 #define	debugPARAM				(debugFLAG & 0x4000)
@@ -222,13 +222,13 @@ void	vSyslogDeInit(void) {
 void	vSyslogSetPriority(uint32_t Priority) { SyslogMinSevLev = Priority % 8 ; }
 
 int32_t	xSyslogSendMessage(char * pcBuffer, int32_t xLen) {
-	if (xRtosCheckStatus(flagNET_SYSLOG) == 0) {		// syslog connected ?
+	if (bRtosCheckStatus(flagNET_SYSLOG) == 0) {		// syslog connected ?
 		if (xSyslogInit() == false) {					// no, try to connect. Failed ?
 			return 0 ;
 		}
 	}
 	int32_t iRV = erFAILURE ;
-	if (xRtosCheckStatus(flagNET_SYSLOG)) {
+	if (bRtosCheckStatus(flagNET_SYSLOG)) {
 		// write directly to socket, not via xNetWrite(), to avoid recursing
 		iRV = sendto(sSyslogCtx.sd, pcBuffer, xLen, 0, &sSyslogCtx.sa, sizeof(sSyslogCtx.sa_in)) ;
 		if (iRV == xLen) {
@@ -242,7 +242,7 @@ int32_t	xSyslogSendMessage(char * pcBuffer, int32_t xLen) {
 
 bool bSyslogCheckStatus(uint8_t MsgPRI) {
 	// If running as AP it is for config only, no upstream SLOG connection available
-	if ((wifi_mode & WIFI_MODE_STA) && xRtosCheckStatus(flagL3_STA) && (MsgPRI & 0x07) <= SyslogMinSevLev) {
+	if ((wifi_mode & WIFI_MODE_STA) && bRtosCheckStatus(flagL3_STA) && (MsgPRI & 0x07) <= SyslogMinSevLev) {
 		return true ;
 	}
 	return false ;
@@ -395,7 +395,7 @@ int32_t	xLogFunc(int32_t (*F)(char *, size_t)) {
  * vSyslogReport() - report x[v]Syslog() related information
  */
 void	vSyslogReport(void) {
-	if (xRtosCheckStatus(flagNET_SYSLOG)) {
+	if (bRtosCheckStatus(flagNET_SYSLOG)) {
 		xNetReport(&sSyslogCtx, "SLOG", 0, 0, 0) ;
 	}
 	PRINT("\tmaxTX=%u  CurRpt=%d\n", sSyslogCtx.maxTx, RptCNT) ;
