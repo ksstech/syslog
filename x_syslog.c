@@ -241,8 +241,9 @@ int32_t	xSyslogSendMessage(char * pcBuffer, int32_t xLen) {
 }
 
 bool bSyslogCheckStatus(uint8_t MsgPRI) {
-	// If running as AP it is for config only, no upstream SLOG connection available
-	if ((wifi_mode & WIFI_MODE_STA) && bRtosCheckStatus(flagL3_STA) && (MsgPRI & 0x07) <= SyslogMinSevLev) {
+	if ((wifi_mode & WIFI_MODE_STA) &&							// STA mode
+		bRtosCheckStatus(flagL1 | flagL2_STA | flagL3_STA) &&	// L1+2+3 up and running
+		(MsgPRI & 0x07) <= SyslogMinSevLev) {					// message priority sufficiently high
 		return true ;
 	}
 	return false ;
@@ -250,12 +251,11 @@ bool bSyslogCheckStatus(uint8_t MsgPRI) {
 
 /**
  * xvSyslog writes an RFC formatted message to syslog host
- * \brief		if syslog not up and running, write to stdout
- * \brief		avoid using malloc or similar since also called from error/crash handlers
- * \param[in]	Priority, ProcID and MsgID as defined by RFC
+ * \brief		write to stdout & syslog host (if up and running)
+ * \param[in]	Priority and MsgID as defined by RFC
  * \param[in]	format string and parameters as per normal vprintf()
  * \param[out]	none
- * \return		number of characters displayed(if only to console) or send(if to server)
+ * \return		number of characters sent to server
  */
 int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_list vArgs) {
 	IF_myASSERT(debugPARAM, INRANGE_MEM(MsgID) && INRANGE_MEM(format)) ;
@@ -299,9 +299,9 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	xLen += vsnprintfx(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
 
 	// Calc CRC to check for repeat message, handle accordingly
-#if		(ESP32_PLATFORM == 1)						// use ROM based CRC lookup table
+#if		(ESP32_PLATFORM == 1)							// use ROM based CRC lookup table
 	uint32_t MsgCRC = crc32_le(0, (uint8_t *) SyslogBuffer, xLen) ;
-#else												// use fastest of external libraries
+#else													// use fastest of external libraries
 	uint32_t MsgCRC = crcSlow((uint8_t *) SyslogBuffer, xLen) ;
 #endif
 
@@ -309,6 +309,8 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 		++RptCNT ;										// Yes, increment the repeat counter
 		RptRUN = MsgRUN ;								// save timestamps of latest repeat
 		RptUTC = MsgUTC ;
+		xLen = 0 ;										// nothing was net via network
+
 	} else {											// new/different message, handle suppressed duplicates
 		RptCRC = MsgCRC ;
 		RptPRI = MsgPRI ;
@@ -318,15 +320,14 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 			if (FRflag && bSyslogCheckStatus(MsgPRI)) {
 				xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %R %s #%d %s %s - Last of %d (skipped) Identical messages",
 						RptPRI, RptUTC, nameSTA, McuID, ProcID, MsgID, RptCNT) ;
-				xLen = xSyslogSendMessage(SyslogBuffer, xLen) ;
+				xSyslogSendMessage(SyslogBuffer, xLen) ;
 			}
-			// rebuild the new (different) console message
+			// rebuild the NEW console message
 			xLen = snprintfx(SyslogBuffer, syslogBUFSIZE, "%s %s ", ProcID, MsgID) ;
-			xLen += vsnprintfx(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
-
-			// and reset the counter
-			RptCNT = 0 ;
+			vsnprintfx(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
+			RptCNT = 0 ;								// and reset the counter
 		}
+
 		// show the new message to the console...
 		PRINT("%C%!R: #%d %s%C\n", xpfSGR(attrRESET, SyslogColors[MsgPRI & 0x07],0,0), MsgRUN, McuID, SyslogBuffer, attrRESET) ;
 		// filter out reasons why message should not go to syslog host, then build and send
@@ -334,6 +335,9 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 			xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %R %s #%d %s %s - ", MsgPRI, MsgUTC, nameSTA, McuID, ProcID, MsgID) ;
 			xLen += vsnprintfx(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
 			xLen = xSyslogSendMessage(SyslogBuffer, xLen) ;
+
+		} else {
+			xLen = 0 ;
 		}
 	}
 	xRtosSemaphoreGive(&SyslogMutex) ;
