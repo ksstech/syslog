@@ -241,7 +241,7 @@ int32_t	xSyslogSendMessage(char * pcBuffer, int32_t xLen) {
 }
 
 bool bSyslogCheckStatus(uint8_t MsgPRI) {
-	if ((wifi_mode & WIFI_MODE_STA) &&							// STA mode
+	if ((CurWifiMode & WIFI_MODE_STA) &&							// STA mode
 		bRtosCheckStatus(flagL1 | flagL2_STA | flagL3_STA) &&	// L1+2+3 up and running
 		(MsgPRI & 0x07) <= SyslogMinSevLev) {					// message priority sufficiently high
 		return true ;
