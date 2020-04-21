@@ -138,7 +138,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
  * could flood the IP stack and cause watchdog timeouts. Even if the timeout is changed from 5 to 10
  * seconds the crash can still occur. In order to minimise load on the IP stack the minimum severity
  * level should be set to NOTICE. */
-static	uint32_t	SyslogMinSevLev = SL_SEV_NOTICE ;
+static	uint32_t	SyslogMinSevLev = CONFIG_LOG_DEFAULT_LEVEL ;
 static	netx_t		sSyslogCtx ;
 static	char		SyslogBuffer[syslogBUFSIZE] ;
 SemaphoreHandle_t	SyslogMutex ;
