@@ -111,7 +111,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 
 #include	<string.h>
 
-#define	debugFLAG				0x4000
+#define	debugFLAG				0x0000
 
 #define	debugTRACK				(debugFLAG & 0x2000)
 #define	debugPARAM				(debugFLAG & 0x4000)
@@ -138,7 +138,12 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
  * could flood the IP stack and cause watchdog timeouts. Even if the timeout is changed from 5 to 10
  * seconds the crash can still occur. In order to minimise load on the IP stack the minimum severity
  * level should be set to NOTICE. */
-static	uint32_t	SyslogMinSevLev = CONFIG_LOG_DEFAULT_LEVEL ;
+#if		(ESP32_PLATFORM == 1)
+static	uint32_t	SyslogMinSevLev = configSYSLOG_DEFAULT_LEVEL ;		// align with ESP-IDF levels
+#else
+static	uint32_t	SyslogMinSevLev = SL_SEV_WARNING ;
+#endif
+
 static	netx_t		sSyslogCtx ;
 static	char		SyslogBuffer[syslogBUFSIZE] ;
 SemaphoreHandle_t	SyslogMutex ;
@@ -181,20 +186,23 @@ int32_t	xSyslogInit(void) {
 	sSyslogCtx.d_flags			= 0 ;
 	sSyslogCtx.d_ndebug			= 1 ;					// disable debug in x_sockets.c
 	if (xNetGetHostByName(&sSyslogCtx) < erSUCCESS) {
+	   	IF_CTRACK(debugTRACK, "FAIL Hostname") ;
 		return false ;
 	}
 	if ((sSyslogCtx.sd = socket(sSyslogCtx.sa_in.sin_family, sSyslogCtx.type, IPPROTO_IP)) < erSUCCESS) {
 		sSyslogCtx.sd = -1 ;
+	   	IF_CTRACK(debugTRACK, "FAIL socket") ;
 		return false ;
 	}
 	if (connect(sSyslogCtx.sd, &sSyslogCtx.sa, sizeof(struct sockaddr_in)) < erSUCCESS) {
 		close(sSyslogCtx.sd) ;
 		sSyslogCtx.sd = -1 ;
+	   	IF_CTRACK(debugTRACK, "FAIL connect") ;
 		return false ;
 	}
    	xNetSetNonBlocking(&sSyslogCtx, flagXNET_NONBLOCK) ;
    	xRtosSetStatus(flagNET_SYSLOG) ;
-   	IF_TRACK(debugTRACK, "init") ;
+   	IF_CTRACK(debugTRACK, "init") ;
    	return true ;
 }
 
@@ -209,7 +217,7 @@ void	vSyslogDeInit(void) {
 	xRtosClearStatus(flagNET_SYSLOG) ;
 	close(sSyslogCtx.sd) ;
 	sSyslogCtx.sd = -1 ;
-	IF_TRACK(debugTRACK, "deinit") ;
+	IF_CTRACK(debugTRACK, "deinit") ;
 }
 
 /**
@@ -221,32 +229,28 @@ void	vSyslogDeInit(void) {
  */
 void	vSyslogSetPriority(uint32_t Priority) { SyslogMinSevLev = Priority % 8 ; }
 
-int32_t	xSyslogSendMessage(char * pcBuffer, int32_t xLen) {
-	if (bRtosCheckStatus(flagNET_SYSLOG) == 0) {		// syslog connected ?
-		if (xSyslogInit() == false) {					// no, try to connect. Failed ?
-			return 0 ;
-		}
+bool bSyslogCheckStatus(uint8_t MsgPRI) {
+   	IF_CTRACK(debugTRACK, "MsgPRI=%d  SLminSL=%d", MsgPRI % 8, SyslogMinSevLev) ;
+	if (bRtosCheckStatus(flagLX_STA) == false || (MsgPRI % 8) > SyslogMinSevLev) {
+		return false ;
 	}
-	int32_t iRV = erFAILURE ;
-	if (bRtosCheckStatus(flagNET_SYSLOG)) {
-		// write directly to socket, not via xNetWrite(), to avoid recursing
-		iRV = sendto(sSyslogCtx.sd, pcBuffer, xLen, 0, &sSyslogCtx.sa, sizeof(sSyslogCtx.sa_in)) ;
-		if (iRV == xLen) {
-			sSyslogCtx.maxTx = (xLen > sSyslogCtx.maxTx) ? xLen : sSyslogCtx.maxTx ;
-		} else {
-			vSyslogDeInit() ;
-		}
+
+	if (bRtosCheckStatus(flagNET_SYSLOG) == false) {
+	   	IF_CTRACK(debugTRACK, "connecting...") ;
+		return xSyslogInit() ;
 	}
-	return iRV ;
+	return true ;
 }
 
-bool bSyslogCheckStatus(uint8_t MsgPRI) {
-	if ((CurWifiMode & WIFI_MODE_STA) &&							// STA mode
-		bRtosCheckStatus(flagL1 | flagL2_STA | flagL3_STA) &&	// L1+2+3 up and running
-		(MsgPRI & 0x07) <= SyslogMinSevLev) {					// message priority sufficiently high
-		return true ;
+int32_t	xSyslogSendMessage(char * pcBuffer, int32_t xLen) {
+	// write directly to socket, not via xNetWrite(), to avoid recursing
+	int32_t	iRV = sendto(sSyslogCtx.sd, pcBuffer, xLen, 0, &sSyslogCtx.sa, sizeof(sSyslogCtx.sa_in)) ;
+	if (iRV == xLen) {
+		sSyslogCtx.maxTx = (xLen > sSyslogCtx.maxTx) ? xLen : sSyslogCtx.maxTx ;
+	} else {
+		vSyslogDeInit() ;
 	}
-	return false ;
+	return iRV ;
 }
 
 /**
@@ -265,12 +269,12 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 	char *	ProcID ;
 	xRtosSemaphoreTake(&SyslogMutex, portMAX_DELAY) ;
 	if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
-		FRflag = 1 ;
-		#if	(tskKERNEL_VERSION_MAJOR < 9)
+		FRflag = true ;
+#if	(tskKERNEL_VERSION_MAJOR < 9)
 		ProcID = pcTaskGetTaskName(NULL) ;				// FreeRTOS pre v9.0.0 uses long form function name
-		#else
+#else
 		ProcID = pcTaskGetName(NULL) ;					// FreeRTOS v9.0.0 onwards uses short form function name
-		#endif
+#endif
 		IF_myASSERT(debugPARAM, INRANGE_SRAM(ProcID)) ;
 		char * pcTmp  = ProcID ;
 		while (*pcTmp) {
@@ -280,7 +284,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 			++pcTmp ;
 		}
 	} else {
-		FRflag = 0 ;
+		FRflag = false ;
 		ProcID = (char *) "preX" ;
 	}
 
