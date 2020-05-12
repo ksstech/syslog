@@ -23,11 +23,10 @@
 
 #pragma once
 
-#include	"x_printf.h"
-#include	"x_sockets.h"
 #include	"x_definitions.h"
 
 #include	<stdarg.h>
+#include	<stdint.h>
 
 #ifdef __cplusplus
 extern "C" {

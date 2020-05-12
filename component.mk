@@ -1,4 +1,1 @@
-#
-# "./z-support/common" pseudo-component makefile.
-#
-# (Uses default behaviour of compiling all source files in directory, adding 'include' to include path.)
+# "./z-components/syslog" pseudo-component makefile.
