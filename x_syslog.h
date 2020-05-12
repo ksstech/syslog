@@ -34,7 +34,7 @@ extern "C" {
 
 // ############################################ macros ############################################
 
-//#define	syslogHOSTNAME					"host.domain.tld"
+#define	syslogHOSTNAME					"host.domain.tld"
 
 // ############################# Facilities & Severities definitions ###############################
 
@@ -74,8 +74,12 @@ extern "C" {
 
 // ############################## Syslog formatting/calling macros #################################
 
+#ifndef	SL_FAC_IRMACOS
+	#define	SL_FAC_IRMACOS					SL_FAC_LOCAL0
+#endif
+
 #define	SL_CHECK(x)						if (x < erSUCCESS) xSyslog(SL_MOD2LOCAL(SL_SEV_ERROR), NULL, __FUNCTION__, "()=%d", x)
-#define	SL_MOD2LOCAL(SEV)				((SL_FAC_LOGAUDIT << 3) | SEV)
+#define	SL_MOD2LOCAL(SEV)				((SL_FAC_IRMACOS << 3) | SEV)
 
 #define	SL_EMER(FORMAT, ...)			xSyslog(SL_MOD2LOCAL(SL_SEV_EMERGENCY),	__FUNCTION__, FORMAT, ##__VA_ARGS__)
 #define	SL_ALRT(FORMAT, ...)			xSyslog(SL_MOD2LOCAL(SL_SEV_ALERT),		__FUNCTION__, FORMAT, ##__VA_ARGS__)
@@ -100,13 +104,13 @@ extern "C" {
 
 // ###################################### function prototypes ######################################
 
+int32_t	xSyslogInit(const char * pcHostName, uint64_t * ptRunTime, uint64_t * ptUTCTime) ;
+int32_t	xSyslogConnect(void) ;
+void	vSyslogDisConnect(void) ;
+
 void 	vSyslogSetPriority(uint32_t Priority) ;
 int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_list args) ;
 int32_t	xSyslog(uint32_t Priority, const char * MsgID, const char * format, ...) ;
-
-int32_t	xvLog(const char * format, va_list vArgs) ;
-int32_t	xLog(const char * format, ...) ;
-int32_t	xLogFunc(int32_t (*F)(char *, size_t)) ;
 
 void	vSyslogReport(void) ;
 

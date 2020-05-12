@@ -92,8 +92,10 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
  *
  */
 
-#include	"x_config.h"
 #include	"x_syslog.h"
+#include	"FreeRTOS_Support.h"
+#include	"x_printf.h"
+#include	"x_sockets.h"
 #include	"x_errors_events.h"
 #include	"x_retarget.h"
 
@@ -139,7 +141,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
  * seconds the crash can still occur. In order to minimise load on the IP stack the minimum severity
  * level should be set to NOTICE. */
 #if		(ESP32_PLATFORM == 1)
-static	uint32_t	SyslogMinSevLev = configSYSLOG_DEFAULT_LEVEL ;		// align with ESP-IDF levels
+static	uint32_t	SyslogMinSevLev = CONFIG_LOG_DEFAULT_LEVEL + 2 ;		// align with ESP-IDF levels
 #else
 static	uint32_t	SyslogMinSevLev = SL_SEV_WARNING ;
 #endif
@@ -150,6 +152,7 @@ SemaphoreHandle_t	SyslogMutex ;
 static	char		SyslogColors[8] = {
 // 0 = Emergency	1 = Alert	2 = Critical	3 = Error		4 = Warning		5 = Notice		6 = Info		7 = Debug
 	colourFG_RED, colourFG_RED, colourBG_BLUE, colourFG_MAGENTA, colourFG_YELLOW, colourFG_CYAN,	colourFG_GREEN,	colourFG_WHITE } ;
+static	uint64_t	* ptRunTime, * ptUTCTime ;
 static	uint32_t 	RptCRC, RptCNT ;
 static	uint64_t	RptRUN, RptUTC ;
 static	uint8_t		RptPRI ;
@@ -157,23 +160,33 @@ static	uint8_t		RptPRI ;
 // ###################################### Public functions #########################################
 
 /**
- * vSyslogInit()
- * \brief		Initialise the SysLog module
- * \param[in]	none
- * \param[out]	none
- * \return		none
+ * xSyslogInit() - Initialise the SysLog module
+ * \param[in]	host name to log to
+ * \param[in]	pointer to uSec runtime counter
+ * \param[in]	pointer to uSec UTC time value
+ * \return		true if connection successful
  */
-int32_t	xSyslogInit(void) {
-#if		defined(syslogHOSTNAME)
-	sSyslogCtx.pHost = syslogHOSTNAME ;
-#else
-	#if (configPRODUCTION == 0)
-	sSyslogCtx.pHost = HostInfo[hostDEV].pName ;
-	#else
-	sSyslogCtx.pHost = HostInfo[nvsVars.HostSLOG].pName ;
-	#endif
-#endif
+int32_t	xSyslogInit(const char * pcHostName, uint64_t * pRunTime, uint64_t * pUTCTime) {
+	IF_myASSERT(debugPARAM, pcHostName && INRANGE_SRAM(pRunTime) && INRANGE_SRAM(pUTCTime)) ;
+	if (sSyslogCtx.pHost != NULL || sSyslogCtx.sd > 0) {
+		vSyslogDisConnect() ;
+		memset(&sSyslogCtx, 0, sizeof(sSyslogCtx)) ;
+	}
+	ptRunTime = pRunTime ;
+	ptUTCTime = pUTCTime ;
+	sSyslogCtx.pHost = pcHostName ;
+	return xSyslogConnect() ;
+}
 
+/**
+ * vSyslogConnect() - establish connection to the selected syslog host
+ * \return		true if successful else false
+ */
+int32_t	xSyslogConnect(void) {
+	IF_myASSERT(debugPARAM, sSyslogCtx.pHost) ;
+	if (bRtosCheckStatus(flagLX_STA) == false) {
+		return false ;
+	}
 	sSyslogCtx.sa_in.sin_family = AF_INET ;
 #if		(syslogUSE_UDP == 1)
 	sSyslogCtx.sa_in.sin_port   = htons(IP_PORT_SYSLOG_UDP) ;
@@ -202,22 +215,18 @@ int32_t	xSyslogInit(void) {
 	}
    	xNetSetNonBlocking(&sSyslogCtx, flagXNET_NONBLOCK) ;
    	xRtosSetStatus(flagNET_SYSLOG) ;
-   	IF_CTRACK(debugTRACK, "init") ;
+   	IF_CTRACK(debugTRACK, "connect") ;
    	return true ;
 }
 
 /**
- * vSyslogDeInit()
- * \brief		De-initialise the SysLog module
- * \param[in]	none
- * \param[out]	none
- * \return		none
+ * vSyslogDisConnect()	De-initialise the SysLog module
  */
-void	vSyslogDeInit(void) {
+void	vSyslogDisConnect(void) {
 	xRtosClearStatus(flagNET_SYSLOG) ;
 	close(sSyslogCtx.sd) ;
 	sSyslogCtx.sd = -1 ;
-	IF_CTRACK(debugTRACK, "deinit") ;
+	IF_CTRACK(debugTRACK, "disconnect") ;
 }
 
 /**
@@ -229,7 +238,7 @@ void	vSyslogDeInit(void) {
  */
 void	vSyslogSetPriority(uint32_t Priority) { SyslogMinSevLev = Priority % 8 ; }
 
-bool bSyslogCheckStatus(uint8_t MsgPRI) {
+bool	bSyslogCheckStatus(uint8_t MsgPRI) {
    	IF_CTRACK(debugTRACK, "MsgPRI=%d  SLminSL=%d", MsgPRI % 8, SyslogMinSevLev) ;
 	if (bRtosCheckStatus(flagLX_STA) == false || (MsgPRI % 8) > SyslogMinSevLev) {
 		return false ;
@@ -237,7 +246,7 @@ bool bSyslogCheckStatus(uint8_t MsgPRI) {
 
 	if (bRtosCheckStatus(flagNET_SYSLOG) == false) {
 	   	IF_CTRACK(debugTRACK, "connecting...") ;
-		return xSyslogInit() ;
+		return xSyslogConnect() ;
 	}
 	return true ;
 }
@@ -248,7 +257,7 @@ int32_t	xSyslogSendMessage(char * pcBuffer, int32_t xLen) {
 	if (iRV == xLen) {
 		sSyslogCtx.maxTx = (xLen > sSyslogCtx.maxTx) ? xLen : sSyslogCtx.maxTx ;
 	} else {
-		vSyslogDeInit() ;
+		vSyslogDisConnect() ;
 	}
 	return iRV ;
 }
@@ -290,8 +299,13 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 
 	// Step 1: setup time, priority and related variables
 	uint8_t		MsgPRI	= Priority % 256 ;
-	uint64_t	MsgUTC	= sTSZ.usecs ;
-	uint64_t	MsgRUN	= RunTime ;
+	uint64_t	MsgRUN, MsgUTC ;
+	if (ptRunTime == NULL) {
+		MsgRUN	=	MsgUTC	= esp_log_timestamp() * MICROS_IN_MILLISEC ;
+	} else {
+		MsgRUN	= *ptRunTime ;
+		MsgUTC	= *ptUTCTime ;
+	}
 #if	(ESP32_PLATFORM == 1) && !defined(CONFIG_FREERTOS_UNICORE)
 	int32_t		McuID	= xPortGetCoreID() ;
 #else
@@ -313,7 +327,7 @@ int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_
 		++RptCNT ;										// Yes, increment the repeat counter
 		RptRUN = MsgRUN ;								// save timestamps of latest repeat
 		RptUTC = MsgUTC ;
-		xLen = 0 ;										// nothing was net via network
+		xLen = 0 ;										// nothing was sent via network
 
 	} else {											// new/different message, handle suppressed duplicates
 		RptCRC = MsgCRC ;
