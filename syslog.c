@@ -104,12 +104,10 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #include	"hal_timer.h"
 #include	"hal_nvic.h"
 
-#if		(ESP32_PLATFORM == 1)
-	#include	"esp_log.h"
-	#include	"esp32/rom/crc.h"						// ESP32 ROM routine
-#else
-	#include	"crc-barr.h"							// Barr group CRC
-#endif
+#include	"esp_log.h"
+#include	"esp32/rom/crc.h"						// ESP32 ROM routine
+//#include	"crc-barr.h"							// Barr group CRC
+#include	<sys/errno.h>
 
 #include	<string.h>
 
@@ -141,7 +139,8 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
  * seconds the crash can still occur. In order to minimise load on the IP stack the minimum severity
  * level should be set to NOTICE. */
 #if		(ESP32_PLATFORM == 1)
-static	uint32_t	SyslogMinSevLev = CONFIG_LOG_DEFAULT_LEVEL + 2 ;		// align with ESP-IDF levels
+//static	uint32_t	SyslogMinSevLev = CONFIG_LOG_DEFAULT_LEVEL + 2 ;		// align with ESP-IDF levels
+static	uint32_t	SyslogMinSevLev = 7 ;										// Override
 #else
 static	uint32_t	SyslogMinSevLev = SL_SEV_WARNING ;
 #endif
@@ -158,6 +157,14 @@ static	uint64_t	RptRUN, RptUTC ;
 static	uint8_t		RptPRI ;
 
 // ###################################### Public functions #########################################
+
+int32_t	IRAM_ATTR xSyslogError(int32_t eCode) {
+	sSyslogCtx.error = errno ? errno : eCode ;
+	IF_CPRINT(debugTRACK, "(%s:%d) err %d => %d (%s)",
+			sSyslogCtx.pHost, ntohs(sSyslogCtx.sa_in.sin_port), eCode, sSyslogCtx.error, strerror(sSyslogCtx.error)) ;
+	sSyslogCtx.sd = -1 ;
+	return false ;
+}
 
 /**
  * xSyslogInit() - Initialise the SysLog module
@@ -193,27 +200,34 @@ int32_t	IRAM_ATTR xSyslogConnect(void) {
 #elif		(syslogUSE_TCP == 1) && (IP_PORT_SYSLOG_TLS == 0)
 	sSyslogCtx.sa_in.sin_port   = htons(IP_PORT_SYSLOG_TCP) ;
 #elif		(syslogUSE_TCP == 1) && (IP_PORT_SYSLOG_TLS == 1)
+	// Not yet fully implemented or tested !!!!
 	sSyslogCtx.sa_in.sin_port   = htons(IP_PORT_SYSLOG_TLS) ;
 #endif
 	sSyslogCtx.type				= SOCK_DGRAM ;
 	sSyslogCtx.d_flags			= 0 ;
 	sSyslogCtx.d_ndebug			= 1 ;					// disable debug in x_sockets.c
-	if (xNetGetHostByName(&sSyslogCtx) < erSUCCESS) {
-	   	IF_CTRACK(debugTRACK, "FAIL Hostname") ;
-		return false ;
+	ip_addr_t	ip_addr ;
+	int32_t iRV = netconn_gethostbyname(sSyslogCtx.pHost, &ip_addr) ;
+	if (iRV == 0) {
+		sSyslogCtx.error = 0 ;
+		sSyslogCtx.sa_in.sin_addr.s_addr = ip_addr.u_addr.ip4.addr ;	// ip_addr is returned in network format, so keep as is...
+	} else {
+		return xSyslogError(iRV) ;
 	}
 	if ((sSyslogCtx.sd = socket(sSyslogCtx.sa_in.sin_family, sSyslogCtx.type, IPPROTO_IP)) < erSUCCESS) {
-		sSyslogCtx.sd = -1 ;
-	   	IF_CTRACK(debugTRACK, "FAIL socket") ;
-		return false ;
+		return xSyslogError(iRV) ;
 	}
 	if (connect(sSyslogCtx.sd, &sSyslogCtx.sa, sizeof(struct sockaddr_in)) < erSUCCESS) {
 		close(sSyslogCtx.sd) ;
-		sSyslogCtx.sd = -1 ;
-	   	IF_CTRACK(debugTRACK, "FAIL connect") ;
-		return false ;
+		return xSyslogError(iRV) ;
 	}
-   	xNetSetNonBlocking(&sSyslogCtx, flagXNET_NONBLOCK) ;
+   	sSyslogCtx.tOut	= flagXNET_NONBLOCK ;
+	iRV = ioctlsocket(sSyslogCtx.sd, FIONBIO, &sSyslogCtx.tOut) ;		// 0 = Disable, 1+ = Enable NonBlocking
+	if (iRV == 0) {
+		sSyslogCtx.error	= 0 ;
+	} else {
+		return xSyslogError(iRV) ;
+	}
    	xRtosSetStatus(flagNET_SYSLOG) ;
    	IF_CTRACK(debugTRACK, "connect") ;
    	return true ;
