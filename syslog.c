@@ -105,11 +105,14 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #include	"hal_timer.h"
 #include	"hal_nvic.h"
 
-#include	"esp_log.h"
-#include	"esp32/rom/crc.h"						// ESP32 ROM routine
-//#include	"crc-barr.h"							// Barr group CRC
-#include	<sys/errno.h>
+#if		(ESP32_PLATFORM == 1)
+	#include	"esp_log.h"
+	#include	"esp32/rom/crc.h"					// ESP32 ROM routine
+#else
+	#include	"crc-barr.h"						// Barr group CRC
+#endif
 
+#include	<sys/errno.h>
 #include	<string.h>
 
 #define	debugFLAG				0x0000
