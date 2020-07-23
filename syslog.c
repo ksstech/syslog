@@ -59,8 +59,8 @@
 	SD-PARAM = PARAM-NAME "=" %d34 PARAM-VALUE %d34
 	SD-ID = SD-NAME
 	PARAM-NAME = SD-NAME
-	PARAM-VALUE = UTF-8-STRING ; characters ’"’, ’\’ and ; ’]’ MUST be escaped.
-	SD-NAME = 1*32PRINTUSASCII ; except ’=’, SP, ’]’, %d34 (")
+	PARAM-VALUE = UTF-8-STRING ; characters ï¿½"ï¿½, ï¿½\ï¿½ and ; ï¿½]ï¿½ MUST be escaped.
+	SD-NAME = 1*32PRINTUSASCII ; except ï¿½=ï¿½, SP, ï¿½]ï¿½, %d34 (")
 
  MSG = MSG-ANY / MSG-UTF8
  MSG-ANY = *OCTET ; not starting with BOM
@@ -98,6 +98,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #include	"x_sockets.h"
 #include	"x_errors_events.h"
 #include	"x_retarget.h"
+#include	"x_time.h"
 
 #include	"hal_debug.h"
 #include	"hal_network.h"
