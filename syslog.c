@@ -115,11 +115,12 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #include	<sys/errno.h>
 #include	<string.h>
 
-#define	debugFLAG				0x0000
+#define	debugFLAG					0x0000
 
-#define	debugTRACK				(debugFLAG & 0x2000)
-#define	debugPARAM				(debugFLAG & 0x4000)
-#define	debugRESULT				(debugFLAG & 0x8000)
+#define	debugTIMING					(debugFLAG_GLOBAL & debugFLAG & 0x1000)
+#define	debugTRACK					(debugFLAG_GLOBAL & debugFLAG & 0x2000)
+#define	debugPARAM					(debugFLAG_GLOBAL & debugFLAG & 0x4000)
+#define	debugRESULT					(debugFLAG_GLOBAL & debugFLAG & 0x8000)
 
 // ###################################### BUILD : CONFIG definitions ##############################
 
