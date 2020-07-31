@@ -97,7 +97,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #include	"printfx.h"
 #include	"x_sockets.h"
 #include	"x_errors_events.h"
-#include	"x_retarget.h"
+#include	"x_stdio.h"
 #include	"x_time.h"
 
 #include	"hal_debug.h"
@@ -347,7 +347,6 @@ int32_t	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * f
 		RptRUN = MsgRUN ;								// save timestamps of latest repeat
 		RptUTC = MsgUTC ;
 		xLen = 0 ;										// nothing was sent via network
-
 	} else {											// new/different message, handle suppressed duplicates
 		RptCRC = MsgCRC ;
 		RptPRI = MsgPRI ;
@@ -372,7 +371,6 @@ int32_t	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * f
 			xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %R %s #%d %s %s - ", MsgPRI, MsgUTC, nameSTA, McuID, ProcID, MsgID) ;
 			xLen += vsnprintfx(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
 			xLen = xSyslogSendMessage(SyslogBuffer, xLen) ;
-
 		} else {
 			xLen = 0 ;
 		}
@@ -398,6 +396,7 @@ int32_t	IRAM_ATTR xSyslog(uint32_t Priority, const char * MsgID, const char * fo
     return iRV ;
 }
 
+#if 0
 /**
  * xvLog() and xLog() - perform printfx() like output to a buffer and then to the console
  * @param	format
@@ -421,16 +420,17 @@ int32_t	xLog(const char * format, ...) {
     return iRV ;
 }
 
-int32_t	xLogFunc(int32_t (*F)(char *, size_t)) {
-	IF_myASSERT(debugPARAM, INRANGE_FLASH(F)) ;
+int32_t	xLogFunc(int32_t (*pFunc)(char *, size_t)) {
+	IF_myASSERT(debugPARAM, INRANGE_FLASH(pFunc)) ;
 	xRtosSemaphoreTake(&SyslogMutex, portMAX_DELAY) ;
-	int32_t iRV = F(SyslogBuffer, syslogBUFSIZE) ;
+	int32_t iRV = pFunc(SyslogBuffer, syslogBUFSIZE) ;
 	if (iRV > 0) {
 		sSyslogCtx.maxTx = (iRV > sSyslogCtx.maxTx) ? iRV : sSyslogCtx.maxTx ;
 	}
 	xRtosSemaphoreGive(&SyslogMutex) ;
     return iRV ;
 }
+#endif
 
 /**
  * vSyslogReport() - report x[v]Syslog() related information
