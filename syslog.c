@@ -306,9 +306,9 @@ int32_t	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * f
 		IF_myASSERT(debugPARAM, INRANGE_SRAM(ProcID)) ;
 		char * pcTmp  = ProcID ;
 		while (*pcTmp) {
-			if (*pcTmp == CHR_SPACE) {
-				*pcTmp = CHR_UNDERSCORE ;
-			}
+			if (*pcTmp == CHR_SPACE) {					// Since ' ' is seen as a separator in the
+				*pcTmp = CHR_UNDERSCORE ;				// syslog specification, replace with'_' to
+			}											// avoid message being scrambled
 			++pcTmp ;
 		}
 	} else {
