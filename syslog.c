@@ -351,10 +351,10 @@ int32_t	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * f
 		RptCRC = MsgCRC ;
 		RptPRI = MsgPRI ;
 		if (RptCNT > 0) {								// if we have skipped messages
-			PRINT("%C%!R: #%d Last of %d (skipped) Identical messages%C\n", xpfSGR(attrRESET, SyslogColors[RptPRI & 0x07],0,0), RptRUN, McuID, RptCNT, attrRESET) ;
+			printfx("%C%!.R: #%d Last of %d (skipped) Identical messages%C\n", xpfSGR(attrRESET, SyslogColors[RptPRI & 0x07],0,0), RptRUN, McuID, RptCNT, attrRESET) ;
 			// build & send skipped message to host
 			if (FRflag && bSyslogCheckStatus(MsgPRI)) {
-				xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %R %s #%d %s %s - Last of %d (skipped) Identical messages",
+				xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %.R %s #%d %s %s - Last of %d (skipped) Identical messages",
 						RptPRI, RptUTC, nameSTA, McuID, ProcID, MsgID, RptCNT) ;
 				xSyslogSendMessage(SyslogBuffer, xLen) ;
 			}
@@ -365,10 +365,10 @@ int32_t	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * f
 		}
 
 		// show the new message to the console...
-		PRINT("%C%!R: #%d %s%C\n", xpfSGR(attrRESET, SyslogColors[MsgPRI & 0x07],0,0), MsgRUN, McuID, SyslogBuffer, attrRESET) ;
+		printfx("%C%!.R: #%d %s%C\n", xpfSGR(attrRESET, SyslogColors[MsgPRI & 0x07],0,0), MsgRUN, McuID, SyslogBuffer, attrRESET) ;
 		// filter out reasons why message should not go to syslog host, then build and send
 		if (FRflag && bSyslogCheckStatus(MsgPRI)) {
-			xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %R %s #%d %s %s - ", MsgPRI, MsgUTC, nameSTA, McuID, ProcID, MsgID) ;
+			xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %.R %s #%d %s %s - ", MsgPRI, MsgUTC, nameSTA, McuID, ProcID, MsgID) ;
 			xLen += vsnprintfx(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
 			xLen = xSyslogSendMessage(SyslogBuffer, xLen) ;
 		} else {
@@ -406,7 +406,7 @@ int32_t	IRAM_ATTR xSyslog(uint32_t Priority, const char * MsgID, const char * fo
 int32_t	xvLog(const char * format, va_list vArgs) {
 	IF_myASSERT(debugPARAM, INRANGE_MEM(format)) ;
 	xRtosSemaphoreTake(&SyslogMutex, portMAX_DELAY) ;
-	int32_t iRV = PRINT(format, vArgs) ;
+	int32_t iRV = vprintfx(format, vArgs) ;
 	sSyslogCtx.maxTx = (iRV > sSyslogCtx.maxTx) ? iRV : sSyslogCtx.maxTx ;
 	xRtosSemaphoreGive(&SyslogMutex) ;
 	return iRV ;
@@ -439,7 +439,7 @@ void	vSyslogReport(void) {
 	if (bRtosCheckStatus(flagNET_SYSLOG)) {
 		xNetReport(&sSyslogCtx, "SLOG", 0, 0, 0) ;
 	}
-	PRINT("\tmaxTX=%u  CurRpt=%d\n", sSyslogCtx.maxTx, RptCNT) ;
+	printfx("\tmaxTX=%u  CurRpt=%d\n", sSyslogCtx.maxTx, RptCNT) ;
 }
 
 // #################################### Test and benchmark routines ################################
@@ -473,7 +473,7 @@ void	vSyslogBenchmark(void) {
 	xSysTimerStop(systimerSLOG) ;
 	vSysTimerShow(1 << systimerSLOG) ;
 
-	PRINT("CRC #1=%u  #2=%u  #3=%u\n", crc1, crc2, crc3) ;
-	PRINT("CRC #4=%u  #5=%u  #6=%u\n", crc4, crc5, crc6) ;
+	printfx("CRC #1=%u  #2=%u  #3=%u\n", crc1, crc2, crc3) ;
+	printfx("CRC #4=%u  #5=%u  #6=%u\n", crc4, crc5, crc6) ;
 }
 #endif
