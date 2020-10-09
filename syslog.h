@@ -75,7 +75,7 @@ extern "C" {
 // ############################## Syslog formatting/calling macros #################################
 
 #ifndef	SL_FAC_IRMACOS
-	#define	SL_FAC_IRMACOS					SL_FAC_LOCAL0
+	#define	SL_FAC_IRMACOS				SL_FAC_LOCAL0
 #endif
 
 #define	SL_CHECK(x)						if (x < erSUCCESS) xSyslog(SL_MOD2LOCAL(SL_SEV_ERROR), NULL, __FUNCTION__, "()=%d", x)

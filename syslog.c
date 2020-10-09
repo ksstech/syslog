@@ -180,10 +180,9 @@ int32_t	IRAM_ATTR xSyslogError(int32_t eCode) {
  */
 int32_t	IRAM_ATTR xSyslogInit(const char * pcHostName, uint64_t * pRunTime, uint64_t * pUTCTime) {
 	IF_myASSERT(debugPARAM, pcHostName && INRANGE_SRAM(pRunTime) && INRANGE_SRAM(pUTCTime)) ;
-	if (sSyslogCtx.pHost != NULL || sSyslogCtx.sd > 0) {
+	if (sSyslogCtx.pHost != NULL || sSyslogCtx.sd > 0)
 		vSyslogDisConnect() ;
-		memset(&sSyslogCtx, 0, sizeof(sSyslogCtx)) ;
-	}
+	memset(&sSyslogCtx, 0, sizeof(sSyslogCtx)) ;
 	ptRunTime = pRunTime ;
 	ptUTCTime = pUTCTime ;
 	sSyslogCtx.pHost = pcHostName ;
