@@ -165,7 +165,7 @@ static	uint8_t		RptPRI ;
 
 int32_t	IRAM_ATTR xSyslogError(int32_t eCode) {
 	sSyslogCtx.error = errno ? errno : eCode ;
-	IF_CPRINT(debugTRACK, "(%s:%d) err %d => %d (%s)",
+	IF_PRINT(debugTRACK, "(%s:%d) err %d => %d (%s)",
 			sSyslogCtx.pHost, ntohs(sSyslogCtx.sa_in.sin_port), eCode, sSyslogCtx.error, strerror(sSyslogCtx.error)) ;
 	sSyslogCtx.sd = -1 ;
 	return false ;
@@ -234,7 +234,7 @@ int32_t	IRAM_ATTR xSyslogConnect(void) {
 		return xSyslogError(iRV) ;
 	}
    	xRtosSetStatus(flagNET_SYSLOG) ;
-   	IF_CTRACK(debugTRACK, "connect") ;
+   	IF_TRACK(debugTRACK, "connect") ;
    	return true ;
 }
 
@@ -245,7 +245,7 @@ void	IRAM_ATTR vSyslogDisConnect(void) {
 	xRtosClearStatus(flagNET_SYSLOG) ;
 	close(sSyslogCtx.sd) ;
 	sSyslogCtx.sd = -1 ;
-	IF_CTRACK(debugTRACK, "disconnect") ;
+	IF_TRACK(debugTRACK, "disconnect") ;
 }
 
 /**
@@ -258,13 +258,13 @@ void	IRAM_ATTR vSyslogDisConnect(void) {
 void	vSyslogSetPriority(uint32_t Priority) { SyslogMinSevLev = Priority % 8 ; }
 
 bool	IRAM_ATTR bSyslogCheckStatus(uint8_t MsgPRI) {
-   	IF_CTRACK(debugTRACK, "MsgPRI=%d  SLminSL=%d", MsgPRI % 8, SyslogMinSevLev) ;
+   	IF_TRACK(debugTRACK, "MsgPRI=%d  SLminSL=%d", MsgPRI % 8, SyslogMinSevLev) ;
 	if (bRtosCheckStatus(flagLX_STA) == false || (MsgPRI % 8) > SyslogMinSevLev) {
 		return false ;
 	}
 
 	if (bRtosCheckStatus(flagNET_SYSLOG) == false) {
-	   	IF_CTRACK(debugTRACK, "connecting...") ;
+	   	IF_TRACK(debugTRACK, "connecting...") ;
 		return xSyslogConnect() ;
 	}
 	return true ;
