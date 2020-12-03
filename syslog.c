@@ -144,8 +144,7 @@ static	uint8_t		RptPRI ;
 
 int32_t	IRAM_ATTR xSyslogError(int32_t eCode) {
 	sSyslogCtx.error = errno ? errno : eCode ;
-	IF_PRINT(debugTRACK, "(%s:%d) err %d => %d (%s)",
-			sSyslogCtx.pHost, ntohs(sSyslogCtx.sa_in.sin_port), eCode, sSyslogCtx.error, strerror(sSyslogCtx.error)) ;
+	IF_PRINT(debugTRACK, "(%s:%d) err %d => %d (%s)", sSyslogCtx.pHost, ntohs(sSyslogCtx.sa_in.sin_port), eCode, sSyslogCtx.error, strerror(sSyslogCtx.error)) ;
 	sSyslogCtx.sd = -1 ;
 	return false ;
 }
@@ -174,9 +173,8 @@ int32_t	IRAM_ATTR xSyslogInit(const char * pcHostName, uint64_t * pRunTime, uint
  */
 int32_t	IRAM_ATTR xSyslogConnect(void) {
 	IF_myASSERT(debugPARAM, sSyslogCtx.pHost) ;
-	if (bRtosCheckStatus(flagLX_STA) == false) {
+	if (bRtosCheckStatus(flagLX_STA) == false)
 		return false ;
-	}
 	sSyslogCtx.sa_in.sin_family = AF_INET ;
 #if		(syslogUSE_UDP == 1)
 	sSyslogCtx.sa_in.sin_port   = htons(IP_PORT_SYSLOG_UDP) ;
@@ -194,23 +192,20 @@ int32_t	IRAM_ATTR xSyslogConnect(void) {
 	if (iRV == 0) {
 		sSyslogCtx.error = 0 ;
 		sSyslogCtx.sa_in.sin_addr.s_addr = ip_addr.u_addr.ip4.addr ;	// ip_addr is returned in network format, so keep as is...
-	} else {
+	} else
 		return xSyslogError(iRV) ;
-	}
-	if ((sSyslogCtx.sd = socket(sSyslogCtx.sa_in.sin_family, sSyslogCtx.type, IPPROTO_IP)) < erSUCCESS) {
+	if ((sSyslogCtx.sd = socket(sSyslogCtx.sa_in.sin_family, sSyslogCtx.type, IPPROTO_IP)) < erSUCCESS)
 		return xSyslogError(iRV) ;
-	}
 	if (connect(sSyslogCtx.sd, &sSyslogCtx.sa, sizeof(struct sockaddr_in)) < erSUCCESS) {
 		close(sSyslogCtx.sd) ;
 		return xSyslogError(iRV) ;
 	}
    	sSyslogCtx.tOut	= flagXNET_NONBLOCK ;
 	iRV = ioctlsocket(sSyslogCtx.sd, FIONBIO, &sSyslogCtx.tOut) ;		// 0 = Disable, 1+ = Enable NonBlocking
-	if (iRV == 0) {
+	if (iRV == 0)
 		sSyslogCtx.error	= 0 ;
-	} else {
+	else
 		return xSyslogError(iRV) ;
-	}
    	xRtosSetStatus(flagNET_SYSLOG) ;
    	IF_TRACK(debugTRACK, "connect") ;
    	return true ;
@@ -240,11 +235,9 @@ bool	IRAM_ATTR bSyslogCheckStatus(uint8_t MsgPRI) {
 	if (bRtosCheckStatus(flagLX_STA) == false || (MsgPRI % 8) > SyslogMinSevLev) {
 		return false ;
 	}
-
-	if (bRtosCheckStatus(flagNET_SYSLOG) == false) {
 	   	IF_TRACK(debugTRACK, "connecting...") ;
+	if (bRtosCheckStatus(flagNET_SYSLOG) == false)
 		return xSyslogConnect() ;
-	}
 	return true ;
 }
 
@@ -335,8 +328,7 @@ int32_t	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * f
 			printfx("%C%!.R: #%d Last of %d (skipped) Identical messages%C\n", xpfSGR(attrRESET, SyslogColors[RptPRI & 0x07],0,0), RptRUN, McuID, RptCNT, attrRESET) ;
 			// build & send skipped message to host
 			if (FRflag && bSyslogCheckStatus(MsgPRI)) {
-				xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %.R %s #%d %s %s - Last of %d (skipped) Identical messages",
-						RptPRI, RptUTC, nameSTA, McuID, ProcID, MsgID, RptCNT) ;
+				xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %.R %s #%d %s %s - Last of %d (skipped) Identical messages", RptPRI, RptUTC, nameSTA, McuID, ProcID, MsgID, RptCNT) ;
 				xSyslogSendMessage(SyslogBuffer, xLen) ;
 			}
 			// rebuild the NEW console message
@@ -381,9 +373,8 @@ int32_t	IRAM_ATTR xSyslog(uint32_t Priority, const char * MsgID, const char * fo
  * vSyslogReport() - report x[v]Syslog() related information
  */
 void	vSyslogReport(void) {
-	if (bRtosCheckStatus(flagNET_SYSLOG)) {
+	if (bRtosCheckStatus(flagNET_SYSLOG))
 		xNetReport(&sSyslogCtx, "SLOG", 0, 0, 0) ;
-	}
 	printfx("\tmaxTX=%u  CurRpt=%d\n", sSyslogCtx.maxTx, RptCNT) ;
 }
 
