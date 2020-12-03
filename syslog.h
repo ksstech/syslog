@@ -74,30 +74,31 @@ extern "C" {
 
 // ############################## Syslog formatting/calling macros #################################
 
-#ifndef	SL_FAC_IRMACOS
-	#define	SL_FAC_IRMACOS				SL_FAC_LOCAL0
-#endif
+#define	SL_LEVEL					(CONFIG_LOG_DEFAULT_LEVEL + 2)
+#define	SL_MOD2LOCAL(SEV)			((SL_FAC_LOCAL0 << 3) | SEV )
 
-#define	SL_CHECK(x)						if (x < erSUCCESS) xSyslog(SL_MOD2LOCAL(SL_SEV_ERROR), NULL, __FUNCTION__, "()=%d", x)
-#define	SL_MOD2LOCAL(SEV)				((SL_FAC_IRMACOS << 3) | SEV)
+#define	SL_LOG(x, f, ...) 			do { \
+	if (SL_LEVEL >= (x)) \
+		xSyslog(SL_MOD2LOCAL(x) , __FUNCTION__ ,f , ##__VA_ARGS__) ; \
+	} while(0)
 
-#define	SL_EMER(FORMAT, ...)			xSyslog(SL_MOD2LOCAL(SL_SEV_EMERGENCY),	__FUNCTION__, FORMAT, ##__VA_ARGS__)
-#define	SL_ALRT(FORMAT, ...)			xSyslog(SL_MOD2LOCAL(SL_SEV_ALERT),		__FUNCTION__, FORMAT, ##__VA_ARGS__)
-#define	SL_CRIT(FORMAT, ...)			xSyslog(SL_MOD2LOCAL(SL_SEV_CRITICAL),	__FUNCTION__, FORMAT, ##__VA_ARGS__)
-#define	SL_ERR(FORMAT, ...)				xSyslog(SL_MOD2LOCAL(SL_SEV_ERROR),		__FUNCTION__, FORMAT, ##__VA_ARGS__)
-#define	SL_WARN(FORMAT, ...)			xSyslog(SL_MOD2LOCAL(SL_SEV_WARNING),	__FUNCTION__, FORMAT, ##__VA_ARGS__)
-#define	SL_NOT(FORMAT, ...)				xSyslog(SL_MOD2LOCAL(SL_SEV_NOTICE), 	__FUNCTION__, FORMAT, ##__VA_ARGS__)
-#define	SL_INFO(FORMAT, ...)			xSyslog(SL_MOD2LOCAL(SL_SEV_INFO), 		__FUNCTION__, FORMAT, ##__VA_ARGS__)
-#define	SL_DBG(FORMAT, ...)				xSyslog(SL_MOD2LOCAL(SL_SEV_DEBUG),		__FUNCTION__, FORMAT, ##__VA_ARGS__)
+#define	SL_EMER(f, ...)				SL_LOG(SL_SEV_EMERGENCY, f, ##__VA_ARGS__)
+#define	SL_ALRT(f, ...)				SL_LOG(SL_SEV_ALERT, f, ##__VA_ARGS__)
+#define	SL_CRIT(f, ...)				SL_LOG(SL_SEV_CRITICAL, f, ##__VA_ARGS__)
+#define	SL_ERR(f, ...)				SL_LOG(SL_SEV_ERROR, f, ##__VA_ARGS__)
+#define	SL_WARN(f, ...)				SL_LOG(SL_SEV_WARNING, f, ##__VA_ARGS__)
+#define	SL_NOT(f, ...)				SL_LOG(SL_SEV_NOTICE, f, ##__VA_ARGS__)
+#define	SL_INFO(f, ...)				SL_LOG(SL_SEV_INFO, f, ##__VA_ARGS__)
+#define	SL_DBG(f, ...)				SL_LOG(SL_SEV_DEBUG, f, ##__VA_ARGS__)
 
-#define	IF_SL_EMER(x, FORMAT, ...)		if (x) SL_EMER(FORMAT, ##__VA_ARGS__)
-#define	IF_SL_ALRT(x, FORMAT, ...)		if (x) SL_ALRT(FORMAT, ##__VA_ARGS__)
-#define	IF_SL_CRIT(x, FORMAT, ...)		if (x) SL_CRIT(FORMAT, ##__VA_ARGS__)
-#define	IF_SL_ERR(x, FORMAT, ...)		if (x) SL_ERR(FORMAT, ##__VA_ARGS__)
-#define	IF_SL_WARN(x, FORMAT, ...)		if (x) SL_WARN(FORMAT, ##__VA_ARGS__)
-#define	IF_SL_NOT(x, FORMAT, ...)		if (x) SL_NOT(FORMAT, ##__VA_ARGS__)
-#define	IF_SL_INFO(x, FORMAT, ...)		if (x) SL_INFO(FORMAT, ##__VA_ARGS__)
-#define	IF_SL_DBG(x, FORMAT, ...)		if (x) SL_DBG(FORMAT, ##__VA_ARGS__)
+#define	IF_SL_EMER(x, f, ...)		if (x) SL_EMER(f, ##__VA_ARGS__)
+#define	IF_SL_ALRT(x, f, ...)		if (x) SL_ALRT(f, ##__VA_ARGS__)
+#define	IF_SL_CRIT(x, f, ...)		if (x) SL_CRIT(f, ##__VA_ARGS__)
+#define	IF_SL_ERR(x, f, ...)		if (x) SL_ERR(f, ##__VA_ARGS__)
+#define	IF_SL_WARN(x, f, ...)		if (x) SL_WARN(f, ##__VA_ARGS__)
+#define	IF_SL_NOT(x, f, ...)		if (x) SL_NOT(f, ##__VA_ARGS__)
+#define	IF_SL_INFO(x, f, ...)		if (x) SL_INFO(f, ##__VA_ARGS__)
+#define	IF_SL_DBG(x, f, ...)		if (x) SL_DBG(f, ##__VA_ARGS__)
 
 // ###################################### Global variables #########################################
 
