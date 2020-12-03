@@ -231,11 +231,9 @@ void	IRAM_ATTR vSyslogDisConnect(void) {
 void	vSyslogSetPriority(uint32_t Priority) { SyslogMinSevLev = Priority % 8 ; }
 
 bool	IRAM_ATTR bSyslogCheckStatus(uint8_t MsgPRI) {
-   	IF_TRACK(debugTRACK, "MsgPRI=%d  SLminSL=%d", MsgPRI % 8, SyslogMinSevLev) ;
 	if (bRtosCheckStatus(flagLX_STA) == false || (MsgPRI % 8) > SyslogMinSevLev) {
 		return false ;
 	}
-	   	IF_TRACK(debugTRACK, "connecting...") ;
 	if (bRtosCheckStatus(flagNET_SYSLOG) == false)
 		return xSyslogConnect() ;
 	return true ;
@@ -265,6 +263,7 @@ int32_t	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * f
 	// Step 0: handle state of scheduler and obtain the task name
 	bool	FRflag ;
 	char *	ProcID ;
+   	IF_TRACK(debugTRACK, "Sev=%d  MinSev=%d", Priority % 8, SyslogMinSevLev) ;
 	xRtosSemaphoreTake(&SyslogMutex, portMAX_DELAY) ;
 	if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
 		FRflag = true ;
