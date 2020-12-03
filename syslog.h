@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-18 Andre M Maree / KSS Technologies (Pty) Ltd.
+ * Copyright 2014-20 Andre M Maree / KSS Technologies (Pty) Ltd.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software
  * and associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -23,7 +23,7 @@
 
 #pragma once
 
-#include	"x_definitions.h"
+#include	"hal_config.h"
 
 #include	<stdarg.h>
 #include	<stdint.h>
@@ -34,43 +34,43 @@ extern "C" {
 
 // ############################################ macros ############################################
 
-#define	syslogHOSTNAME					"host.domain.tld"
+#define	syslogHOSTNAME				"host.domain.tld"
 
 // ############################# Facilities & Severities definitions ###############################
 
-#define		SL_FAC_KERNEL				0			// kernel messages
-#define		SL_FAC_USER					1			// user-level messages
-#define		SL_FAC_MAIL					2			// mail system
-#define		SL_FAC_SYSTEM				3			// system daemons
-#define		SL_FAC_SECURITY				4			// security/authorization messages
-#define		SL_FAC_SYSLOG				5			// messages generated internally by syslogd
-#define		SL_FAC_LINEPRNTR			6			// line printer subsystem
-#define		SL_FAC_NEWS					7			// network news subsystem
-#define		SL_FAC_UUCP					8			// UUCP subsystem
-#define		SL_FAC_CLOCK				9			// clock daemon
-#define		SL_FAC_SECURITY2			10			// security/authorization messages
-#define		SL_FAC_FTP					11			// FTP daemon
-#define		SL_FAC_NTP					12			// NTP subsystem
-#define		SL_FAC_LOGAUDIT				13			// log audit
-#define		SL_FAC_LOGALERT				14			// log alert
-#define		SL_FAC_CLOCK2				15			// clock daemon (note 2)
-#define		SL_FAC_LOCAL0				16			// local use 0 (local0)
-#define		SL_FAC_LOCAL1				17			// local use 1 (local1)
-#define		SL_FAC_LOCAL2				18			// local use 2 (local2)
-#define		SL_FAC_LOCAL3				19			// local use 3 (local3)
-#define		SL_FAC_LOCAL4				20			// local use 4 (local4)
-#define		SL_FAC_LOCAL5				21			// local use 5 (local5)
-#define		SL_FAC_LOCAL6				22			// local use 6 (local6)
-#define		SL_FAC_LOCAL7				23			// local use 7 (local7)
+#define		SL_FAC_KERNEL			0			// kernel messages
+#define		SL_FAC_USER				1			// user-level messages
+#define		SL_FAC_MAIL				2			// mail system
+#define		SL_FAC_SYSTEM			3			// system daemons
+#define		SL_FAC_SECURITY			4			// security/authorization messages
+#define		SL_FAC_SYSLOG			5			// messages generated internally by syslogd
+#define		SL_FAC_LINEPRNTR		6			// line printer subsystem
+#define		SL_FAC_NEWS				7			// network news subsystem
+#define		SL_FAC_UUCP				8			// UUCP subsystem
+#define		SL_FAC_CLOCK			9			// clock daemon
+#define		SL_FAC_SECURITY2		10			// security/authorization messages
+#define		SL_FAC_FTP				11			// FTP daemon
+#define		SL_FAC_NTP				12			// NTP subsystem
+#define		SL_FAC_LOGAUDIT			13			// log audit
+#define		SL_FAC_LOGALERT			14			// log alert
+#define		SL_FAC_CLOCK2			15			// clock daemon (note 2)
+#define		SL_FAC_LOCAL0			16			// local use 0 (local0)
+#define		SL_FAC_LOCAL1			17			// local use 1 (local1)
+#define		SL_FAC_LOCAL2			18			// local use 2 (local2)
+#define		SL_FAC_LOCAL3			19			// local use 3 (local3)
+#define		SL_FAC_LOCAL4			20			// local use 4 (local4)
+#define		SL_FAC_LOCAL5			21			// local use 5 (local5)
+#define		SL_FAC_LOCAL6			22			// local use 6 (local6)
+#define		SL_FAC_LOCAL7			23			// local use 7 (local7)
 
-#define		SL_SEV_EMERGENCY			0			// Emergency: system is unusable
-#define		SL_SEV_ALERT				1			// Alert: action must be taken immediately
-#define		SL_SEV_CRITICAL				2			// Critical: critical conditions
-#define		SL_SEV_ERROR				3			// Error: error conditions
-#define		SL_SEV_WARNING				4			// Warning: warning conditions
-#define		SL_SEV_NOTICE				5			// Notice: normal but significant condition
-#define		SL_SEV_INFO					6			// Informational: informational messages
-#define		SL_SEV_DEBUG				7			// Debug: debug-level messages
+#define		SL_SEV_EMERGENCY		0			// Emergency: system is unusable
+#define		SL_SEV_ALERT			1			// Alert: action must be taken immediately
+#define		SL_SEV_CRITICAL			2			// Critical: critical conditions
+#define		SL_SEV_ERROR			3			// Error: error conditions
+#define		SL_SEV_WARNING			4			// Warning: warning conditions
+#define		SL_SEV_NOTICE			5			// Notice: normal but significant condition
+#define		SL_SEV_INFO				6			// Informational: informational messages
+#define		SL_SEV_DEBUG			7			// Debug: debug-level messages
 
 // ############################## Syslog formatting/calling macros #################################
 

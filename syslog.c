@@ -1,25 +1,6 @@
 /*
- * Copyright 2014-18 Andre M Maree / KSS Technologies (Pty) Ltd.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software
- * and associated documentation files (the "Software"), to deal in the Software without restriction,
- * including without limitation the rights to use, copy, modify, merge, publish, distribute,
- * sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or
- * substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
- * BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
- * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- *
- */
-
-/*
  * syslog.c
+ * Copyright 2014-20 Andre M Maree / KSS Technologies (Pty) Ltd.
  *
  ******************************************************************************************************************
  SYSLOG-MSG = HEADER SP STRUCTURED-DATA [SP MSG]
@@ -93,19 +74,18 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
  */
 
 #include	"syslog.h"
+#include	"printfx.h"									// +x_definitions +stdarg +stdint +stdio
 #include	"FreeRTOS_Support.h"
-#include	"printfx.h"
 #include	"x_sockets.h"
 #include	"x_errors_events.h"
 #include	"x_stdio.h"
 #include	"x_time.h"
 
+#include	"hal_config.h"
 #include	"hal_debug.h"
 #include	"hal_network.h"
-#include	"hal_timer.h"
-#include	"hal_nvic.h"
 
-#if		(ESP32_PLATFORM == 1)
+#if		defined(ESP_PLATFORM)
 	#include	"esp_log.h"
 	#include	"esp32/rom/crc.h"					// ESP32 ROM routine
 #else
@@ -143,11 +123,10 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
  * could flood the IP stack and cause watchdog timeouts. Even if the timeout is changed from 5 to 10
  * seconds the crash can still occur. In order to minimise load on the IP stack the minimum severity
  * level should be set to NOTICE. */
-#if		(ESP32_PLATFORM == 1)
-//static	uint32_t	SyslogMinSevLev = CONFIG_LOG_DEFAULT_LEVEL + 2 ;		// align with ESP-IDF levels
-static	uint32_t	SyslogMinSevLev = 7 ;										// Override
+#if		defined(ESP_PLATFORM)
+	static	uint32_t	SyslogMinSevLev = CONFIG_LOG_DEFAULT_LEVEL + 2 ;	// align ESP-IDF levels
 #else
-static	uint32_t	SyslogMinSevLev = SL_SEV_WARNING ;
+	static	uint32_t	SyslogMinSevLev = SL_SEV_WARNING ;
 #endif
 
 static	netx_t		sSyslogCtx ;
@@ -272,11 +251,10 @@ bool	IRAM_ATTR bSyslogCheckStatus(uint8_t MsgPRI) {
 int32_t	IRAM_ATTR xSyslogSendMessage(char * pcBuffer, int32_t xLen) {
 	// write directly to socket, not via xNetWrite(), to avoid recursing
 	int32_t	iRV = sendto(sSyslogCtx.sd, pcBuffer, xLen, 0, &sSyslogCtx.sa, sizeof(sSyslogCtx.sa_in)) ;
-	if (iRV == xLen) {
+	if (iRV == xLen)
 		sSyslogCtx.maxTx = (xLen > sSyslogCtx.maxTx) ? xLen : sSyslogCtx.maxTx ;
-	} else {
+	else
 		vSyslogDisConnect() ;
-	}
 	return iRV ;
 }
 
@@ -324,10 +302,14 @@ int32_t	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * f
 		MsgRUN	= *ptRunTime ;
 		MsgUTC	= *ptUTCTime ;
 	}
-#if	(ESP32_PLATFORM == 1) && !defined(CONFIG_FREERTOS_UNICORE)
-	int32_t		McuID	= xPortGetCoreID() ;
-#else
+#if	defined(ESP_PLATFORM)
+	#if	defined(CONFIG_FREERTOS_UNICORE)
 	int32_t		McuID	= 0 ;							// default in case not ESP32 or scheduler not running
+	#else
+	int32_t		McuID	= xPortGetCoreID() ;
+	#endif
+#else
+	// add non ESP32 support.....
 #endif
 
 	// Step 2: build the console formatted message into the buffer
@@ -335,7 +317,7 @@ int32_t	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * f
 	xLen += vsnprintfx(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
 
 	// Calc CRC to check for repeat message, handle accordingly
-#if		(ESP32_PLATFORM == 1)							// use ROM based CRC lookup table
+#if		defined(ESP_PLATFORM)							// use ROM based CRC lookup table
 	uint32_t MsgCRC = crc32_le(0, (uint8_t *) SyslogBuffer, xLen) ;
 #else													// use fastest of external libraries
 	uint32_t MsgCRC = crcSlow((uint8_t *) SyslogBuffer, xLen) ;
@@ -346,7 +328,7 @@ int32_t	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * f
 		RptRUN = MsgRUN ;								// save timestamps of latest repeat
 		RptUTC = MsgUTC ;
 		xLen = 0 ;										// nothing was sent via network
-	} else {											// new/different message, handle suppressed duplicates
+	} else {											// new/different message
 		RptCRC = MsgCRC ;
 		RptPRI = MsgPRI ;
 		if (RptCNT > 0) {								// if we have skipped messages
@@ -394,42 +376,6 @@ int32_t	IRAM_ATTR xSyslog(uint32_t Priority, const char * MsgID, const char * fo
     va_end(vaList) ;
     return iRV ;
 }
-
-#if 0
-/**
- * xvLog() and xLog() - perform printfx() like output to a buffer and then to the console
- * @param	format
- * @param	vArgs or Args
- * @return	number of characters written to the buffer and then console
- */
-int32_t	xvLog(const char * format, va_list vArgs) {
-	IF_myASSERT(debugPARAM, INRANGE_MEM(format)) ;
-	xRtosSemaphoreTake(&SyslogMutex, portMAX_DELAY) ;
-	int32_t iRV = vprintfx(format, vArgs) ;
-	sSyslogCtx.maxTx = (iRV > sSyslogCtx.maxTx) ? iRV : sSyslogCtx.maxTx ;
-	xRtosSemaphoreGive(&SyslogMutex) ;
-	return iRV ;
-}
-
-int32_t	xLog(const char * format, ...) {
-    va_list vaList ;
-    va_start(vaList, format) ;
-	int32_t iRV = xvLog(format, vaList) ;
-    va_end(vaList) ;
-    return iRV ;
-}
-
-int32_t	xLogFunc(int32_t (*pFunc)(char *, size_t)) {
-	IF_myASSERT(debugPARAM, INRANGE_FLASH(pFunc)) ;
-	xRtosSemaphoreTake(&SyslogMutex, portMAX_DELAY) ;
-	int32_t iRV = pFunc(SyslogBuffer, syslogBUFSIZE) ;
-	if (iRV > 0) {
-		sSyslogCtx.maxTx = (iRV > sSyslogCtx.maxTx) ? iRV : sSyslogCtx.maxTx ;
-	}
-	xRtosSemaphoreGive(&SyslogMutex) ;
-    return iRV ;
-}
-#endif
 
 /**
  * vSyslogReport() - report x[v]Syslog() related information
