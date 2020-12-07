@@ -76,7 +76,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #include	"syslog.h"
 #include	"printfx.h"									// +x_definitions +stdarg +stdint +stdio
 #include	"FreeRTOS_Support.h"
-#include	"x_sockets.h"
+#include	"socketsX.h"
 #include	"x_errors_events.h"
 #include	"x_stdio.h"
 #include	"x_time.h"
@@ -186,7 +186,7 @@ int32_t	IRAM_ATTR xSyslogConnect(void) {
 #endif
 	sSyslogCtx.type				= SOCK_DGRAM ;
 	sSyslogCtx.d_flags			= 0 ;
-	sSyslogCtx.d_ndebug			= 1 ;					// disable debug in x_sockets.c
+	sSyslogCtx.d_ndebug			= 1 ;					// disable debug in socketsX.c
 	ip_addr_t	ip_addr ;
 	int32_t iRV = netconn_gethostbyname(sSyslogCtx.pHost, &ip_addr) ;
 	if (iRV == 0) {
