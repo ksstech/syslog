@@ -75,7 +75,7 @@ extern "C" {
 // ############################## Syslog formatting/calling macros #################################
 
 #define	SL_LEVEL					(CONFIG_LOG_DEFAULT_LEVEL + 2)
-#define	SL_MOD2LOCAL(SEV)			((SL_FAC_LOCAL0 << 3) | SEV )
+#define	SL_MOD2LOCAL(SEV)			((SL_FAC_LOCAL0 << 3) | (SEV) )
 
 #define	SL_LOG(x, f, ...) 			do { \
 	if (SL_LEVEL >= (x)) \
