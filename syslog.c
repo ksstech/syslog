@@ -157,7 +157,7 @@ int32_t	IRAM_ATTR xSyslogError(int32_t eCode) {
  * \return		true if connection successful
  */
 int32_t	IRAM_ATTR xSyslogInit(const char * pcHostName, uint64_t * pRunTime, uint64_t * pUTCTime) {
-	IF_myASSERT(debugPARAM, pcHostName && INRANGE_SRAM(pRunTime) && INRANGE_SRAM(pUTCTime)) ;
+	IF_myASSERT(debugPARAM, pcHostName && halCONFIG_inSRAM(pRunTime) && halCONFIG_inSRAM(pUTCTime)) ;
 	if (sSyslogCtx.pHost != NULL || sSyslogCtx.sd > 0)
 		vSyslogDisConnect() ;
 	memset(&sSyslogCtx, 0, sizeof(sSyslogCtx)) ;
@@ -257,7 +257,7 @@ int32_t	IRAM_ATTR xSyslogSendMessage(char * pcBuffer, int32_t xLen) {
  * \return		number of characters sent to server
  */
 int32_t	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_list vArgs) {
-	IF_myASSERT(debugPARAM, INRANGE_MEM(MsgID) && INRANGE_MEM(format)) ;
+	IF_myASSERT(debugPARAM, halCONFIG_inMEM(MsgID) && halCONFIG_inMEM(format)) ;
 
 	// Step 0: handle state of scheduler and obtain the task name
 	bool	FRflag ;
@@ -273,7 +273,7 @@ int32_t	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * f
 #else
 		ProcID = pcTaskGetName(NULL) ;					// FreeRTOS v9.0.0 onwards uses short form function name
 #endif
-		IF_myASSERT(debugPARAM, INRANGE_SRAM(ProcID)) ;
+		IF_myASSERT(debugPARAM, halCONFIG_inSRAM(ProcID)) ;
 		char * pcTmp  = ProcID ;
 		while (*pcTmp) {
 			if (*pcTmp == CHR_SPACE) {					// Since ' ' is seen as a separator in the
