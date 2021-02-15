@@ -134,7 +134,7 @@ static	char		SyslogBuffer[syslogBUFSIZE] ;
 SemaphoreHandle_t	SyslogMutex ;
 static	char		SyslogColors[8] = {
 // 0 = Emergency	1 = Alert	2 = Critical	3 = Error		4 = Warning		5 = Notice		6 = Info		7 = Debug
-	colourFG_RED, colourFG_RED, colourBG_BLUE, colourFG_MAGENTA, colourFG_YELLOW, colourFG_CYAN,	colourFG_GREEN,	colourFG_WHITE } ;
+	colourFG_RED, colourFG_RED, colourFG_BLUE, colourFG_MAGENTA, colourFG_YELLOW, colourFG_CYAN,	colourFG_GREEN,	colourFG_WHITE } ;
 static	uint64_t	* ptRunTime, * ptUTCTime ;
 static	uint32_t 	RptCRC, RptCNT ;
 static	uint64_t	RptRUN, RptUTC ;
