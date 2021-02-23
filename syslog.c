@@ -82,7 +82,6 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #include	"x_time.h"
 
 #include	"hal_config.h"
-#include	"hal_debug.h"
 #include	"hal_network.h"
 
 #if		defined(ESP_PLATFORM)
