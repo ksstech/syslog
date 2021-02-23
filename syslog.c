@@ -372,9 +372,10 @@ int32_t	IRAM_ATTR xSyslog(uint32_t Priority, const char * MsgID, const char * fo
  * vSyslogReport() - report x[v]Syslog() related information
  */
 void	vSyslogReport(void) {
-	if (bRtosCheckStatus(flagNET_SYSLOG))
+	if (bRtosCheckStatus(flagNET_SYSLOG)) {
 		xNetReport(&sSyslogCtx, "SLOG", 0, 0, 0) ;
-	printfx("\tmaxTX=%u  CurRpt=%d\n", sSyslogCtx.maxTx, RptCNT) ;
+		printfx(" =>\tmaxTX=%u  CurRpt=%d\n", sSyslogCtx.maxTx, RptCNT) ;
+	}
 }
 
 // #################################### Test and benchmark routines ################################
