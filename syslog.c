@@ -266,7 +266,7 @@ int32_t	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * f
 		return 0 ;
 	xRtosSemaphoreTake(&SyslogMutex, portMAX_DELAY) ;
 	if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
-		FRflag = true ;
+		FRflag = 1 ;
 #if	(tskKERNEL_VERSION_MAJOR < 9)
 		ProcID = pcTaskGetTaskName(NULL) ;				// FreeRTOS pre v9.0.0 uses long form function name
 #else
@@ -281,7 +281,7 @@ int32_t	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * f
 			++pcTmp ;
 		}
 	} else {
-		FRflag = false ;
+		FRflag = 0 ;
 		ProcID = (char *) "preX" ;
 	}
 
