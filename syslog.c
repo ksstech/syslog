@@ -1,6 +1,6 @@
 /*
  * syslog.c
- * Copyright 2014-20 Andre M Maree / KSS Technologies (Pty) Ltd.
+ * Copyright 2014-21 Andre M Maree / KSS Technologies (Pty) Ltd.
  *
  ******************************************************************************************************************
  SYSLOG-MSG = HEADER SP STRUCTURED-DATA [SP MSG]
@@ -324,7 +324,7 @@ int32_t	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * f
 		RptCRC = MsgCRC ;
 		RptPRI = MsgPRI ;
 		if (RptCNT > 0) {								// if we have skipped messages
-			printfx("%C%!.3R: #%d Last of %d (skipped) Identical messages%C\n", xpfSGR(attrRESET, SyslogColors[RptPRI & 0x07],0,0), RptRUN, McuID, RptCNT, xpfSGR(attrRESET, 0, 0, 0)) ;
+			printfx("%C%!.3R: #%d Last of %d (skipped) Identical messages%C\n", xpfSGR(SyslogColors[RptPRI & 0x07], 0, 0, 0), RptRUN, McuID, RptCNT, xpfSGR(attrRESET, 0, 0, 0)) ;
 			// build & send skipped message to host
 			if (FRflag && bSyslogCheckStatus(MsgPRI)) {
 				xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %.R %s #%d %s %s - Last of %d (skipped) Identical messages", RptPRI, RptUTC, nameSTA, McuID, ProcID, MsgID, RptCNT) ;
@@ -337,7 +337,7 @@ int32_t	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * f
 		}
 
 		// show the new message to the console...
-		printfx("%C%!.3R: #%d %s%C\n", xpfSGR(attrRESET, SyslogColors[MsgPRI & 0x07],0,0), MsgRUN, McuID, SyslogBuffer, xpfSGR(attrRESET, 0, 0, 0)) ;
+		printfx("%C%!.3R: #%d %s%C\n", xpfSGR(SyslogColors[MsgPRI & 0x07], 0, 0, 0), MsgRUN, McuID, SyslogBuffer, xpfSGR(attrRESET, 0, 0, 0)) ;
 		// filter out reasons why message should not go to syslog host, then build and send
 		if (FRflag && bSyslogCheckStatus(MsgPRI)) {
 			xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %.R %s #%d %s %s - ", MsgPRI, MsgUTC, nameSTA, McuID, ProcID, MsgID) ;
@@ -374,7 +374,7 @@ int32_t	IRAM_ATTR xSyslog(uint32_t Priority, const char * MsgID, const char * fo
 void	vSyslogReport(void) {
 	if (bRtosCheckStatus(flagNET_SYSLOG)) {
 		xNetReport(&sSyslogCtx, "SLOG", 0, 0, 0) ;
-		printfx(" =>\tmaxTX=%u  CurRpt=%d\n", sSyslogCtx.maxTx, RptCNT) ;
+		printfx("\tmaxTX=%u  CurRpt=%d\n", sSyslogCtx.maxTx, RptCNT) ;
 	}
 }
 
