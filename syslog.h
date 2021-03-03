@@ -8,9 +8,7 @@
 
 #pragma once
 
-#ifdef	ESP_PLATFORM
-	#include	"sdkconfig.h"
-#endif
+#include	"hal_config.h"
 
 #include	<stdarg.h>
 #include	<stdint.h>
