@@ -172,8 +172,8 @@ int32_t	IRAM_ATTR xSyslogInit(const char * pcHostName, uint64_t * pRunTime, uint
  */
 int32_t	IRAM_ATTR xSyslogConnect(void) {
 	IF_myASSERT(debugPARAM, sSyslogCtx.pHost) ;
-	if (bRtosCheckStatus(flagLX_STA) == false)
-		return false ;
+	if (bRtosCheckStatus(flagLX_STA) == 0)
+		return 0 ;
 	sSyslogCtx.sa_in.sin_family = AF_INET ;
 #if		(syslogUSE_UDP == 1)
 	sSyslogCtx.sa_in.sin_port   = htons(IP_PORT_SYSLOG_UDP) ;
@@ -207,7 +207,7 @@ int32_t	IRAM_ATTR xSyslogConnect(void) {
 		return xSyslogError(iRV) ;
    	xRtosSetStatus(flagNET_SYSLOG) ;
    	IF_TRACK(debugTRACK, "connect") ;
-   	return true ;
+   	return 1 ;
 }
 
 /**
@@ -230,11 +230,11 @@ void	IRAM_ATTR vSyslogDisConnect(void) {
 void	vSyslogSetPriority(uint32_t Priority) { SyslogMinSevLev = Priority % 8 ; }
 
 bool	IRAM_ATTR bSyslogCheckStatus(uint8_t MsgPRI) {
-	if (bRtosCheckStatus(flagLX_STA) == false)
-		return false ;
-	if (bRtosCheckStatus(flagNET_SYSLOG) == false)
+	if (bRtosCheckStatus(flagLX_STA) == 0)
+		return 0 ;
+	if (bRtosCheckStatus(flagNET_SYSLOG) == 0)
 		return xSyslogConnect() ;
-	return true ;
+	return 1 ;
 }
 
 int32_t	IRAM_ATTR xSyslogSendMessage(char * pcBuffer, int32_t xLen) {
@@ -372,7 +372,7 @@ int32_t	IRAM_ATTR xSyslog(uint32_t Priority, const char * MsgID, const char * fo
  * vSyslogReport() - report x[v]Syslog() related information
  */
 void	vSyslogReport(void) {
-	if (bRtosCheckStatus(flagNET_SYSLOG)) {
+	if (bRtosCheckStatus(flagNET_SYSLOG) == 1) {
 		xNetReport(&sSyslogCtx, "SLOG", 0, 0, 0) ;
 		printfx("\tmaxTX=%u  CurRpt=%d\n", sSyslogCtx.maxTx, RptCNT) ;
 	}
