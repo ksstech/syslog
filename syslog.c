@@ -262,16 +262,13 @@ int32_t	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * f
 	bool	FRflag ;
 	char *	ProcID ;
    	IF_TRACK(debugTRACK, "Sev=%d  MinSev=%d", Priority % 8, SyslogMinSevLev) ;
-	if ((Priority % 8) > SyslogMinSevLev)
+	if ((Priority % 8) > SyslogMinSevLev) {
 		return 0 ;
+	}
 	xRtosSemaphoreTake(&SyslogMutex, portMAX_DELAY) ;
 	if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
 		FRflag = 1 ;
-#if	(tskKERNEL_VERSION_MAJOR < 9)
-		ProcID = pcTaskGetTaskName(NULL) ;				// FreeRTOS pre v9.0.0 uses long form function name
-#else
 		ProcID = pcTaskGetName(NULL) ;					// FreeRTOS v9.0.0 onwards uses short form function name
-#endif
 		IF_myASSERT(debugPARAM, halCONFIG_inSRAM(ProcID)) ;
 		char * pcTmp  = ProcID ;
 		while (*pcTmp) {
