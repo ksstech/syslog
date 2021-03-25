@@ -137,7 +137,7 @@ int32_t	IRAM_ATTR xSyslogError(int32_t eCode) {
 	sSyslogCtx.error = errno ? errno : eCode ;
 	IF_PRINT(debugTRACK, "(%s:%d) err %d => %d (%s)", sSyslogCtx.pHost, ntohs(sSyslogCtx.sa_in.sin_port), eCode, sSyslogCtx.error, strerror(sSyslogCtx.error)) ;
 	sSyslogCtx.sd = -1 ;
-	return false ;
+	return 0 ;
 }
 
 /**
@@ -145,7 +145,7 @@ int32_t	IRAM_ATTR xSyslogError(int32_t eCode) {
  * \param[in]	host name to log to
  * \param[in]	pointer to uSec runtime counter
  * \param[in]	pointer to uSec UTC time value
- * \return		true if connection successful
+ * \return		1 if connection successful
  */
 int32_t	IRAM_ATTR xSyslogInit(const char * pcHostName, uint64_t * pRunTime, uint64_t * pUTCTime) {
 	IF_myASSERT(debugPARAM, pcHostName && halCONFIG_inSRAM(pRunTime) && halCONFIG_inSRAM(pUTCTime)) ;
@@ -161,7 +161,7 @@ int32_t	IRAM_ATTR xSyslogInit(const char * pcHostName, uint64_t * pRunTime, uint
 
 /**
  * vSyslogConnect() - establish connection to the selected syslog host
- * \return		true if successful else false
+ * \return		1 if successful else 0
  */
 int32_t	IRAM_ATTR xSyslogConnect(void) {
 	IF_myASSERT(debugPARAM, sSyslogCtx.pHost) ;
