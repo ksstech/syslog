@@ -175,6 +175,18 @@ int32_t	IRAM_ATTR xSyslogConnect(void) {
 	sSyslogCtx.d_ndebug			= 1 ;					// disable debug in socketsX.c
 	ip_addr_t	ip_addr ;
 	int32_t iRV = netconn_gethostbyname(sSyslogCtx.pHost, &ip_addr) ;
+#if 1
+	int32_t	iRV = xNetOpen(&sSyslogCtx) ;
+	if (iRV > erFAILURE) {
+		iRV = xNetSetNonBlocking(&sSyslogCtx, flagXNET_NONBLOCK) ;
+		if (iRV > erFAILURE) {
+			xRtosSetStatus(flagNET_SYSLOG) ;
+			return 1 ;
+		}
+	}
+	xNetClose(&sSyslogCtx) ;
+	return 0 ;
+#else
 	if (iRV == 0) {
 		sSyslogCtx.error = 0 ;
 		sSyslogCtx.sa_in.sin_addr.s_addr = ip_addr.u_addr.ip4.addr ;	// ip_addr is returned in network format, so keep as is...
@@ -197,6 +209,7 @@ int32_t	IRAM_ATTR xSyslogConnect(void) {
    	xRtosSetStatus(flagNET_SYSLOG) ;
    	IF_TRACK(debugTRACK, "connect") ;
    	return 1 ;
+#endif
 }
 
 /**
