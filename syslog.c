@@ -94,7 +94,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #include	<sys/errno.h>
 #include	<string.h>
 
-#define	debugFLAG					0x0000
+#define	debugFLAG					0xD000
 
 #define	debugTIMING					(debugFLAG_GLOBAL & debugFLAG & 0x1000)
 #define	debugTRACK					(debugFLAG_GLOBAL & debugFLAG & 0x2000)
@@ -104,17 +104,6 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 // ###################################### BUILD : CONFIG definitions ##############################
 
 #define	syslogBUFSIZE			2048
-
-#define	syslogUSE_UDP			1
-#define	syslogUSE_TCP			0
-#define	syslogUSE_TLS			0
-
-/**
- * Compile time system checks
- */
-#if		MORETHAN1of3(syslogUSE_UDP, syslogUSE_TCP, syslogUSE_TLS)
-	#error	"More than 1 option of UDP vs TCP selected !!!"
-#endif
 
 // ###################################### Global variables #########################################
 
@@ -157,8 +146,9 @@ int32_t	IRAM_ATTR xSyslogError(int32_t eCode) {
  */
 int32_t	IRAM_ATTR xSyslogInit(const char * pcHostName, uint64_t * pRunTime, uint64_t * pUTCTime) {
 	IF_myASSERT(debugPARAM, pcHostName && halCONFIG_inSRAM(pRunTime) && halCONFIG_inSRAM(pUTCTime)) ;
-	if (sSyslogCtx.pHost != NULL || sSyslogCtx.sd > 0)
+	if (sSyslogCtx.pHost != NULL || sSyslogCtx.sd > 0) {
 		vSyslogDisConnect() ;
+	}
 	memset(&sSyslogCtx, 0, sizeof(sSyslogCtx)) ;
 	ptRunTime = pRunTime ;
 	ptUTCTime = pUTCTime ;
@@ -172,17 +162,11 @@ int32_t	IRAM_ATTR xSyslogInit(const char * pcHostName, uint64_t * pRunTime, uint
  */
 int32_t	IRAM_ATTR xSyslogConnect(void) {
 	IF_myASSERT(debugPARAM, sSyslogCtx.pHost) ;
-	if (bRtosCheckStatus(flagLX_STA) == 0)
+	if (bRtosCheckStatus(flagLX_STA) == 0) {
 		return 0 ;
+	}
 	sSyslogCtx.sa_in.sin_family = AF_INET ;
-#if		(syslogUSE_UDP == 1)
 	sSyslogCtx.sa_in.sin_port   = htons(IP_PORT_SYSLOG_UDP) ;
-#elif		(syslogUSE_TCP == 1) && (IP_PORT_SYSLOG_TLS == 0)
-	sSyslogCtx.sa_in.sin_port   = htons(IP_PORT_SYSLOG_TCP) ;
-#elif		(syslogUSE_TCP == 1) && (IP_PORT_SYSLOG_TLS == 1)
-	// Not yet fully implemented or tested !!!!
-	sSyslogCtx.sa_in.sin_port   = htons(IP_PORT_SYSLOG_TLS) ;
-#endif
 	sSyslogCtx.type				= SOCK_DGRAM ;
 	sSyslogCtx.d_flags			= 0 ;
 	sSyslogCtx.d_ndebug			= 1 ;					// disable debug in socketsX.c
@@ -191,20 +175,22 @@ int32_t	IRAM_ATTR xSyslogConnect(void) {
 	if (iRV == 0) {
 		sSyslogCtx.error = 0 ;
 		sSyslogCtx.sa_in.sin_addr.s_addr = ip_addr.u_addr.ip4.addr ;	// ip_addr is returned in network format, so keep as is...
-	} else
+	} else {
 		return xSyslogError(iRV) ;
-	if ((sSyslogCtx.sd = socket(sSyslogCtx.sa_in.sin_family, sSyslogCtx.type, IPPROTO_IP)) < erSUCCESS)
+	if ((sSyslogCtx.sd = socket(sSyslogCtx.sa_in.sin_family, sSyslogCtx.type, IPPROTO_IP)) < erSUCCESS) {
 		return xSyslogError(iRV) ;
+	}
 	if (connect(sSyslogCtx.sd, &sSyslogCtx.sa, sizeof(struct sockaddr_in)) < erSUCCESS) {
 		close(sSyslogCtx.sd) ;
 		return xSyslogError(iRV) ;
 	}
    	sSyslogCtx.tOut	= flagXNET_NONBLOCK ;
 	iRV = ioctlsocket(sSyslogCtx.sd, FIONBIO, &sSyslogCtx.tOut) ;		// 0 = Disable, 1+ = Enable NonBlocking
-	if (iRV == 0)
+	if (iRV == 0) {
 		sSyslogCtx.error	= 0 ;
-	else
+	} else {
 		return xSyslogError(iRV) ;
+	}
    	xRtosSetStatus(flagNET_SYSLOG) ;
    	IF_TRACK(debugTRACK, "connect") ;
    	return 1 ;
@@ -230,20 +216,23 @@ void	IRAM_ATTR vSyslogDisConnect(void) {
 void	vSyslogSetPriority(uint32_t Priority) { SyslogMinSevLev = Priority % 8 ; }
 
 bool	IRAM_ATTR bSyslogCheckStatus(uint8_t MsgPRI) {
-	if (bRtosCheckStatus(flagLX_STA) == 0)
+	if (bRtosCheckStatus(flagLX_STA) == 0) {
 		return 0 ;
-	if (bRtosCheckStatus(flagNET_SYSLOG) == 0)
+	}
+	if (bRtosCheckStatus(flagNET_SYSLOG) == 0) {
 		return xSyslogConnect() ;
+	}
 	return 1 ;
 }
 
 int32_t	IRAM_ATTR xSyslogSendMessage(char * pcBuffer, int32_t xLen) {
 	// write directly to socket, not via xNetWrite(), to avoid recursing
 	int32_t	iRV = sendto(sSyslogCtx.sd, pcBuffer, xLen, 0, &sSyslogCtx.sa, sizeof(sSyslogCtx.sa_in)) ;
-	if (iRV == xLen)
+	if (iRV == xLen) {
 		sSyslogCtx.maxTx = (xLen > sSyslogCtx.maxTx) ? xLen : sSyslogCtx.maxTx ;
-	else
+	} else {
 		vSyslogDisConnect() ;
+	}
 	return iRV ;
 }
 
