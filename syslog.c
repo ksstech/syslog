@@ -91,7 +91,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 	#include	"crc-barr.h"						// Barr group CRC
 #endif
 
-#include	<sys/errno.h>
+#include	<errno.h>
 #include	<string.h>
 
 #define	debugFLAG					0xD000
@@ -173,8 +173,6 @@ int32_t	IRAM_ATTR xSyslogConnect(void) {
 	sSyslogCtx.type				= SOCK_DGRAM ;
 	sSyslogCtx.d_flags			= 0 ;
 	sSyslogCtx.d_ndebug			= 1 ;					// disable debug in socketsX.c
-	ip_addr_t	ip_addr ;
-	int32_t iRV = netconn_gethostbyname(sSyslogCtx.pHost, &ip_addr) ;
 #if 1
 	int32_t	iRV = xNetOpen(&sSyslogCtx) ;
 	if (iRV > erFAILURE) {
@@ -187,11 +185,15 @@ int32_t	IRAM_ATTR xSyslogConnect(void) {
 	xNetClose(&sSyslogCtx) ;
 	return 0 ;
 #else
+	ip_addr_t	DstAddr ;
+	int32_t iRV = netconn_gethostbyname(sSyslogCtx.pHost, &DstAddr) ;
 	if (iRV == 0) {
 		sSyslogCtx.error = 0 ;
-		sSyslogCtx.sa_in.sin_addr.s_addr = ip_addr.u_addr.ip4.addr ;	// ip_addr is returned in network format, so keep as is...
+//		sSyslogCtx.sa_in.sin_addr.s_addr = DstAddr.u_addr.ip4.addr ;
+		sSyslogCtx.sa_in.sin_addr.s_addr = DstAddr.addr ;
 	} else {
 		return xSyslogError(iRV) ;
+	}
 	if ((sSyslogCtx.sd = socket(sSyslogCtx.sa_in.sin_family, sSyslogCtx.type, IPPROTO_IP)) < erSUCCESS) {
 		return xSyslogError(iRV) ;
 	}
@@ -200,7 +202,7 @@ int32_t	IRAM_ATTR xSyslogConnect(void) {
 		return xSyslogError(iRV) ;
 	}
    	sSyslogCtx.tOut	= flagXNET_NONBLOCK ;
-	iRV = ioctlsocket(sSyslogCtx.sd, FIONBIO, &sSyslogCtx.tOut) ;		// 0 = Disable, 1+ = Enable NonBlocking
+	iRV = ioctlsocket(sSyslogCtx.sd, FIONBIO, &sSyslogCtx.tOut) ;	// 0 = Disable, 1+ = Enable NonBlocking
 	if (iRV == 0) {
 		sSyslogCtx.error	= 0 ;
 	} else {
