@@ -4,10 +4,10 @@
 
 #pragma once
 
-#include	"hal_config.h"
-
 #include	<stdarg.h>
 #include	<stdint.h>
+
+#include	"hal_config.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -58,10 +58,7 @@ extern "C" {
 #define	SL_LEVEL					(CONFIG_LOG_DEFAULT_LEVEL + 2)
 #define	SL_MOD2LOCAL(SEV)			((SL_FAC_LOCAL0 << 3) | (SEV) )
 
-#define	SL_LOG(x, f, ...) 			do { \
-	if (SL_LEVEL >= (x)) \
-		xSyslog(SL_MOD2LOCAL(x) , __FUNCTION__ ,f , ##__VA_ARGS__) ; \
-	} while(0)
+#define	SL_LOG(x, f, ...) 			do{if(SL_LEVEL>=(x)) xSyslog(SL_MOD2LOCAL(x),__FUNCTION__ ,f,##__VA_ARGS__);}while(0)
 
 #define	SL_EMER(f, ...)				SL_LOG(SL_SEV_EMERGENCY, f, ##__VA_ARGS__)
 #define	SL_ALRT(f, ...)				SL_LOG(SL_SEV_ALERT, f, ##__VA_ARGS__)

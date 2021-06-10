@@ -209,7 +209,7 @@ int32_t	IRAM_ATTR xSyslogConnect(void) {
 		return xSyslogError(iRV) ;
 	}
    	xRtosSetStatus(flagNET_SYSLOG) ;
-   	IF_TRACK(debugTRACK, "connect") ;
+   	IF_TRACK(debugTRACK, "connect\n") ;
    	return 1 ;
 #endif
 }
@@ -221,7 +221,7 @@ void	IRAM_ATTR vSyslogDisConnect(void) {
 	xRtosClearStatus(flagNET_SYSLOG) ;
 	close(sSyslogCtx.sd) ;
 	sSyslogCtx.sd = -1 ;
-	IF_TRACK(debugTRACK, "disconnect") ;
+	IF_TRACK(debugTRACK, "disconnect\n") ;
 }
 
 /**
