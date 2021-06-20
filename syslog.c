@@ -392,26 +392,26 @@ void	vSyslogBenchmark(void) {
 	char Test2[] = "01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz 01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" ;
 
 	uint32_t	crc1, crc2, crc3, crc4, crc5, crc6 ;
-	vSysTimerReset(1 << systimerSLOG, systimerCLOCKS, "SLOG", myUS_TO_CLOCKS(10), myUS_TO_CLOCKS(1000)) ;
-	xSysTimerStart(systimerSLOG) ;
+	vSysTimerReset(1 << stSLOG, stCLOCKS, "SLOG", myUS_TO_CLOCKS(10), myUS_TO_CLOCKS(1000)) ;
+	xSysTimerStart(stSLOG) ;
 	crc1 = F_CRC_CalculaCheckSum((uint8_t *) Test1, sizeof(Test1)-1) ;
 	crc4 = F_CRC_CalculaCheckSum((uint8_t *) Test2, sizeof(Test2)-1) ;
-	xSysTimerStop(systimerSLOG) ;
-	vSysTimerShow(1 << systimerSLOG) ;
+	xSysTimerStop(stSLOG) ;
+	vSysTimerShow(1 << stSLOG) ;
 
-	vSysTimerReset(1 << systimerSLOG, systimerCLOCKS, "SLOG", myUS_TO_CLOCKS(10), myUS_TO_CLOCKS(1000)) ;
-	xSysTimerStart(systimerSLOG) ;
+	vSysTimerReset(1 << stSLOG, stCLOCKS, "SLOG", myUS_TO_CLOCKS(10), myUS_TO_CLOCKS(1000)) ;
+	xSysTimerStart(stSLOG) ;
 	crc2 = crc32_le(0, (uint8_t *) Test1, sizeof(Test1)-1) ;
 	crc5 = crc32_le(0, (uint8_t *) Test2, sizeof(Test2)-1) ;
-	xSysTimerStop(systimerSLOG) ;
-	vSysTimerShow(1 << systimerSLOG) ;
+	xSysTimerStop(stSLOG) ;
+	vSysTimerShow(1 << stSLOG) ;
 
-	vSysTimerReset(1 << systimerSLOG, systimerCLOCKS, "SLOG", myUS_TO_CLOCKS(10), myUS_TO_CLOCKS(1000)) ;
-	xSysTimerStart(systimerSLOG) ;
+	vSysTimerReset(1 << stSLOG, stCLOCKS, "SLOG", myUS_TO_CLOCKS(10), myUS_TO_CLOCKS(1000)) ;
+	xSysTimerStart(stSLOG) ;
 	crc3 = crcSlow((uint8_t *) Test1, sizeof(Test1)-1) ;
 	crc6 = crcSlow((uint8_t *) Test2, sizeof(Test2)-1) ;
-	xSysTimerStop(systimerSLOG) ;
-	vSysTimerShow(1 << systimerSLOG) ;
+	xSysTimerStop(stSLOG) ;
+	vSysTimerShow(1 << stSLOG) ;
 
 	printfx("CRC #1=%u  #2=%u  #3=%u\n", crc1, crc2, crc3) ;
 	printfx("CRC #4=%u  #5=%u  #6=%u\n", crc4, crc5, crc6) ;
