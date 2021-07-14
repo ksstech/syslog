@@ -1,1 +1,1 @@
-# "./z-components/syslog" pseudo-component makefile.
+# pseudo component makefile.
