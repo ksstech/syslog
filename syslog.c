@@ -77,14 +77,14 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #include	"printfx.h"									// +x_definitions +stdarg +stdint +stdio
 #include	"FreeRTOS_Support.h"
 #include	"socketsX.h"
+
 #include	"x_errors_events.h"
 #include	"x_stdio.h"
 #include	"x_time.h"
 
-#include	"hal_config.h"
 #include	"hal_network.h"
 
-#if		defined(ESP_PLATFORM)
+#ifdef ESP_PLATFORM
 	#include	"esp_log.h"
 	#include	"esp32/rom/crc.h"					// ESP32 ROM routine
 #else
@@ -125,7 +125,7 @@ static	char		SyslogColors[8] = {
  * could flood the IP stack and cause watchdog timeouts. Even if the timeout is changed from 5 to 10
  * seconds the crash can still occur. In order to minimise load on the IP stack the minimum severity
  * level should be set to NOTICE. */
-#if		defined(ESP_PLATFORM)
+#ifdef ESP_PLATFORM
 	static uint32_t SyslogMinSevLev = CONFIG_LOG_DEFAULT_LEVEL + 2 ;	// align ESP-IDF levels
 #else
 	static uint32_t SyslogMinSevLev = SL_SEV_WARNING ;
@@ -133,7 +133,7 @@ static	char		SyslogColors[8] = {
 
 // ###################################### Public functions #########################################
 
-int32_t	IRAM_ATTR xSyslogError(int32_t eCode) {
+int	IRAM_ATTR xSyslogError(int32_t eCode) {
 	sSyslogCtx.error = errno ? errno : eCode ;
 	IF_PRINT(debugTRACK, "(%s:%d) err %d => %d (%s)", sSyslogCtx.pHost, ntohs(sSyslogCtx.sa_in.sin_port), eCode, sSyslogCtx.error, strerror(sSyslogCtx.error)) ;
 	sSyslogCtx.sd = -1 ;
@@ -147,11 +147,9 @@ int32_t	IRAM_ATTR xSyslogError(int32_t eCode) {
  * \param[in]	pointer to uSec UTC time value
  * \return		1 if connection successful
  */
-int32_t	IRAM_ATTR xSyslogInit(const char * pcHostName, uint64_t * pRunTime, uint64_t * pUTCTime) {
+int	IRAM_ATTR xSyslogInit(const char * pcHostName, uint64_t * pRunTime, uint64_t * pUTCTime) {
 	IF_myASSERT(debugPARAM, pcHostName && halCONFIG_inSRAM(pRunTime) && halCONFIG_inSRAM(pUTCTime)) ;
-	if (sSyslogCtx.pHost != NULL || sSyslogCtx.sd > 0) {
-		vSyslogDisConnect() ;
-	}
+	if (sSyslogCtx.pHost != NULL || sSyslogCtx.sd > 0) vSyslogDisConnect() ;
 	memset(&sSyslogCtx, 0, sizeof(sSyslogCtx)) ;
 	ptRunTime = pRunTime ;
 	ptUTCTime = pUTCTime ;
@@ -163,18 +161,16 @@ int32_t	IRAM_ATTR xSyslogInit(const char * pcHostName, uint64_t * pRunTime, uint
  * vSyslogConnect() - establish connection to the selected syslog host
  * \return		1 if successful else 0
  */
-int32_t	IRAM_ATTR xSyslogConnect(void) {
+int	IRAM_ATTR xSyslogConnect(void) {
 	IF_myASSERT(debugPARAM, sSyslogCtx.pHost) ;
-	if (bRtosCheckStatus(flagLX_STA) == 0) {
-		return 0 ;
-	}
+	if (bRtosCheckStatus(flagLX_STA) == 0) return 0 ;
 	sSyslogCtx.sa_in.sin_family = AF_INET ;
 	sSyslogCtx.sa_in.sin_port   = htons(IP_PORT_SYSLOG_UDP) ;
 	sSyslogCtx.type				= SOCK_DGRAM ;
 	sSyslogCtx.d_flags			= 0 ;
 	sSyslogCtx.d_ndebug			= 1 ;					// disable debug in socketsX.c
 #if 1
-	int32_t	iRV = xNetOpen(&sSyslogCtx) ;
+	int	iRV = xNetOpen(&sSyslogCtx) ;
 	if (iRV > erFAILURE) {
 		iRV = xNetSetNonBlocking(&sSyslogCtx, flagXNET_NONBLOCK) ;
 		if (iRV > erFAILURE) {
@@ -217,7 +213,7 @@ int32_t	IRAM_ATTR xSyslogConnect(void) {
 /**
  * vSyslogDisConnect()	De-initialise the SysLog module
  */
-void	IRAM_ATTR vSyslogDisConnect(void) {
+void IRAM_ATTR vSyslogDisConnect(void) {
 	xRtosClearStatus(flagNET_SYSLOG) ;
 	close(sSyslogCtx.sd) ;
 	sSyslogCtx.sd = -1 ;
@@ -231,21 +227,17 @@ void	IRAM_ATTR vSyslogDisConnect(void) {
  * \param[in]	Priority - value 0->7 indicating the threshold for host logging
  * \return		none
  */
-void	vSyslogSetPriority(uint32_t Priority) { SyslogMinSevLev = Priority % 8 ; }
+void vSyslogSetPriority(uint32_t Priority) { SyslogMinSevLev = Priority % 8 ; }
 
-bool	IRAM_ATTR bSyslogCheckStatus(uint8_t MsgPRI) {
-	if (bRtosCheckStatus(flagLX_STA) == 0) {
-		return 0 ;
-	}
-	if (bRtosCheckStatus(flagNET_SYSLOG) == 0) {
-		return xSyslogConnect() ;
-	}
+bool IRAM_ATTR bSyslogCheckStatus(uint8_t MsgPRI) {
+	if (bRtosCheckStatus(flagLX_STA) == 0) return 0;
+	if (bRtosCheckStatus(flagNET_SYSLOG) == 0) return xSyslogConnect() ;
 	return 1 ;
 }
 
-int32_t	IRAM_ATTR xSyslogSendMessage(char * pcBuffer, int32_t xLen) {
+int	IRAM_ATTR xSyslogSendMessage(char * pcBuffer, int32_t xLen) {
 	// write directly to socket, not via xNetWrite(), to avoid recursing
-	int32_t	iRV = sendto(sSyslogCtx.sd, pcBuffer, xLen, 0, &sSyslogCtx.sa, sizeof(sSyslogCtx.sa_in)) ;
+	int	iRV = sendto(sSyslogCtx.sd, pcBuffer, xLen, 0, &sSyslogCtx.sa, sizeof(sSyslogCtx.sa_in)) ;
 	if (iRV == xLen) {
 		sSyslogCtx.maxTx = (xLen > sSyslogCtx.maxTx) ? xLen : sSyslogCtx.maxTx ;
 	} else {
@@ -262,16 +254,14 @@ int32_t	IRAM_ATTR xSyslogSendMessage(char * pcBuffer, int32_t xLen) {
  * \param[out]	none
  * \return		number of characters sent to server
  */
-int32_t	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_list vArgs) {
+int	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_list vArgs) {
 	IF_myASSERT(debugPARAM, halCONFIG_inMEM(MsgID) && halCONFIG_inMEM(format)) ;
 
 	// Step 0: handle state of scheduler and obtain the task name
 	bool	FRflag ;
 	char *	ProcID ;
    	IF_TRACK(debugTRACK, "Sev=%d  MinSev=%d", Priority % 8, SyslogMinSevLev) ;
-	if ((Priority % 8) > SyslogMinSevLev) {
-		return 0 ;
-	}
+	if ((Priority % 8) > SyslogMinSevLev) return 0;
 	xRtosSemaphoreTake(&SyslogMutex, portMAX_DELAY) ;
 	if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
 		FRflag = 1 ;
@@ -279,9 +269,7 @@ int32_t	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * f
 		IF_myASSERT(debugPARAM, halCONFIG_inSRAM(ProcID)) ;
 		char * pcTmp  = ProcID ;
 		while (*pcTmp) {
-			if (*pcTmp == CHR_SPACE) {					// Since ' ' is seen as a separator in the
-				*pcTmp = CHR_UNDERSCORE ;				// syslog specification, replace with'_' to
-			}											// avoid message being scrambled
+			if (*pcTmp == CHR_SPACE) *pcTmp = '_' ;
 			++pcTmp ;
 		}
 	} else {
@@ -309,7 +297,7 @@ int32_t	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * f
 #endif
 
 	// Step 2: build the console formatted message into the buffer
-	int32_t xLen = snprintfx(SyslogBuffer, syslogBUFSIZE, "%s %s ", ProcID, MsgID) ;
+	int xLen = snprintfx(SyslogBuffer, syslogBUFSIZE, "%s %s ", ProcID, MsgID) ;
 	xLen += vsnprintfx(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
 
 	// Calc CRC to check for repeat message, handle accordingly
@@ -364,10 +352,10 @@ int32_t	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * f
  * \param[out]	none
  * \return		number of characters displayed(if only to console) or send(if to server)
  */
-int32_t	IRAM_ATTR xSyslog(uint32_t Priority, const char * MsgID, const char * format, ...) {
+int	IRAM_ATTR xSyslog(uint32_t Priority, const char * MsgID, const char * format, ...) {
     va_list vaList ;
     va_start(vaList, format) ;
-	int32_t iRV = xvSyslog(Priority, MsgID, format, vaList) ;
+	int iRV = xvSyslog(Priority, MsgID, format, vaList) ;
     va_end(vaList) ;
     return iRV ;
 }
@@ -375,7 +363,7 @@ int32_t	IRAM_ATTR xSyslog(uint32_t Priority, const char * MsgID, const char * fo
 /**
  * vSyslogReport() - report x[v]Syslog() related information
  */
-void	vSyslogReport(void) {
+void vSyslogReport(void) {
 	if (bRtosCheckStatus(flagNET_SYSLOG) == 1) {
 		xNetReport(&sSyslogCtx, "SLOG", 0, 0, 0) ;
 		printfx("\tmaxTX=%u  CurRpt=%d\n", sSyslogCtx.maxTx, RptCNT) ;

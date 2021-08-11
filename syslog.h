@@ -4,10 +4,14 @@
 
 #pragma once
 
+#ifdef ESP_PLATFORM
+	#include	"sdkconfig.h"
+#else
+	#define	CONFIG_LOG_DEFAULT_LEVEL	4
+#endif
+
 #include	<stdarg.h>
 #include	<stdint.h>
-
-#include	"hal_config.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -83,15 +87,13 @@ extern "C" {
 
 // ###################################### function prototypes ######################################
 
-int32_t	xSyslogInit(const char * pcHostName, uint64_t * ptRunTime, uint64_t * ptUTCTime) ;
-int32_t	xSyslogConnect(void) ;
-void	vSyslogDisConnect(void) ;
-
-void 	vSyslogSetPriority(uint32_t Priority) ;
-int32_t	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_list args) ;
-int32_t	xSyslog(uint32_t Priority, const char * MsgID, const char * format, ...) ;
-
-void	vSyslogReport(void) ;
+int	xSyslogInit(const char * pcHostName, uint64_t * ptRunTime, uint64_t * ptUTCTime) ;
+int	xSyslogConnect(void) ;
+void vSyslogDisConnect(void) ;
+void vSyslogSetPriority(uint32_t Priority) ;
+int	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_list args) ;
+int	xSyslog(uint32_t Priority, const char * MsgID, const char * format, ...) ;
+void vSyslogReport(void) ;
 
 #ifdef __cplusplus
 }
