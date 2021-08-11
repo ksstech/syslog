@@ -169,7 +169,6 @@ int	IRAM_ATTR xSyslogConnect(void) {
 	sSyslogCtx.type				= SOCK_DGRAM ;
 	sSyslogCtx.d_flags			= 0 ;
 	sSyslogCtx.d_ndebug			= 1 ;					// disable debug in socketsX.c
-#if 1
 	int	iRV = xNetOpen(&sSyslogCtx) ;
 	if (iRV > erFAILURE) {
 		iRV = xNetSetNonBlocking(&sSyslogCtx, flagXNET_NONBLOCK) ;
@@ -180,34 +179,6 @@ int	IRAM_ATTR xSyslogConnect(void) {
 	}
 	xNetClose(&sSyslogCtx) ;
 	return 0 ;
-#else
-	ip_addr_t	DstAddr ;
-	int32_t iRV = netconn_gethostbyname(sSyslogCtx.pHost, &DstAddr) ;
-	if (iRV == 0) {
-		sSyslogCtx.error = 0 ;
-//		sSyslogCtx.sa_in.sin_addr.s_addr = DstAddr.u_addr.ip4.addr ;
-		sSyslogCtx.sa_in.sin_addr.s_addr = DstAddr.addr ;
-	} else {
-		return xSyslogError(iRV) ;
-	}
-	if ((sSyslogCtx.sd = socket(sSyslogCtx.sa_in.sin_family, sSyslogCtx.type, IPPROTO_IP)) < erSUCCESS) {
-		return xSyslogError(iRV) ;
-	}
-	if (connect(sSyslogCtx.sd, &sSyslogCtx.sa, sizeof(struct sockaddr_in)) < erSUCCESS) {
-		close(sSyslogCtx.sd) ;
-		return xSyslogError(iRV) ;
-	}
-   	sSyslogCtx.tOut	= flagXNET_NONBLOCK ;
-	iRV = ioctlsocket(sSyslogCtx.sd, FIONBIO, &sSyslogCtx.tOut) ;	// 0 = Disable, 1+ = Enable NonBlocking
-	if (iRV == 0) {
-		sSyslogCtx.error	= 0 ;
-	} else {
-		return xSyslogError(iRV) ;
-	}
-   	xRtosSetStatus(flagNET_SYSLOG) ;
-   	IF_TRACK(debugTRACK, "connect\n") ;
-   	return 1 ;
-#endif
 }
 
 /**
