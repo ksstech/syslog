@@ -209,11 +209,8 @@ bool IRAM_ATTR bSyslogCheckStatus(uint8_t MsgPRI) {
 int	IRAM_ATTR xSyslogSendMessage(char * pcBuffer, int32_t xLen) {
 	// write directly to socket, not via xNetWrite(), to avoid recursing
 	int	iRV = sendto(sSyslogCtx.sd, pcBuffer, xLen, 0, &sSyslogCtx.sa, sizeof(sSyslogCtx.sa_in)) ;
-	if (iRV == xLen) {
-		sSyslogCtx.maxTx = (xLen > sSyslogCtx.maxTx) ? xLen : sSyslogCtx.maxTx ;
-	} else {
-		vSyslogDisConnect() ;
-	}
+	if (iRV == xLen) sSyslogCtx.maxTx = (xLen > sSyslogCtx.maxTx) ? xLen : sSyslogCtx.maxTx ;
+	else vSyslogDisConnect() ;
 	return iRV ;
 }
 
@@ -229,7 +226,7 @@ int	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * forma
 	IF_myASSERT(debugPARAM, halCONFIG_inMEM(MsgID) && halCONFIG_inMEM(format)) ;
 
 	// Step 0: handle state of scheduler and obtain the task name
-	bool	FRflag ;
+	bool FRflag ;
 	char *	ProcID ;
    	IF_TRACK(debugTRACK, "Sev=%d  MinSev=%d", Priority % 8, SyslogMinSevLev) ;
 	if ((Priority % 8) > SyslogMinSevLev) return 0;
@@ -257,14 +254,12 @@ int	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * forma
 		MsgRUN	= *ptRunTime ;
 		MsgUTC	= *ptUTCTime ;
 	}
-#if	defined(ESP_PLATFORM)
-	#if	defined(CONFIG_FREERTOS_UNICORE)
-	int32_t		McuID	= 0 ;							// default in case not ESP32 or scheduler not running
+#ifdef ESP_PLATFORM
+	#ifdef CONFIG_FREERTOS_UNICORE
+	int McuID = 0 ;							// default in case not ESP32 or scheduler not running
 	#else
-	int32_t		McuID	= xPortGetCoreID() ;
+	int McuID = xPortGetCoreID() ;
 	#endif
-#else
-	// add non ESP32 support.....
 #endif
 
 	// Step 2: build the console formatted message into the buffer
@@ -272,7 +267,7 @@ int	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * forma
 	xLen += vsnprintfx(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
 
 	// Calc CRC to check for repeat message, handle accordingly
-#if		defined(ESP_PLATFORM)							// use ROM based CRC lookup table
+#ifdef ESP_PLATFORM										// use ROM based CRC lookup table
 	uint32_t MsgCRC = crc32_le(0, (uint8_t *) SyslogBuffer, xLen) ;
 #else													// use fastest of external libraries
 	uint32_t MsgCRC = crcSlow((uint8_t *) SyslogBuffer, xLen) ;
