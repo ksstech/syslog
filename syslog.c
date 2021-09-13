@@ -312,7 +312,7 @@ int	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * forma
 /**
  * xSyslog writes an RFC formatted message to syslog host
  * \brief		if syslog not up and running, write to stdout
- * \brief		avoid using malloc{} or similar since also called from error/crash handlers
+ * \brief		avoid using pvRtosMalloc() or similar since also called from error/crash handlers
  * \param[in]	Priority, ProcID and MsgID as defined by RFC
  * \param[in]	format string and parameters as per normal printf()
  * \param[out]	none
