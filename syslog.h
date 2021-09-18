@@ -90,8 +90,8 @@ extern "C" {
 int	xSyslogInit(const char * pcHostName, uint64_t * ptRunTime, uint64_t * ptUTCTime) ;
 int	xSyslogConnect(void) ;
 void vSyslogDisConnect(void) ;
-int	xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_list args) ;
-int	xSyslog(uint32_t Priority, const char * MsgID, const char * format, ...) ;
+int	xvSyslog(int Priority, const char * MsgID, const char * format, va_list args) ;
+int	xSyslog(int Priority, const char * MsgID, const char * format, ...) ;
 void vSyslogReport(void) ;
 
 #ifdef __cplusplus

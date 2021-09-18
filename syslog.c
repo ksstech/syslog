@@ -60,7 +60,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
  * Theory of operation.
  *
  *	#1	ALL messages are sent to the console (if present)
- *	#2	Only messages with SEVerity <= SyslogMinSevLev will be logged to the syslog server
+ *	#2	Only messages with SEVerity <= ioSLOGhi will be logged to the syslog server
  *
  *	To minimise the impact on application size the SL_xxxx macros must be used to in/exclude levels of info.
  * 		SL_DBG() to control inclusion and display of DEBUG type information
@@ -74,9 +74,11 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
  */
 
 #include	"syslog.h"
+#include	"hal_variables.h"
 #include	"printfx.h"									// +x_definitions +stdarg +stdint +stdio
-#include	"FreeRTOS_Support.h"
 #include	"socketsX.h"
+
+#include	"FreeRTOS_Support.h"
 
 #include	"x_errors_events.h"
 #include	"x_stdio.h"
@@ -94,7 +96,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #include	<errno.h>
 #include	<string.h>
 
-#define	debugFLAG					0xD000
+#define	debugFLAG					0xF000
 
 #define	debugTIMING					(debugFLAG_GLOBAL & debugFLAG & 0x1000)
 #define	debugTRACK					(debugFLAG_GLOBAL & debugFLAG & 0x2000)
@@ -116,29 +118,17 @@ static	uint64_t	RptRUN, RptUTC ;
 static	uint8_t		RptPRI ;
 static	char		SyslogColors[8] = {
 // 0 = Emergency	1 = Alert	2 = Critical	3 = Error
-	colourFG_RED, colourFG_RED, colourFG_BLUE, colourFG_MAGENTA,
+	colourFG_RED, colourFG_RED, colourFG_RED, colourFG_RED,
 // 4 = Warning		5 = Notice		6 = Info		7 = Debug
-	colourFG_YELLOW, colourFG_CYAN, colourFG_GREEN, colourFG_WHITE
+	colourFG_YELLOW, colourFG_GREEN, colourFG_MAGENTA, colourFG_CYAN,
 } ;
 
 /* In the case where the log level is set to DEBUG in ESP-IDF the volume of messages being generated
  * could flood the IP stack and cause watchdog timeouts. Even if the timeout is changed from 5 to 10
  * seconds the crash can still occur. In order to minimise load on the IP stack the minimum severity
  * level should be set to NOTICE. */
-#ifdef ESP_PLATFORM
-	static uint32_t SyslogMinSevLev = CONFIG_LOG_DEFAULT_LEVEL + 2 ;	// align ESP-IDF levels
-#else
-	static uint32_t SyslogMinSevLev = SL_SEV_WARNING ;
-#endif
 
 // ###################################### Public functions #########################################
-
-int	IRAM_ATTR xSyslogError(int32_t eCode) {
-	sSyslogCtx.error = errno ? errno : eCode ;
-	IF_PRINT(debugTRACK, "(%s:%d) err %d => %d (%s)", sSyslogCtx.pHost, ntohs(sSyslogCtx.sa_in.sin_port), eCode, sSyslogCtx.error, strerror(sSyslogCtx.error)) ;
-	sSyslogCtx.sd = -1 ;
-	return 0 ;
-}
 
 /**
  * xSyslogInit() - Initialise the SysLog module
@@ -188,17 +178,8 @@ void IRAM_ATTR vSyslogDisConnect(void) {
 	xRtosClearStatus(flagNET_SYSLOG) ;
 	close(sSyslogCtx.sd) ;
 	sSyslogCtx.sd = -1 ;
-	IF_TRACK(debugTRACK, "disconnect\n") ;
+	IF_PRINT(debugTRACK && ioB1GET(ioRstrt), "disconnect\n") ;
 }
-
-/**
- * vSyslogSetPriority() - sets the minimum priority level for logging to host
- * \brief		Lower value priority is actually higher ie more urgent
- * \brief		values <= Priority will be logged to host, > priority will go to console
- * \param[in]	Priority - value 0->7 indicating the threshold for host logging
- * \return		none
- */
-void vSyslogSetPriority(uint32_t Priority) { SyslogMinSevLev = Priority % 8 ; }
 
 bool IRAM_ATTR bSyslogCheckStatus(uint8_t MsgPRI) {
 	if (bRtosCheckStatus(flagLX_STA) == 0) return 0;
@@ -206,7 +187,7 @@ bool IRAM_ATTR bSyslogCheckStatus(uint8_t MsgPRI) {
 	return 1 ;
 }
 
-int	IRAM_ATTR xSyslogSendMessage(char * pcBuffer, int32_t xLen) {
+int	IRAM_ATTR xSyslogSendMessage(char * pcBuffer, int xLen) {
 	// write directly to socket, not via xNetWrite(), to avoid recursing
 	int	iRV = sendto(sSyslogCtx.sd, pcBuffer, xLen, 0, &sSyslogCtx.sa, sizeof(sSyslogCtx.sa_in)) ;
 	if (iRV == xLen) sSyslogCtx.maxTx = (xLen > sSyslogCtx.maxTx) ? xLen : sSyslogCtx.maxTx ;
@@ -218,21 +199,24 @@ int	IRAM_ATTR xSyslogSendMessage(char * pcBuffer, int32_t xLen) {
  * xvSyslog writes an RFC formatted message to syslog host
  * \brief		write to stdout & syslog host (if up and running)
  * \param[in]	Priority and MsgID as defined by RFC
- * \param[in]	format string and parameters as per normal vprintf()
- * \param[out]	none
+ * \param[in]	format string and parameters as per normal printf()
  * \return		number of characters sent to server
  */
-int	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * format, va_list vArgs) {
-	IF_myASSERT(debugPARAM, halCONFIG_inMEM(MsgID) && halCONFIG_inMEM(format)) ;
+int	IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_list vArgs) {
+	if (MsgID == NULL) MsgID = "null";
+	else if (*MsgID == 0) MsgID = "empty";
+
+	if (format == NULL) format = "null";
+	else if (*format == 0) format = "empty";
 
 	// Step 0: handle state of scheduler and obtain the task name
-	bool FRflag ;
-	char *	ProcID ;
+	bool FRflag;
+	char *	ProcID;
 	uint8_t LogLev;
 	int xLen = 0;
 	xRtosSemaphoreTake(&SyslogMutex, portMAX_DELAY) ;
 	if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
-		FRflag = 1 ;
+		FRflag = 1;
 		LogLev = ioB3GET(ioSLOGhi);
 		ProcID = pcTaskGetName(NULL) ;					// FreeRTOS v9.0.0 onwards uses short form function name
 		IF_myASSERT(debugPARAM, halCONFIG_inSRAM(ProcID)) ;
@@ -243,6 +227,7 @@ int	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * forma
 		}
 	} else {
 		FRflag = 0 ;
+		LogLev = CONFIG_LOG_DEFAULT_LEVEL + 2;
 		ProcID = (char *) "preX" ;
 	}
 	if ((Level % 8) > LogLev) goto exit;
@@ -256,11 +241,10 @@ int	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * forma
 		MsgRUN	= *ptRunTime ;
 		MsgUTC	= *ptUTCTime ;
 	}
-#ifdef ESP_PLATFORM
-	#ifdef CONFIG_FREERTOS_UNICORE
 	int McuID = 0 ;							// default in case not ESP32 or scheduler not running
-	#else
-	int McuID = xPortGetCoreID() ;
+#ifdef ESP_PLATFORM
+	#ifndef CONFIG_FREERTOS_UNICORE
+	McuID = xPortGetCoreID();
 	#endif
 #endif
 
@@ -284,7 +268,9 @@ int	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * forma
 		RptCRC = MsgCRC ;
 		RptPRI = MsgPRI ;
 		if (RptCNT > 0) {								// if we have skipped messages
-			printfx("%C%!.3R: #%d Last of %d (skipped) Identical messages%C\n", xpfSGR(SyslogColors[RptPRI & 0x07], 0, 0, 0), RptRUN, McuID, RptCNT, xpfSGR(attrRESET, 0, 0, 0)) ;
+//			printfx("%C%!.3R: #%d Last of %d (skipped) Identical messages%C\n", xpfSGR(SyslogColors[RptPRI & 0x07],0,0,0), RptRUN, McuID, RptCNT, 0) ;
+			printfx("%C%!.3R: #%d %s (x %d)%C\n", xpfSGR(SyslogColors[MsgPRI & 0x07], 0, 0, 0),
+					MsgRUN, McuID, SyslogBuffer, RptCNT, 0) ;
 			// build & send skipped message to host
 			if (FRflag && bSyslogCheckStatus(MsgPRI)) {
 				xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %.R %s #%d %s %s - Last of %d (skipped) Identical messages", RptPRI, RptUTC, nameSTA, McuID, ProcID, MsgID, RptCNT) ;
@@ -297,10 +283,11 @@ int	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * forma
 		}
 
 		// show the new message to the console...
-		printfx("%C%!.3R: #%d %s%C\n", xpfSGR(SyslogColors[MsgPRI & 0x07], 0, 0, 0), MsgRUN, McuID, SyslogBuffer, xpfSGR(attrRESET, 0, 0, 0)) ;
+		printfx("%C%!.3R: #%d %s%C\n", xpfSGR(SyslogColors[MsgPRI & 0x07], 0, 0, 0), MsgRUN, McuID, SyslogBuffer, 0) ;
 		// filter out reasons why message should not go to syslog host, then build and send
 		if (FRflag && bSyslogCheckStatus(MsgPRI)) {
-			xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %.R %s #%d %s %s - ", MsgPRI, MsgUTC, nameSTA, McuID, ProcID, MsgID) ;
+			xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %.R %s #%d %s %s - ",
+					MsgPRI, MsgUTC, nameSTA, McuID, ProcID, MsgID) ;
 			xLen += vsnprintfx(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
 			xLen = xSyslogSendMessage(SyslogBuffer, xLen) ;
 		} else {
@@ -321,10 +308,10 @@ exit:
  * \param[out]	none
  * \return		number of characters displayed(if only to console) or send(if to server)
  */
-int	IRAM_ATTR xSyslog(uint32_t Priority, const char * MsgID, const char * format, ...) {
+int	IRAM_ATTR xSyslog(int Level, const char * MsgID, const char * format, ...) {
     va_list vaList ;
     va_start(vaList, format) ;
-	int iRV = xvSyslog(Priority, MsgID, format, vaList) ;
+	int iRV = xvSyslog(Level, MsgID, format, vaList) ;
     va_end(vaList) ;
     return iRV ;
 }
