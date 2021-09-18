@@ -228,11 +228,12 @@ int	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * forma
 	// Step 0: handle state of scheduler and obtain the task name
 	bool FRflag ;
 	char *	ProcID ;
-   	IF_TRACK(debugTRACK, "Sev=%d  MinSev=%d", Priority % 8, SyslogMinSevLev) ;
-	if ((Priority % 8) > SyslogMinSevLev) return 0;
+	uint8_t LogLev;
+	int xLen = 0;
 	xRtosSemaphoreTake(&SyslogMutex, portMAX_DELAY) ;
 	if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
 		FRflag = 1 ;
+		LogLev = ioB3GET(ioSLOGhi);
 		ProcID = pcTaskGetName(NULL) ;					// FreeRTOS v9.0.0 onwards uses short form function name
 		IF_myASSERT(debugPARAM, halCONFIG_inSRAM(ProcID)) ;
 		char * pcTmp  = ProcID ;
@@ -244,9 +245,10 @@ int	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * forma
 		FRflag = 0 ;
 		ProcID = (char *) "preX" ;
 	}
+	if ((Level % 8) > LogLev) goto exit;
 
 	// Step 1: setup time, priority and related variables
-	uint8_t		MsgPRI	= Priority % 256 ;
+	uint8_t		MsgPRI	= Level % 256 ;
 	uint64_t	MsgRUN, MsgUTC ;
 	if (ptRunTime == NULL) {
 		MsgRUN	=	MsgUTC	= esp_log_timestamp() * MICROS_IN_MILLISEC ;
@@ -263,7 +265,7 @@ int	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * forma
 #endif
 
 	// Step 2: build the console formatted message into the buffer
-	int xLen = snprintfx(SyslogBuffer, syslogBUFSIZE, "%s %s ", ProcID, MsgID) ;
+	xLen = snprintfx(SyslogBuffer, syslogBUFSIZE, "%s %s ", ProcID, MsgID) ;
 	xLen += vsnprintfx(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
 
 	// Calc CRC to check for repeat message, handle accordingly
@@ -305,6 +307,7 @@ int	IRAM_ATTR xvSyslog(uint32_t Priority, const char * MsgID, const char * forma
 			xLen = 0 ;
 		}
 	}
+exit:
 	xRtosSemaphoreGive(&SyslogMutex) ;
 	return xLen ;
 }
