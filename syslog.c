@@ -268,7 +268,6 @@ int	IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_li
 		RptCRC = MsgCRC ;
 		RptPRI = MsgPRI ;
 		if (RptCNT > 0) {								// if we have skipped messages
-//			printfx("%C%!.3R: #%d Last of %d (skipped) Identical messages%C\n", xpfSGR(SyslogColors[RptPRI & 0x07],0,0,0), RptRUN, McuID, RptCNT, 0) ;
 			printfx("%C%!.3R: #%d %s (x %d)%C\n", xpfSGR(SyslogColors[MsgPRI & 0x07], 0, 0, 0),
 					MsgRUN, McuID, SyslogBuffer, RptCNT, 0) ;
 			// build & send skipped message to host
