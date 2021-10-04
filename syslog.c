@@ -275,8 +275,8 @@ int	IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_li
 				xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %.R %s #%d %s %s - Last of %d (skipped) Identical messages", RptPRI, RptUTC, nameSTA, McuID, ProcID, MsgID, RptCNT) ;
 				xSyslogSendMessage(SyslogBuffer, xLen) ;
 				// rebuild the NEW console message
-				xLen = snprintfx(SyslogBuffer, syslogBUFSIZE, "%s %s ", ProcID, MsgID) ;
-				vsnprintfx(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
+				xLen = snprintf(SyslogBuffer, syslogBUFSIZE, "%s %s ", ProcID, MsgID) ;
+				vsnprintf(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
 			}
 			RptCNT = 0 ;								// and reset the counter
 		}
@@ -287,7 +287,7 @@ int	IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_li
 		if (FRflag && bSyslogCheckStatus(MsgPRI)) {
 			xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %.R %s #%d %s %s - ",
 					MsgPRI, MsgUTC, nameSTA, McuID, ProcID, MsgID) ;
-			xLen += vsnprintfx(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
+			xLen += vsnprintf(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
 			xLen = xSyslogSendMessage(SyslogBuffer, xLen) ;
 		} else {
 			xLen = 0 ;
