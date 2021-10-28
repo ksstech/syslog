@@ -205,7 +205,8 @@ void IRAM_ATTR vSyslogDisConnect(void) {
 }
 
 bool IRAM_ATTR bSyslogCheckStatus(uint8_t MsgPRI) {
-	if (bRtosCheckStatus(flagLX_STA) == 0) return 0;
+	if (MsgPRI > ioB3GET(ioSLhost) || bRtosCheckStatus(flagLX_STA) == 0)
+		return 0;
 	if (bRtosCheckStatus(flagNET_SYSLOG) == 0)
 		return xSyslogConnect();
 	return 1;
