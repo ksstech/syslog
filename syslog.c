@@ -243,8 +243,7 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 	uint32_t MsgCRC;
 	if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
 		FRflag = 1;
-		ProcID = pcTaskGetName(NULL) ;					// FreeRTOS v9.0.0 onwards uses short form function name
-		IF_myASSERT(debugPARAM, halCONFIG_inSRAM(ProcID)) ;
+		ProcID = pcTaskGetName(NULL);
 		char * pcTmp  = ProcID ;
 		while (*pcTmp) {
 			if (*pcTmp == ' ')
