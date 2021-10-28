@@ -250,7 +250,6 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 	// Handle state of scheduler and obtain the task name
 	bool FRflag;
 	char *	ProcID;
-	xRtosSemaphoreTake(&SyslogMutex, portMAX_DELAY) ;
 	uint32_t MsgCRC;
 	if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
 		FRflag = 1;
@@ -316,7 +315,6 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 		xSyslogSendMessage(MsgPRI, MsgUTC, McuID);
 	}
 exit:
-	xRtosSemaphoreGive(&SyslogMutex) ;
 	return;
 }
 
