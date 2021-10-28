@@ -240,6 +240,7 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 	char *	ProcID;
 	int xLen = 0;
 	xRtosSemaphoreTake(&SyslogMutex, portMAX_DELAY) ;
+	uint32_t MsgCRC;
 	if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
 		FRflag = 1;
 		ProcID = pcTaskGetName(NULL) ;					// FreeRTOS v9.0.0 onwards uses short form function name
@@ -276,10 +277,10 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 	xLen += vsnprintfx(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
 
 	// Calc CRC to check for repeat message, handle accordingly
-	uint32_t MsgCRC = crc32_le(0, (uint8_t *) SyslogBuffer, xLen) ;
 #if defined(ESP_PLATFORM)								// use ROM based CRC lookup table
+	MsgCRC = crc32_le(0, (uint8_t *) &sSyslog[McuID].buf2[0], sSyslog[McuID].len2);
 #else													// use fastest of external libraries
-	uint32_t MsgCRC = crcSlow((uint8_t *) SyslogBuffer, xLen) ;
+	MsgCRC = crcSlow((uint8_t *) &sSyslog[McuID].buf2[0], sSyslog[McuID].len2);
 #endif
 
 	if (MsgCRC == RptCRC && MsgPRI == RptPRI) {			// CRC & PRI same as previous message ?
