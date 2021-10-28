@@ -258,18 +258,18 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 		ProcID = (char *) "preX" ;
 	}
 
-	// Step 1: setup time, priority and related variables
-	uint8_t		MsgPRI	= Level % 256 ;
-	uint64_t	MsgRUN, MsgUTC ;
+	// Setup time, priority and related variables
+	uint8_t MsgPRI = Level % 256 ;
+	uint64_t MsgRUN, MsgUTC ;
 	if (ptRunTime == NULL) {
-		MsgRUN	=	MsgUTC	= esp_log_timestamp() * MICROS_IN_MILLISEC ;
+		MsgRUN = MsgUTC = esp_log_timestamp() * MICROS_IN_MILLISEC ;
 	} else {
-		MsgRUN	= *ptRunTime ;
-		MsgUTC	= *ptUTCTime ;
+		MsgRUN = *ptRunTime ;
+		MsgUTC = *ptUTCTime ;
 	}
 	int McuID = 0 ;							// default in case not ESP32 or scheduler not running
-#ifdef ESP_PLATFORM
-	#ifndef CONFIG_FREERTOS_UNICORE
+#if defined(ESP_PLATFORM)
+	#if !defined(CONFIG_FREERTOS_UNICORE)
 	McuID = xPortGetCoreID();
 	#endif
 #endif
