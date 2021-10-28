@@ -105,9 +105,30 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 
 // ###################################### BUILD : CONFIG definitions ##############################
 
-#define	syslogBUFSIZE			2048
 
 // ###################################### Global variables #########################################
+
+// '<7>1 2021/10/21T12:34.567: cc50e38819ec_WROVERv4_5C9 #0 esp_timer halVARS_ReportFlags - '
+#define	SL_SIZEBUF1				120
+#define	SL_SIZEBUF2				880
+#if defined(ESP_PLATFORM) && !defined(CONFIG_FREERTOS_UNICORE)
+	#define SL_CORES 				2
+#else
+	#define SL_CORES 				1
+#endif
+
+typedef union __attribute__((packed)) {
+	struct {
+		char buf0[SL_SIZEBUF1 + SL_SIZEBUF2];
+		uint16_t len0, pad0;
+	};
+	struct {
+		char buf1[SL_SIZEBUF1];
+		char buf2[SL_SIZEBUF2];
+		uint16_t len1, len2;
+	};
+} syslog_t;
+syslog_t sSyslog[SL_CORES];
 
 static SemaphoreHandle_t SyslogMutex ;
 static netx_t sSyslogCtx ;
