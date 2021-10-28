@@ -226,7 +226,7 @@ int	IRAM_ATTR xSyslogSendMessage(char * pcBuffer, int xLen) {
  * \param[in]	format string and parameters as per normal printf()
  * \return		number of characters sent to server
  */
-int	IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_list vArgs) {
+void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_list vArgs) {
 
 	// Fix up incorrectly formatted messages
 	MsgID = (MsgID == NULL) ? "null" : (*MsgID == 0) ? "empty" : MsgID;
@@ -319,7 +319,7 @@ int	IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_li
 	}
 exit:
 	xRtosSemaphoreGive(&SyslogMutex) ;
-	return xLen ;
+	return;
 }
 
 /**
@@ -331,12 +331,11 @@ exit:
  * \param[out]	none
  * \return		number of characters displayed(if only to console) or send(if to server)
  */
-int	IRAM_ATTR xSyslog(int Level, const char * MsgID, const char * format, ...) {
+void IRAM_ATTR vSyslog(int Level, const char * MsgID, const char * format, ...) {
     va_list vaList ;
     va_start(vaList, format) ;
-	int iRV = xvSyslog(Level, MsgID, format, vaList) ;
+	xvSyslog(Level, MsgID, format, vaList) ;
     va_end(vaList) ;
-    return iRV ;
 }
 
 /**

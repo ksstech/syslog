@@ -62,7 +62,7 @@ extern "C" {
 #define	SL_LEVEL					(CONFIG_LOG_DEFAULT_LEVEL + 2)
 #define	SL_MOD2LOCAL(SEV)			((SL_FAC_LOCAL0 << 3) | (SEV) )
 
-#define	SL_LOG(x, f, ...) 			do{ if (SL_LEVEL >= (x)) xSyslog(SL_MOD2LOCAL(x),__FUNCTION__ ,f,##__VA_ARGS__);}while(0)
+#define	SL_LOG(x, f, ...) 			do{ if (SL_LEVEL >= (x)) vSyslog(SL_MOD2LOCAL(x),__FUNCTION__ ,f,##__VA_ARGS__);}while(0)
 
 #define	SL_EMER(f, ...)				SL_LOG(SL_SEV_EMERGENCY, f, ##__VA_ARGS__)
 #define	SL_ALRT(f, ...)				SL_LOG(SL_SEV_ALERT, f, ##__VA_ARGS__)
@@ -90,8 +90,8 @@ extern "C" {
 int	xSyslogInit(const char * pcHostName, uint64_t * ptRunTime, uint64_t * ptUTCTime) ;
 int	xSyslogConnect(void) ;
 void vSyslogDisConnect(void) ;
-int	xvSyslog(int Priority, const char * MsgID, const char * format, va_list args) ;
-int	xSyslog(int Priority, const char * MsgID, const char * format, ...) ;
+void xvSyslog(int Priority, const char * MsgID, const char * format, va_list args) ;
+void vSyslog(int Priority, const char * MsgID, const char * format, ...) ;
 void vSyslogReport(void) ;
 
 #ifdef __cplusplus
