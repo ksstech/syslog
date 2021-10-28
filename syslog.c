@@ -109,14 +109,14 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 
 // ###################################### Global variables #########################################
 
-static	SemaphoreHandle_t	SyslogMutex ;
-static	netx_t		sSyslogCtx ;
-static	char		SyslogBuffer[syslogBUFSIZE] ;
-static	uint64_t	* ptRunTime, * ptUTCTime ;
-static	uint32_t 	RptCRC, RptCNT ;
-static	uint64_t	RptRUN, RptUTC ;
-static	uint8_t		RptPRI ;
-static	char		SyslogColors[8] = {
+static SemaphoreHandle_t SyslogMutex ;
+static netx_t sSyslogCtx ;
+
+static uint64_t	* ptRunTime, * ptUTCTime ;
+static uint32_t RptCRC = 0, RptCNT = 0;
+static uint64_t RptRUN = 0, RptUTC = 0;
+static uint8_t RptPRI = 0;
+static char SyslogColors[8] = {
 // 0 = Emergency	1 = Alert	2 = Critical	3 = Error
 	colourFG_RED, colourFG_RED, colourFG_RED, colourFG_RED,
 // 4 = Warning		5 = Notice		6 = Info		7 = Debug
@@ -139,7 +139,8 @@ static	char		SyslogColors[8] = {
  */
 int	IRAM_ATTR xSyslogInit(const char * pcHostName, uint64_t * pRunTime, uint64_t * pUTCTime) {
 	IF_myASSERT(debugPARAM, pcHostName && halCONFIG_inSRAM(pRunTime) && halCONFIG_inSRAM(pUTCTime)) ;
-	if (sSyslogCtx.pHost != NULL || sSyslogCtx.sd > 0) vSyslogDisConnect() ;
+	if (sSyslogCtx.pHost != NULL || sSyslogCtx.sd > 0)
+		vSyslogDisConnect() ;
 	memset(&sSyslogCtx, 0, sizeof(sSyslogCtx)) ;
 	ptRunTime = pRunTime ;
 	ptUTCTime = pUTCTime ;
@@ -153,7 +154,8 @@ int	IRAM_ATTR xSyslogInit(const char * pcHostName, uint64_t * pRunTime, uint64_t
  */
 int	IRAM_ATTR xSyslogConnect(void) {
 	IF_myASSERT(debugPARAM, sSyslogCtx.pHost) ;
-	if (bRtosCheckStatus(flagLX_STA) == 0) return 0 ;
+	if (bRtosCheckStatus(flagLX_STA) == 0)
+		return 0 ;
 	sSyslogCtx.sa_in.sin_family = AF_INET ;
 	sSyslogCtx.sa_in.sin_port   = htons(IP_PORT_SYSLOG_UDP) ;
 	sSyslogCtx.type				= SOCK_DGRAM ;
@@ -183,8 +185,9 @@ void IRAM_ATTR vSyslogDisConnect(void) {
 
 bool IRAM_ATTR bSyslogCheckStatus(uint8_t MsgPRI) {
 	if (bRtosCheckStatus(flagLX_STA) == 0) return 0;
-	if (bRtosCheckStatus(flagNET_SYSLOG) == 0) return xSyslogConnect() ;
-	return 1 ;
+	if (bRtosCheckStatus(flagNET_SYSLOG) == 0)
+		return xSyslogConnect();
+	return 1;
 }
 
 int	IRAM_ATTR xSyslogSendMessage(char * pcBuffer, int xLen) {
@@ -203,13 +206,12 @@ int	IRAM_ATTR xSyslogSendMessage(char * pcBuffer, int xLen) {
  * \return		number of characters sent to server
  */
 int	IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_list vArgs) {
-	if (MsgID == NULL) MsgID = "null";
-	else if (*MsgID == 0) MsgID = "empty";
 
-	if (format == NULL) format = "null";
-	else if (*format == 0) format = "empty";
+	// Fix up incorrectly formatted messages
+	MsgID = (MsgID == NULL) ? "null" : (*MsgID == 0) ? "empty" : MsgID;
+	format = (format == NULL) ? "null" : (*format == 0) ? "empty" : format;
 
-	// Step 0: handle state of scheduler and obtain the task name
+	// Handle state of scheduler and obtain the task name
 	bool FRflag;
 	char *	ProcID;
 	uint8_t LogLev;
@@ -222,7 +224,8 @@ int	IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_li
 		IF_myASSERT(debugPARAM, halCONFIG_inSRAM(ProcID)) ;
 		char * pcTmp  = ProcID ;
 		while (*pcTmp) {
-			if (*pcTmp == CHR_SPACE) *pcTmp = '_' ;
+			if (*pcTmp == ' ')
+				*pcTmp = '_' ;
 			++pcTmp ;
 		}
 	} else {
@@ -253,8 +256,8 @@ int	IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_li
 	xLen += vsnprintfx(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
 
 	// Calc CRC to check for repeat message, handle accordingly
-#ifdef ESP_PLATFORM										// use ROM based CRC lookup table
 	uint32_t MsgCRC = crc32_le(0, (uint8_t *) SyslogBuffer, xLen) ;
+#if defined(ESP_PLATFORM)								// use ROM based CRC lookup table
 #else													// use fastest of external libraries
 	uint32_t MsgCRC = crcSlow((uint8_t *) SyslogBuffer, xLen) ;
 #endif
@@ -299,7 +302,7 @@ exit:
 }
 
 /**
- * xSyslog writes an RFC formatted message to syslog host
+ * Writes an RFC formatted message to syslog host
  * \brief		if syslog not up and running, write to stdout
  * \brief		avoid using pvRtosMalloc() or similar since also called from error/crash handlers
  * \param[in]	Priority, ProcID and MsgID as defined by RFC
