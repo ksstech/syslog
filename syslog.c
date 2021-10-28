@@ -212,17 +212,22 @@ bool IRAM_ATTR bSyslogCheckStatus(uint8_t MsgPRI) {
 	return 1;
 }
 
-int	IRAM_ATTR xSyslogSendMessage(char * pcBuffer, int xLen) {
-	// write directly to socket, not via xNetWrite(), to avoid recursing
-	int	iRV = sendto(sSyslogCtx.sd, pcBuffer, xLen, 0, &sSyslogCtx.sa, sizeof(sSyslogCtx.sa_in)) ;
-	if (iRV == xLen) sSyslogCtx.maxTx = (xLen > sSyslogCtx.maxTx) ? xLen : sSyslogCtx.maxTx ;
-	else vSyslogDisConnect() ;
 void IRAM_ATTR vSyslogPrintMessage(int McuID, char * ProcID, const char * MsgID, const char * format, va_list vArgs) {
 	int xLen = snprintfx(&sSyslog[McuID].buf2[0], SO_MEM(syslog_t, buf2), "%s %s - ", ProcID, MsgID);
 	xLen += vsnprintfx(&sSyslog[McuID].buf2[xLen], SO_MEM(syslog_t, buf2) - xLen, format, vArgs);
 	sSyslog[McuID].len2 = xLen;
 }
 
+int	IRAM_ATTR xSyslogSendMessage(int PRI, uint64_t UTC, int McuID) {
+	int xLen = snprintfx(&sSyslog[McuID].buf0[0], SO_MEM(syslog_t, buf0),
+			"<%u>1 %.R %s #%d %s", PRI, UTC, nameSTA, McuID, &sSyslog[McuID].buf2[0]);
+	xRtosSemaphoreTake(&SyslogMutex, portMAX_DELAY);
+	int	iRV = sendto(sSyslogCtx.sd, &sSyslog[McuID].buf0[0], xLen, 0, &sSyslogCtx.sa, sizeof(sSyslogCtx.sa_in));
+	if (iRV == xLen)
+		sSyslogCtx.maxTx = (xLen > sSyslogCtx.maxTx) ? xLen : sSyslogCtx.maxTx ;
+	else
+		vSyslogDisConnect() ;
+	xRtosSemaphoreGive(&SyslogMutex) ;
 	return iRV ;
 }
 
@@ -245,7 +250,6 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 	// Handle state of scheduler and obtain the task name
 	bool FRflag;
 	char *	ProcID;
-	int xLen = 0;
 	xRtosSemaphoreTake(&SyslogMutex, portMAX_DELAY) ;
 	uint32_t MsgCRC;
 	if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
@@ -287,37 +291,29 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 #endif
 
 	if (MsgCRC == RptCRC && MsgPRI == RptPRI) {			// CRC & PRI same as previous message ?
-		++RptCNT ;										// Yes, increment the repeat counter
-		RptRUN = MsgRUN ;								// save timestamps of latest repeat
-		RptUTC = MsgUTC ;
-		xLen = 0 ;										// nothing was sent via network
-	} else {											// new/different message
-		RptCRC = MsgCRC ;
-		RptPRI = MsgPRI ;
-		if (RptCNT > 0) {								// if we have skipped messages
-			printfx("%C%!.3R: #%d %s (x %d)%C\n", xpfSGR(SyslogColors[MsgPRI & 0x07], 0, 0, 0),
-					MsgRUN, McuID, SyslogBuffer, RptCNT, 0) ;
-			// build & send skipped message to host
-			if (FRflag && bSyslogCheckStatus(MsgPRI)) {
-				xSyslogSendMessage(SyslogBuffer, xLen) ;
-			}
-			RptCNT = 0 ;								// and reset the counter
-		}
-
-		// show the new message to the console...
-		printfx("%C%!.3R: #%d %s%C\n", xpfSGR(SyslogColors[MsgPRI & 0x07], 0, 0, 0), MsgRUN, McuID, SyslogBuffer, 0) ;
-		// filter out reasons why message should not go to syslog host, then build and send
-		if (FRflag && bSyslogCheckStatus(MsgPRI)) {
-			xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %.R %s #%d %s %s - ",
-					MsgPRI, MsgUTC, nameSTA, McuID, ProcID, MsgID) ;
-			xLen += vsnprintf(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
-			xLen = xSyslogSendMessage(SyslogBuffer, xLen) ;
-		} else {
-			xLen = 0 ;
+		++RptCNT;										// Yes, increment the repeat counter
+		RptRUN = MsgRUN;								// save timestamps of latest repeat
+		RptUTC = MsgUTC;
+		goto exit;
+	}
+	// different message, check if we previously skipped repeated messages
+	if (RptCNT > 0) {
+		printfx("%C%!.3R: #%d Last message repeated %dx%c\n", SyslogColors[RptPRI & 7], RptRUN, McuID, RptCNT, 0);
+		if (FRflag && bSyslogCheckStatus(RptPRI)) {		// build & send skipped message to host
 			va_list va_empty;
 			vSyslogPrintMessage(McuID, ProcID, MsgID, "Last message repeated...", va_empty);
+			xSyslogSendMessage(RptPRI, RptUTC, McuID);
 			vSyslogPrintMessage(McuID, ProcID, MsgID, format, vArgs);	// rebuild console message
 		}
+		RptCNT = 0;					// and reset the counter
+	}
+	// new message...
+	RptCRC = MsgCRC ;
+	RptPRI = MsgPRI ;
+	printfx("%C%!.3R: #%d %s%C\n", SyslogColors[MsgPRI & 7],
+								MsgRUN, McuID, &sSyslog[McuID].buf2[0], 0);
+	if (FRflag && bSyslogCheckStatus(MsgPRI)) {
+		xSyslogSendMessage(MsgPRI, MsgUTC, McuID);
 	}
 exit:
 	xRtosSemaphoreGive(&SyslogMutex) ;
