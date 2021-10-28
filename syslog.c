@@ -217,6 +217,12 @@ int	IRAM_ATTR xSyslogSendMessage(char * pcBuffer, int xLen) {
 	int	iRV = sendto(sSyslogCtx.sd, pcBuffer, xLen, 0, &sSyslogCtx.sa, sizeof(sSyslogCtx.sa_in)) ;
 	if (iRV == xLen) sSyslogCtx.maxTx = (xLen > sSyslogCtx.maxTx) ? xLen : sSyslogCtx.maxTx ;
 	else vSyslogDisConnect() ;
+void IRAM_ATTR vSyslogPrintMessage(int McuID, char * ProcID, const char * MsgID, const char * format, va_list vArgs) {
+	int xLen = snprintfx(&sSyslog[McuID].buf2[0], SO_MEM(syslog_t, buf2), "%s %s - ", ProcID, MsgID);
+	xLen += vsnprintfx(&sSyslog[McuID].buf2[xLen], SO_MEM(syslog_t, buf2) - xLen, format, vArgs);
+	sSyslog[McuID].len2 = xLen;
+}
+
 	return iRV ;
 }
 
@@ -271,11 +277,8 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 	McuID = xPortGetCoreID();
 	#endif
 #endif
-
-	// Step 2: build the console formatted message into the buffer
-	xLen = snprintfx(SyslogBuffer, syslogBUFSIZE, "%s %s ", ProcID, MsgID) ;
-	xLen += vsnprintfx(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
-
+	// Build the console formatted message into the buffer (basis for CRC comparison)
+	vSyslogPrintMessage(McuID, ProcID, MsgID, format, vArgs);
 	// Calc CRC to check for repeat message, handle accordingly
 #if defined(ESP_PLATFORM)								// use ROM based CRC lookup table
 	MsgCRC = crc32_le(0, (uint8_t *) &sSyslog[McuID].buf2[0], sSyslog[McuID].len2);
@@ -296,11 +299,7 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 					MsgRUN, McuID, SyslogBuffer, RptCNT, 0) ;
 			// build & send skipped message to host
 			if (FRflag && bSyslogCheckStatus(MsgPRI)) {
-				xLen =	snprintfx(SyslogBuffer, syslogBUFSIZE, "<%u>1 %.R %s #%d %s %s - Last of %d (skipped) Identical messages", RptPRI, RptUTC, nameSTA, McuID, ProcID, MsgID, RptCNT) ;
 				xSyslogSendMessage(SyslogBuffer, xLen) ;
-				// rebuild the NEW console message
-				xLen = snprintf(SyslogBuffer, syslogBUFSIZE, "%s %s ", ProcID, MsgID) ;
-				vsnprintf(&SyslogBuffer[xLen], syslogBUFSIZE - xLen, format, vArgs) ;
 			}
 			RptCNT = 0 ;								// and reset the counter
 		}
@@ -315,6 +314,9 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 			xLen = xSyslogSendMessage(SyslogBuffer, xLen) ;
 		} else {
 			xLen = 0 ;
+			va_list va_empty;
+			vSyslogPrintMessage(McuID, ProcID, MsgID, "Last message repeated...", va_empty);
+			vSyslogPrintMessage(McuID, ProcID, MsgID, format, vArgs);	// rebuild console message
 		}
 	}
 exit:
