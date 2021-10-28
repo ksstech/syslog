@@ -227,6 +227,9 @@ int	IRAM_ATTR xSyslogSendMessage(char * pcBuffer, int xLen) {
  * \return		number of characters sent to server
  */
 void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_list vArgs) {
+	// ANY message above this option value WILL be ignored....
+	if ((Level % 8) > ioB3GET(ioSLOGhi))
+		return;
 
 	// Fix up incorrectly formatted messages
 	MsgID = (MsgID == NULL) ? "null" : (*MsgID == 0) ? "empty" : MsgID;
@@ -254,7 +257,6 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 		LogLev = CONFIG_LOG_DEFAULT_LEVEL + 2;
 		ProcID = (char *) "preX" ;
 	}
-	if ((Level % 8) > LogLev) goto exit;
 
 	// Step 1: setup time, priority and related variables
 	uint8_t		MsgPRI	= Level % 256 ;
