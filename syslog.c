@@ -293,29 +293,23 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 		++RptCNT;										// Yes, increment the repeat counter
 		RptRUN = MsgRUN;								// save timestamps of latest repeat
 		RptUTC = MsgUTC;
-		goto exit;
-	}
-	// different message, check if we previously skipped repeated messages
-	if (RptCNT > 0) {
-		printfx("%C%!.3R: #%d Last message repeated %dx%c\n", SyslogColors[RptPRI & 7], RptRUN, McuID, RptCNT, 0);
-		if (FRflag && bSyslogCheckStatus(RptPRI)) {		// build & send skipped message to host
-			va_list va_empty;
-			vSyslogPrintMessage(McuID, ProcID, MsgID, "Last message repeated...", va_empty);
-			xSyslogSendMessage(RptPRI, RptUTC, McuID);
-			vSyslogPrintMessage(McuID, ProcID, MsgID, format, vArgs);	// rebuild console message
+	} else {											// different message
+		if (RptCNT > 0) {								// previously skipped repeated messages ?
+			printfx("%C%!.3R: #%d Repeated %dx%c\n", SyslogColors[RptPRI & 7], RptRUN, McuID, RptCNT, 0);
+			if (FRflag && bSyslogCheckStatus(RptPRI)) {		// process skipped message to host
+				vSyslogPrintMessage(McuID, ProcID, MsgID, "Repeated %dx", RptCNT);
+				xSyslogSendMessage(RptPRI, RptUTC, McuID);
+				vvSyslogPrintMessage(McuID, ProcID, MsgID, format, vArgs);	// rebuild console message
+			}
+			RptCNT = 0;					// and reset the counter
 		}
-		RptCNT = 0;					// and reset the counter
+		// process new message...
+		RptCRC = MsgCRC;
+		RptPRI = MsgPRI;
+		printfx("%C%!.3R: #%d %s%C\n", SyslogColors[MsgPRI & 7], MsgRUN, McuID, &sSyslog[McuID].buf2[0], 0);
+		if (FRflag && bSyslogCheckStatus(MsgPRI))
+			xSyslogSendMessage(MsgPRI, MsgUTC, McuID);
 	}
-	// new message...
-	RptCRC = MsgCRC ;
-	RptPRI = MsgPRI ;
-	printfx("%C%!.3R: #%d %s%C\n", SyslogColors[MsgPRI & 7],
-								MsgRUN, McuID, &sSyslog[McuID].buf2[0], 0);
-	if (FRflag && bSyslogCheckStatus(MsgPRI)) {
-		xSyslogSendMessage(MsgPRI, MsgUTC, McuID);
-	}
-exit:
-	return;
 }
 
 /**
