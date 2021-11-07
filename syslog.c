@@ -212,10 +212,17 @@ bool IRAM_ATTR bSyslogCheckStatus(uint8_t MsgPRI) {
 	return 1;
 }
 
-void IRAM_ATTR vSyslogPrintMessage(int McuID, char * ProcID, const char * MsgID, const char * format, va_list vArgs) {
+void IRAM_ATTR vvSyslogPrintMessage(int McuID, char * ProcID, const char * MsgID, const char * format, va_list vArgs) {
 	int xLen = snprintfx(&sSyslog[McuID].buf2[0], SO_MEM(syslog_t, buf2), "%s %s - ", ProcID, MsgID);
 	xLen += vsnprintfx(&sSyslog[McuID].buf2[xLen], SO_MEM(syslog_t, buf2) - xLen, format, vArgs);
 	sSyslog[McuID].len2 = xLen;
+}
+
+void IRAM_ATTR vSyslogPrintMessage(int McuID, char * ProcID, const char * MsgID, const char * format, ...) {
+    va_list vaList ;
+    va_start(vaList, format) ;
+    vvSyslogPrintMessage(McuID, ProcID, MsgID, format, vaList) ;
+    va_end(vaList) ;
 }
 
 int	IRAM_ATTR xSyslogSendMessage(int PRI, uint64_t UTC, int McuID) {
@@ -268,20 +275,20 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 	// Setup time, priority and related variables
 	uint8_t MsgPRI = Level % 256 ;
 	uint64_t MsgRUN, MsgUTC ;
-	if (ptRunTime == NULL) {
-		MsgRUN = MsgUTC = esp_log_timestamp() * MICROS_IN_MILLISEC ;
-	} else {
+	if (ptRunTime) {
 		MsgRUN = *ptRunTime ;
 		MsgUTC = *ptUTCTime ;
-	}
-	int McuID = 0 ;							// default in case not ESP32 or scheduler not running
-#if defined(ESP_PLATFORM)
-	#if !defined(CONFIG_FREERTOS_UNICORE)
-	McuID = xPortGetCoreID();
-	#endif
+	} else
+		MsgRUN = MsgUTC = esp_log_timestamp() * MICROS_IN_MILLISEC ;
+
+#if defined(ESP_PLATFORM) && !defined(CONFIG_FREERTOS_UNICORE)
+	int McuID = xPortGetCoreID();
+#else
+	int McuID = 0;					// default in case not ESP32 or scheduler not running
 #endif
 	// Build the console formatted message into the buffer (basis for CRC comparison)
-	vSyslogPrintMessage(McuID, ProcID, MsgID, format, vArgs);
+	vvSyslogPrintMessage(McuID, ProcID, MsgID, format, vArgs);
+
 	// Calc CRC to check for repeat message, handle accordingly
 #if defined(ESP_PLATFORM)								// use ROM based CRC lookup table
 	MsgCRC = crc32_le(0, (uint8_t *) &sSyslog[McuID].buf2[0], sSyslog[McuID].len2);
