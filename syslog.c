@@ -73,17 +73,16 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
  *
  */
 
+#include	<errno.h>
+#include	<string.h>
+
 #include	"syslog.h"
 #include	"hal_variables.h"
 #include	"printfx.h"									// +x_definitions +stdarg +stdint +stdio
 #include	"socketsX.h"
-
 #include	"FreeRTOS_Support.h"
-
 #include	"x_errors_events.h"
-#include	"x_stdio.h"
 #include	"x_time.h"
-
 #include	"hal_network.h"
 
 #ifdef ESP_PLATFORM
@@ -92,9 +91,6 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #else
 	#include	"crc-barr.h"						// Barr group CRC
 #endif
-
-#include	<errno.h>
-#include	<string.h>
 
 #define	debugFLAG					0xF000
 
