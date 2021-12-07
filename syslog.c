@@ -114,6 +114,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #endif
 
 typedef union __attribute__((packed)) {
+	SemaphoreHandle_t mux;
 	struct {
 		char buf0[SL_SIZEBUF1 + SL_SIZEBUF2];
 		uint16_t len0, pad0;
@@ -274,8 +275,9 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 	if (ptRunTime) {
 		MsgRUN = *ptRunTime ;
 		MsgUTC = *ptUTCTime ;
-	} else
-		MsgRUN = MsgUTC = esp_log_timestamp() * MICROS_IN_MILLISEC ;
+	} else {
+		MsgRUN = MsgUTC = esp_log_timestamp() * MICROS_IN_MILLISEC;
+	}
 
 #if defined(ESP_PLATFORM) && !defined(CONFIG_FREERTOS_UNICORE)
 	int McuID = xPortGetCoreID();
@@ -283,6 +285,7 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 	int McuID = 0;					// default in case not ESP32 or scheduler not running
 #endif
 	// Build the console formatted message into the buffer (basis for CRC comparison)
+	xRtosSemaphoreTake(&sSyslog[McuID].mux, portMAX_DELAY);
 	vvSyslogPrintMessage(McuID, ProcID, MsgID, format, vArgs);
 
 	// Calc CRC to check for repeat message, handle accordingly
@@ -313,6 +316,7 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 		if (FRflag && bSyslogCheckStatus(MsgPRI))
 			xSyslogSendMessage(MsgPRI, MsgUTC, McuID);
 	}
+	xRtosSemaphoreGive(&sSyslog[McuID].mux);
 }
 
 /**
