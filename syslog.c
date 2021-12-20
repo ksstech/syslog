@@ -243,7 +243,7 @@ int	IRAM_ATTR xSyslogSendMessage(int PRI, uint64_t UTC, int McuID) {
  * \return		number of characters sent to server
  */
 void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_list vArgs) {
-	// ANY message above this option value WILL be ignored....
+	// ANY message PRI/level above this option value WILL be ignored....
 	if ((Level % 8) > ioB3GET(ioSLOGhi))
 		return;
 
