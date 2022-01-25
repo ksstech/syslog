@@ -136,7 +136,7 @@ static uint8_t RptPRI = 0;
 static char SyslogColors[8] = {
 // 0 = Emergency	1 = Alert	2 = Critical	3 = Error
 	colourFG_RED, colourFG_RED, colourFG_RED, colourFG_RED,
-// 4 = Warning		5 = Notice		6 = Info		7 = Debug
+//	4 = Warning			5 = Notice		6 = Info		7 = Debug
 	colourFG_YELLOW, colourFG_GREEN, colourFG_MAGENTA, colourFG_CYAN,
 } ;
 
@@ -183,7 +183,7 @@ int	IRAM_ATTR xSyslogConnect(void) {
 		iRV = xNetSetNonBlocking(&sSyslogCtx, flagXNET_NONBLOCK) ;
 		if (iRV > erFAILURE) {
 			xRtosSetStatus(flagNET_SYSLOG) ;
-			return 1 ;
+			return 1;
 		}
 	}
 	xNetClose(&sSyslogCtx) ;
@@ -195,9 +195,9 @@ int	IRAM_ATTR xSyslogConnect(void) {
  */
 void IRAM_ATTR vSyslogDisConnect(void) {
 	xRtosClearStatus(flagNET_SYSLOG) ;
-	close(sSyslogCtx.sd) ;
-	sSyslogCtx.sd = -1 ;
-	IF_PRINT(debugTRACK && ioB1GET(ioRstrt), "disconnect\n") ;
+	close(sSyslogCtx.sd);
+	sSyslogCtx.sd = -1;
+	IF_PRINT(debugTRACK && ioB1GET(ioRstrt), "disconnect\n");
 }
 
 bool IRAM_ATTR bSyslogCheckStatus(uint8_t MsgPRI) {
@@ -225,11 +225,12 @@ int	IRAM_ATTR xSyslogSendMessage(int PRI, uint64_t UTC, int McuID) {
 	int xLen = snprintfx(&sSyslog[McuID].buf0[0], SO_MEM(syslog_t, buf0),
 			"<%u>1 %.R %s #%d %s", PRI, UTC, nameSTA, McuID, &sSyslog[McuID].buf2[0]);
 	int	iRV = sendto(sSyslogCtx.sd, &sSyslog[McuID].buf0[0], xLen, 0, &sSyslogCtx.sa, sizeof(sSyslogCtx.sa_in));
-	if (iRV == xLen)
+	if (iRV == xLen) {
 		sSyslogCtx.maxTx = (xLen > sSyslogCtx.maxTx) ? xLen : sSyslogCtx.maxTx ;
-	else
-		vSyslogDisConnect() ;
-	return iRV ;
+	} else {
+		vSyslogDisConnect();
+	}
+	return iRV;
 }
 
 /**
