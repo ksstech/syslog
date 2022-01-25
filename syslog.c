@@ -182,7 +182,7 @@ int	IRAM_ATTR xSyslogConnect(void) {
 	if (iRV > erFAILURE) {
 		iRV = xNetSetNonBlocking(&sSyslogCtx, flagXNET_NONBLOCK) ;
 		if (iRV > erFAILURE) {
-			xRtosSetStatus(flagNET_SYSLOG) ;
+			setSYSFLAGS(sfSYSLOG);
 			return 1;
 		}
 	}
@@ -194,7 +194,7 @@ int	IRAM_ATTR xSyslogConnect(void) {
  * vSyslogDisConnect()	De-initialise the SysLog module
  */
 void IRAM_ATTR vSyslogDisConnect(void) {
-	xRtosClearStatus(flagNET_SYSLOG) ;
+	clrSYSFLAGS(sfSYSLOG);
 	close(sSyslogCtx.sd);
 	sSyslogCtx.sd = -1;
 	IF_PRINT(debugTRACK && ioB1GET(ioRstrt), "disconnect\n");
@@ -203,7 +203,7 @@ void IRAM_ATTR vSyslogDisConnect(void) {
 bool IRAM_ATTR bSyslogCheckStatus(uint8_t MsgPRI) {
 	if (MsgPRI > ioB3GET(ioSLhost) || bRtosCheckStatus(flagLX_STA) == 0)
 		return 0;
-	if (bRtosCheckStatus(flagNET_SYSLOG) == 0)
+	if (allSYSFLAGS(sfSYSLOG) == 0)
 		return xSyslogConnect();
 	return 1;
 }
