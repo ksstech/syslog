@@ -114,7 +114,6 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #endif
 
 typedef union __attribute__((packed)) {
-	SemaphoreHandle_t mux;
 	struct {
 		char buf0[SL_SIZEBUF1 + SL_SIZEBUF2];
 		uint16_t len0, pad0;
@@ -225,13 +224,11 @@ void IRAM_ATTR vSyslogPrintMessage(int McuID, char * ProcID, const char * MsgID,
 int	IRAM_ATTR xSyslogSendMessage(int PRI, uint64_t UTC, int McuID) {
 	int xLen = snprintfx(&sSyslog[McuID].buf0[0], SO_MEM(syslog_t, buf0),
 			"<%u>1 %.R %s #%d %s", PRI, UTC, nameSTA, McuID, &sSyslog[McuID].buf2[0]);
-	xRtosSemaphoreTake(&SyslogMutex, portMAX_DELAY);
 	int	iRV = sendto(sSyslogCtx.sd, &sSyslog[McuID].buf0[0], xLen, 0, &sSyslogCtx.sa, sizeof(sSyslogCtx.sa_in));
 	if (iRV == xLen)
 		sSyslogCtx.maxTx = (xLen > sSyslogCtx.maxTx) ? xLen : sSyslogCtx.maxTx ;
 	else
 		vSyslogDisConnect() ;
-	xRtosSemaphoreGive(&SyslogMutex) ;
 	return iRV ;
 }
 
@@ -285,7 +282,7 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 	int McuID = 0;					// default in case not ESP32 or scheduler not running
 #endif
 	// Build the console formatted message into the buffer (basis for CRC comparison)
-	xRtosSemaphoreTake(&sSyslog[McuID].mux, portMAX_DELAY);
+	xRtosSemaphoreTake(&SyslogMutex, portMAX_DELAY);
 	vvSyslogPrintMessage(McuID, ProcID, MsgID, format, vArgs);
 
 	// Calc CRC to check for repeat message, handle accordingly
@@ -316,7 +313,7 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 		if (FRflag && bSyslogCheckStatus(MsgPRI))
 			xSyslogSendMessage(MsgPRI, MsgUTC, McuID);
 	}
-	xRtosSemaphoreGive(&sSyslog[McuID].mux);
+	xRtosSemaphoreGive(&SyslogMutex) ;
 }
 
 /**
@@ -339,7 +336,7 @@ void IRAM_ATTR vSyslog(int Level, const char * MsgID, const char * format, ...) 
  * vSyslogReport() - report x[v]Syslog() related information
  */
 void vSyslogReport(void) {
-	if (bRtosCheckStatus(flagNET_SYSLOG) == 1) {
+	if (allSYSFLAGS(sfSYSLOG) == 1) {
 		xNetReport(&sSyslogCtx, "SLOG", 0, 0, 0) ;
 		printfx("\tmaxTX=%u  CurRpt=%d\n", sSyslogCtx.maxTx, RptCNT) ;
 	}
