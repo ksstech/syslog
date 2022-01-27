@@ -300,8 +300,8 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 		RptUTC = MsgUTC;
 	} else {											// different message
 		if (RptCNT > 0) {								// previously skipped repeated messages ?
-			printfx("%C%!.3R: #%d Repeated %dx%c\n", SyslogColors[RptPRI & 7], RptRUN, McuID, RptCNT, 0);
-			if (FRflag && bSyslogCheckStatus(RptPRI)) {		// process skipped message to host
+			printfx("%C%!.3R: #%d Repeated %dx%C\n", SyslogColors[RptPRI & 7], RptRUN, McuID, RptCNT, 0);
+			if (FRflag && bSyslogCheckStatus(RptPRI)) {	// process skipped message to host
 				vSyslogPrintMessage(McuID, ProcID, MsgID, "Repeated %dx", RptCNT);
 				xSyslogSendMessage(RptPRI, RptUTC, McuID);
 				vvSyslogPrintMessage(McuID, ProcID, MsgID, format, vArgs);	// rebuild console message
