@@ -1,6 +1,6 @@
 /*
  * syslog.c
- * Copyright 2014-21 Andre M Maree / KSS Technologies (Pty) Ltd.
+ * Copyright 2014-22 Andre M Maree / KSS Technologies (Pty) Ltd.
  *
  ******************************************************************************************************************
  SYSLOG-MSG = HEADER SP STRUCTURED-DATA [SP MSG]
@@ -181,7 +181,7 @@ int	IRAM_ATTR xSyslogConnect(void) {
 	int	iRV = xNetOpen(&sSyslogCtx) ;
 	if (iRV > erFAILURE) {
 		iRV = xNetSetNonBlocking(&sSyslogCtx, flagXNET_NONBLOCK) ;
-		if (iRV > erFAILURE) {
+		if (iRV >= erSUCCESS) {
 			setSYSFLAGS(sfSYSLOG);
 			return 1;
 		}
@@ -282,6 +282,7 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 #else
 	int McuID = 0;					// default in case not ESP32 or scheduler not running
 #endif
+
 	// Build the console formatted message into the buffer (basis for CRC comparison)
 	xRtosSemaphoreTake(&SyslogMutex, portMAX_DELAY);
 	vvSyslogPrintMessage(McuID, ProcID, MsgID, format, vArgs);
