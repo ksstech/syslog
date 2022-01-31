@@ -334,6 +334,16 @@ void IRAM_ATTR vSyslog(int Level, const char * MsgID, const char * format, ...) 
     va_end(vaList) ;
 }
 
+int IRAM_ATTR xSyslogError(const char * pcFN, int iRV) {
+#ifdef ESP_PLATFORM
+	vSyslog(SL_MOD2LOCAL(SL_SEV_ERROR), pcFN, "iRV=0x%X (%s)", iRV, esp_err_to_name(iRV));
+	return (iRV > 0) ? -iRV : iRV;
+#else
+	vSyslog(SL_MOD2LOCAL(SL_SEV_ERROR), pcFN, "iRV=0x%X (%s)", iRV, strerr(iRV)) ;
+	return iRV;
+#endif
+}
+
 /**
  * vSyslogReport() - report x[v]Syslog() related information
  */

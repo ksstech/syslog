@@ -93,6 +93,7 @@ int	xSyslogConnect(void) ;
 void vSyslogDisConnect(void) ;
 void xvSyslog(int Priority, const char * MsgID, const char * format, va_list args) ;
 void vSyslog(int Priority, const char * MsgID, const char * format, ...) ;
+int xSyslogError(const char * pcFN, int eCode);
 void vSyslogReport(void) ;
 
 #ifdef __cplusplus
