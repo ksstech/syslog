@@ -197,7 +197,7 @@ void IRAM_ATTR vSyslogDisConnect(void) {
 	clrSYSFLAGS(sfSYSLOG);
 	close(sSyslogCtx.sd);
 	sSyslogCtx.sd = -1;
-	IF_PRINT(debugTRACK && ioB1GET(ioRstrt), "disconnect\n");
+	IF_PRINT(debugTRACK && ioB1GET(ioUpDown), "disconnect\n");
 }
 
 bool IRAM_ATTR bSyslogCheckStatus(uint8_t MsgPRI) {
