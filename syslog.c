@@ -68,9 +68,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
  *		SL_NOT() to control information inclusion/display of important events, NOT errors
  *		SL_WARN() to inform on concerns such as values closely approaching threshold
  *		SL_ERR() for errors that the system can/will recover from automatically
- *		SL_CRIT/ALRT() ?????
- *		SL_EMER() should be reserved for unrecoverable errors that should result in a system restart
- *
+ *		SL_CRIT/ALRT/EMER() reserved for unrecoverable errors that should result in a system restart
  */
 
 #include	<errno.h>
