@@ -4,14 +4,9 @@
 
 #pragma once
 
-#ifdef ESP_PLATFORM
-	#include	"sdkconfig.h"
-#else
-	#define	CONFIG_LOG_DEFAULT_LEVEL	4
-#endif
-
 #include	<stdarg.h>
 #include	<stdint.h>
+#include	"hal_config.h"
 
 #ifdef __cplusplus
 extern "C" {
