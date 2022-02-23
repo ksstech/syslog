@@ -127,7 +127,6 @@ syslog_t sSyslog[SL_CORES];
 static SemaphoreHandle_t SyslogMutex ;
 static netx_t sSyslogCtx ;
 
-static uint64_t	* ptRunTime, * ptUTCTime ;
 static uint32_t RptCRC = 0, RptCNT = 0;
 static uint64_t RptRUN = 0, RptUTC = 0;
 static uint8_t RptPRI = 0;
@@ -152,13 +151,11 @@ static char SyslogColors[8] = {
  * \param[in]	pointer to uSec UTC time value
  * \return		1 if connection successful
  */
-int	IRAM_ATTR xSyslogInit(const char * pcHostName, uint64_t * pRunTime, uint64_t * pUTCTime) {
-	IF_myASSERT(debugPARAM, pcHostName && halCONFIG_inSRAM(pRunTime) && halCONFIG_inSRAM(pUTCTime)) ;
+int	IRAM_ATTR xSyslogInit(const char * pcHostName) {
+	IF_myASSERT(debugPARAM, pcHostName);
 	if (sSyslogCtx.pHost != NULL || sSyslogCtx.sd > 0)
 		vSyslogDisConnect() ;
 	memset(&sSyslogCtx, 0, sizeof(sSyslogCtx)) ;
-	ptRunTime = pRunTime ;
-	ptUTCTime = pUTCTime ;
 	sSyslogCtx.pHost = pcHostName ;
 	return xSyslogConnect() ;
 }
@@ -171,6 +168,7 @@ int	IRAM_ATTR xSyslogConnect(void) {
 	IF_myASSERT(debugPARAM, sSyslogCtx.pHost) ;
 	if (bRtosCheckStatus(flagLX_STA) == 0)
 		return 0 ;
+	sSyslogCtx.pHost = HostInfo[ioB2GET(ioHostSLOG)].pName;
 	sSyslogCtx.sa_in.sin_family = AF_INET ;
 	sSyslogCtx.sa_in.sin_port   = htons(IP_PORT_SYSLOG_UDP) ;
 	sSyslogCtx.type				= SOCK_DGRAM ;
@@ -266,14 +264,9 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 	}
 
 	// Setup time, priority and related variables
-	uint8_t MsgPRI = Level % 256 ;
-	uint64_t MsgRUN, MsgUTC ;
-	if (ptRunTime) {
-		MsgRUN = *ptRunTime ;
-		MsgUTC = *ptUTCTime ;
-	} else {
-		MsgRUN = MsgUTC = esp_log_timestamp() * MICROS_IN_MILLISEC;
-	}
+	uint8_t MsgPRI = Level % 256;
+	if (RunTime == 0ULL)
+		RunTime = sTSZ.usecs = (uint64_t) esp_log_timestamp() * (uint64_t) MICROS_IN_MILLISEC;
 
 #if defined(ESP_PLATFORM) && !defined(CONFIG_FREERTOS_UNICORE)
 	int McuID = xPortGetCoreID();
@@ -294,8 +287,8 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 
 	if (MsgCRC == RptCRC && MsgPRI == RptPRI) {			// CRC & PRI same as previous message ?
 		++RptCNT;										// Yes, increment the repeat counter
-		RptRUN = MsgRUN;								// save timestamps of latest repeat
-		RptUTC = MsgUTC;
+		RptRUN = RunTime;								// save timestamps of latest repeat
+		RptUTC = sTSZ.usecs;
 	} else {											// different message
 		if (RptCNT > 0) {								// previously skipped repeated messages ?
 			printfx("%C%!.3R: #%d Repeated %dx%C\n", SyslogColors[RptPRI & 7], RptRUN, McuID, RptCNT, 0);
@@ -309,9 +302,9 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 		// process new message...
 		RptCRC = MsgCRC;
 		RptPRI = MsgPRI;
-		printfx("%C%!.3R: #%d %s%C\n", SyslogColors[MsgPRI & 7], MsgRUN, McuID, &sSyslog[McuID].buf2[0], 0);
+		printfx("%C%!.3R: #%d %s%C\n", SyslogColors[MsgPRI & 7], RunTime, McuID, &sSyslog[McuID].buf2[0], 0);
 		if (FRflag && bSyslogCheckStatus(MsgPRI))
-			xSyslogSendMessage(MsgPRI, MsgUTC, McuID);
+			xSyslogSendMessage(MsgPRI, sTSZ.usecs, McuID);
 	}
 	xRtosSemaphoreGive(&SyslogMutex) ;
 }
