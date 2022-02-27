@@ -222,7 +222,6 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 	// Handle state of scheduler and obtain the task name
 	char *	ProcID;
 	uint32_t MsgCRC;
-	if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
 	if (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) {
 		ProcID = (char *) "preX";
 	} else {
