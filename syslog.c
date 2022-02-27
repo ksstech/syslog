@@ -99,9 +99,6 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 
 // ###################################### BUILD : CONFIG definitions ##############################
 
-
-// ###################################### Global variables #########################################
-
 // '<7>1 2021/10/21T12:34.567: cc50e38819ec_WROVERv4_5C9 #0 esp_timer halVARS_ReportFlags - '
 #define	SL_SIZEBUF1				120
 #define	SL_SIZEBUF2				880
@@ -110,6 +107,15 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #else
 	#define SL_CORES 				1
 #endif
+
+// ###################################### Global variables #########################################
+
+static char SyslogColors[8] = {
+// 0 = Emergency	1 = Alert	2 = Critical	3 = Error
+	colourFG_RED, colourFG_RED, colourFG_RED, colourFG_RED,
+//	4 = Warning			5 = Notice		6 = Info		7 = Debug
+	colourFG_YELLOW, colourFG_GREEN, colourFG_MAGENTA, colourFG_CYAN,
+};
 
 typedef union __attribute__((packed)) {
 	struct {
@@ -130,45 +136,23 @@ static netx_t sSyslogCtx ;
 static uint32_t RptCRC = 0, RptCNT = 0;
 static uint64_t RptRUN = 0, RptUTC = 0;
 static uint8_t RptPRI = 0;
-static char SyslogColors[8] = {
-// 0 = Emergency	1 = Alert	2 = Critical	3 = Error
-	colourFG_RED, colourFG_RED, colourFG_RED, colourFG_RED,
-//	4 = Warning			5 = Notice		6 = Info		7 = Debug
-	colourFG_YELLOW, colourFG_GREEN, colourFG_MAGENTA, colourFG_CYAN,
-} ;
+
+// ###################################### Public functions #########################################
 
 /* In the case where the log level is set to DEBUG in ESP-IDF the volume of messages being generated
  * could flood the IP stack and cause watchdog timeouts. Even if the timeout is changed from 5 to 10
  * seconds the crash can still occur. In order to minimise load on the IP stack the minimum severity
  * level should be set to NOTICE. */
 
-// ###################################### Public functions #########################################
-
 /**
- * xSyslogInit() - Initialise the SysLog module
- * \param[in]	host name to log to
- * \param[in]	pointer to uSec runtime counter
- * \param[in]	pointer to uSec UTC time value
- * \return		1 if connection successful
+ * @brief	establish connection to the selected syslog host
+ * @return	1 if successful else 0
  */
-int	IRAM_ATTR xSyslogInit(const char * pcHostName) {
-	IF_myASSERT(debugPARAM, pcHostName);
-	if (sSyslogCtx.pHost != NULL || sSyslogCtx.sd > 0)
-		vSyslogDisConnect() ;
-	memset(&sSyslogCtx, 0, sizeof(sSyslogCtx)) ;
-	sSyslogCtx.pHost = pcHostName ;
-	return xSyslogConnect() ;
-}
-
-/**
- * vSyslogConnect() - establish connection to the selected syslog host
- * \return		1 if successful else 0
- */
-int	IRAM_ATTR xSyslogConnect(void) {
-	IF_myASSERT(debugPARAM, sSyslogCtx.pHost) ;
+static int	IRAM_ATTR xSyslogConnect(void) {
 	if (bRtosCheckStatus(flagLX_STA) == 0)
 		return 0 ;
 	sSyslogCtx.pHost = HostInfo[ioB2GET(ioHostSLOG)].pName;
+	IF_myASSERT(debugPARAM, sSyslogCtx.pHost) ;
 	sSyslogCtx.sa_in.sin_family = AF_INET ;
 	sSyslogCtx.sa_in.sin_port   = htons(IP_PORT_SYSLOG_UDP) ;
 	sSyslogCtx.type				= SOCK_DGRAM ;
@@ -187,37 +171,28 @@ int	IRAM_ATTR xSyslogConnect(void) {
 }
 
 /**
- * vSyslogDisConnect()	De-initialise the SysLog module
+ * @brief	de-initialise the SysLog module
  */
-void IRAM_ATTR vSyslogDisConnect(void) {
-	clrSYSFLAGS(sfSYSLOG);
+static void IRAM_ATTR vSyslogDisConnect(void) {
 	close(sSyslogCtx.sd);
 	sSyslogCtx.sd = -1;
-	IF_PRINT(debugTRACK && ioB1GET(ioUpDown), "disconnect\n");
+	IF_RP(debugTRACK && ioB1GET(ioUpDown), "SLOG disconnect\n");
 }
 
-bool IRAM_ATTR bSyslogCheckStatus(uint8_t MsgPRI) {
-	if (MsgPRI > ioB3GET(ioSLhost) || bRtosCheckStatus(flagLX_STA) == 0)
-		return 0;
-	if (allSYSFLAGS(sfSYSLOG) == 0)
-		return xSyslogConnect();
-	return 1;
-}
-
-void IRAM_ATTR vvSyslogPrintMessage(int McuID, char * ProcID, const char * MsgID, const char * format, va_list vArgs) {
+static void IRAM_ATTR vvSyslogPrintMessage(int McuID, char * ProcID, const char * MsgID, const char * format, va_list vArgs) {
 	int xLen = snprintfx(&sSyslog[McuID].buf2[0], SO_MEM(syslog_t, buf2), "%s %s - ", ProcID, MsgID);
 	xLen += vsnprintfx(&sSyslog[McuID].buf2[xLen], SO_MEM(syslog_t, buf2) - xLen, format, vArgs);
 	sSyslog[McuID].len2 = xLen;
 }
 
-void IRAM_ATTR vSyslogPrintMessage(int McuID, char * ProcID, const char * MsgID, const char * format, ...) {
+static void IRAM_ATTR vSyslogPrintMessage(int McuID, char * ProcID, const char * MsgID, const char * format, ...) {
     va_list vaList ;
     va_start(vaList, format) ;
     vvSyslogPrintMessage(McuID, ProcID, MsgID, format, vaList) ;
     va_end(vaList) ;
 }
 
-int	IRAM_ATTR xSyslogSendMessage(int PRI, uint64_t UTC, int McuID) {
+static int IRAM_ATTR xSyslogSendMessage(int PRI, uint64_t UTC, int McuID) {
 	int xLen = snprintfx(&sSyslog[McuID].buf0[0], SO_MEM(syslog_t, buf0),
 			"<%u>1 %.R %s #%d %s", PRI, UTC, nameSTA, McuID, &sSyslog[McuID].buf2[0]);
 	int	iRV = sendto(sSyslogCtx.sd, &sSyslog[McuID].buf0[0], xLen, 0, &sSyslogCtx.sa, sizeof(sSyslogCtx.sa_in));
@@ -230,11 +205,11 @@ int	IRAM_ATTR xSyslogSendMessage(int PRI, uint64_t UTC, int McuID) {
 }
 
 /**
- * xvSyslog writes an RFC formatted message to syslog host
- * \brief		write to stdout & syslog host (if up and running)
- * \param[in]	Priority and MsgID as defined by RFC
- * \param[in]	format string and parameters as per normal printf()
- * \return		number of characters sent to server
+ * @brief		writes an RFC formatted message to syslog host
+ * @brief		write to stdout & syslog host (if up and running)
+ * @param[in]	Priority and MsgID as defined by RFC
+ * @param[in]	format string and parameters as per normal printf()
+ * @return		number of characters sent to server
  */
 void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_list vArgs) {
 	// ANY message PRI/level above this option value WILL be ignored....
@@ -311,12 +286,12 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 
 /**
  * Writes an RFC formatted message to syslog host
- * \brief		if syslog not up and running, write to stdout
- * \brief		avoid using pvRtosMalloc() or similar since also called from error/crash handlers
- * \param[in]	Priority, ProcID and MsgID as defined by RFC
- * \param[in]	format string and parameters as per normal printf()
- * \param[out]	none
- * \return		number of characters displayed(if only to console) or send(if to server)
+ * @brief		if syslog not up and running, write to stdout
+ * @brief		avoid using pvRtosMalloc() or similar since also called from error/crash handlers
+ * @param[in]	Priority, ProcID and MsgID as defined by RFC
+ * @param[in]	format string and parameters as per normal printf()
+ * @param[out]	none
+ * @return		number of characters displayed(if only to console) or send(if to server)
  */
 void IRAM_ATTR vSyslog(int Level, const char * MsgID, const char * format, ...) {
     va_list vaList ;
