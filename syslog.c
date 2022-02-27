@@ -197,11 +197,13 @@ static void IRAM_ATTR vSyslogPrintMessage(int McuID, char * ProcID, const char *
 static int IRAM_ATTR xSyslogSendMessage(int PRI, uint64_t UTC, int McuID) {
 	int xLen = snprintfx(&sSyslog[McuID].buf0[0], SO_MEM(syslog_t, buf0),
 			"<%u>1 %.R %s #%d %s", PRI, UTC, nameSTA, McuID, &sSyslog[McuID].buf2[0]);
-	int	iRV = sendto(sSyslogCtx.sd, &sSyslog[McuID].buf0[0], xLen, 0, &sSyslogCtx.sa, sizeof(sSyslogCtx.sa_in));
-	if (iRV == xLen) {
-		sSyslogCtx.maxTx = (xLen > sSyslogCtx.maxTx) ? xLen : sSyslogCtx.maxTx ;
-	} else {
-		vSyslogDisConnect();
+	if ((sSyslogCtx.sd > 0) || xSyslogConnect()) {		// LxSTA are up and connection established
+		iRV = sendto(sSyslogCtx.sd, &sSyslog[McuID].buf0[0], xLen, 0, &sSyslogCtx.sa, sizeof(sSyslogCtx.sa_in));
+		if (iRV == xLen) {
+			sSyslogCtx.maxTx = (xLen > sSyslogCtx.maxTx) ? xLen : sSyslogCtx.maxTx ;
+		} else {
+			vSyslogDisConnect();
+		}
 	}
 	#if	(halUSE_LITTLEFS == 1)
 	else if (allSYSFLAGS(sfLFS)) {	// LxSTA all down, no connection, append to file...
