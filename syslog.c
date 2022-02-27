@@ -292,7 +292,7 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 		if (FRflag && bSyslogCheckStatus(MsgPRI))
 			xSyslogSendMessage(MsgPRI, sTSZ.usecs, McuID);
 	}
-	xRtosSemaphoreGive(&SyslogMutex) ;
+	xRtosSemaphoreGive(&SyslogMutex);
 }
 
 /**
