@@ -311,7 +311,7 @@ int IRAM_ATTR xSyslogError(const char * pcFN, int iRV) {
 }
 
 /**
- * vSyslogReport() - report x[v]Syslog() related information
+ * @brief		report syslog related information
  */
 void vSyslogReport(void) {
 	if (allSYSFLAGS(sfSYSLOG) == 1) {
