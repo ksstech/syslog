@@ -226,7 +226,9 @@ static int IRAM_ATTR xSyslogSendMessage(int PRI, uint64_t UTC, int McuID) {
  */
 void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_list vArgs) {
 	// ANY message PRI/level above this option value WILL be ignored....
-	if ((Level % 8) > ioB3GET(ioSLOGhi))
+	uint8_t MsgPRI = Level % 8;
+//	if (allSYSFLAGS(sfAPPSTAGE) && (Level % 8) > ioB3GET(ioSLOGhi))
+	if (MsgPRI > ioB3GET(ioSLOGhi))
 		return;
 
 	// Fix up incorrectly formatted messages
@@ -248,8 +250,6 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 		}
 	}
 
-	// Setup time, priority and related variables
-	uint8_t MsgPRI = Level % 256;
 	if (RunTime == 0ULL) {
 		RunTime = sTSZ.usecs = (uint64_t) esp_log_timestamp() * (uint64_t) MICROS_IN_MILLISEC;
 	}
