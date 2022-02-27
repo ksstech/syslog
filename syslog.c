@@ -162,7 +162,6 @@ static int	IRAM_ATTR xSyslogConnect(void) {
 	if (iRV > erFAILURE) {
 		iRV = xNetSetNonBlocking(&sSyslogCtx, flagXNET_NONBLOCK) ;
 		if (iRV >= erSUCCESS) {
-			setSYSFLAGS(sfSYSLOG);
 			return 1;
 		}
 	}
@@ -314,7 +313,7 @@ int IRAM_ATTR xSyslogError(const char * pcFN, int iRV) {
  * @brief		report syslog related information
  */
 void vSyslogReport(void) {
-	if (allSYSFLAGS(sfSYSLOG) == 1) {
+	if (sSyslogCtx.sd > 0) {
 		xNetReport(&sSyslogCtx, "SLOG", 0, 0, 0) ;
 		printfx("\tmaxTX=%u  CurRpt=%d\n", sSyslogCtx.maxTx, RptCNT) ;
 	}
