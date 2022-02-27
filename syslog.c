@@ -325,7 +325,7 @@ void vSyslogReport(void) {
 #if 0
 #include	"crc.h"										// private component
 
-void	vSyslogBenchmark(void) {
+void vSyslogBenchmark(void) {
 	char Test1[] = "SNTP vSntpTask ntp1.meraka.csir.co.za  2019-03-05T10:56:58.901Z  tOFF=78,873,521uS  tRTD=11,976uS" ;
 	char Test2[] = "01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz 01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" ;
 
