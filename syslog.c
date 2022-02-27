@@ -203,6 +203,15 @@ static int IRAM_ATTR xSyslogSendMessage(int PRI, uint64_t UTC, int McuID) {
 	} else {
 		vSyslogDisConnect();
 	}
+	#if	(halUSE_LITTLEFS == 1)
+	else if (allSYSFLAGS(sfLFS)) {	// LxSTA all down, no connection, append to file...
+		FILE * fp = fopen("syslog.txt", "a");
+		IF_myASSERT(debugRESULT, fp != 0);
+		iRV = fwrite(sSyslog[McuID].buf0, 1, xLen+1, fp);
+		fclose(fp);
+		IF_myASSERT(debugRESULT, iRV == xLen+1);
+	}
+	#endif
 	return iRV;
 }
 
