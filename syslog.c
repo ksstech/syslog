@@ -226,11 +226,11 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 	if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
 		FRflag = 1;
 		ProcID = pcTaskGetName(NULL);
-		char * pcTmp  = ProcID ;
+		char * pcTmp  = ProcID;
 		while (*pcTmp) {
 			if (*pcTmp == ' ')
-				*pcTmp = '_' ;
-			++pcTmp ;
+				*pcTmp = '_';
+			++pcTmp;
 		}
 	} else {
 		FRflag = 0 ;
@@ -239,25 +239,26 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 
 	// Setup time, priority and related variables
 	uint8_t MsgPRI = Level % 256;
-	if (RunTime == 0ULL)
+	if (RunTime == 0ULL) {
 		RunTime = sTSZ.usecs = (uint64_t) esp_log_timestamp() * (uint64_t) MICROS_IN_MILLISEC;
+	}
 
-#if defined(ESP_PLATFORM) && !defined(CONFIG_FREERTOS_UNICORE)
-	int McuID = xPortGetCoreID();
-#else
+	#if defined(ESP_PLATFORM) && !defined(CONFIG_FREERTOS_UNICORE)
+	int McuID = cpu_hal_get_core_id();
+	#else
 	int McuID = 0;					// default in case not ESP32 or scheduler not running
-#endif
+	#endif
 
 	// Build the console formatted message into the buffer (basis for CRC comparison)
 	xRtosSemaphoreTake(&SyslogMutex, portMAX_DELAY);
 	vvSyslogPrintMessage(McuID, ProcID, MsgID, format, vArgs);
 
 	// Calc CRC to check for repeat message, handle accordingly
-#if defined(ESP_PLATFORM)								// use ROM based CRC lookup table
-	MsgCRC = crc32_le(0, (uint8_t *) &sSyslog[McuID].buf2[0], sSyslog[McuID].len2);
-#else													// use fastest of external libraries
-	MsgCRC = crcSlow((uint8_t *) &sSyslog[McuID].buf2[0], sSyslog[McuID].len2);
-#endif
+	#if defined(ESP_PLATFORM)								// use ROM based CRC lookup table
+	MsgCRC = crc32_le(0, (uint8_t *) sSyslog[McuID].buf2, sSyslog[McuID].len2);
+	#else													// use fastest of external libraries
+	MsgCRC = crcSlow((uint8_t *) sSyslog[McuID].buf2, sSyslog[McuID].len2);
+	#endif
 
 	if (MsgCRC == RptCRC && MsgPRI == RptPRI) {			// CRC & PRI same as previous message ?
 		++RptCNT;										// Yes, increment the repeat counter
