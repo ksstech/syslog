@@ -220,11 +220,12 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 	format = (format == NULL) ? "null" : (*format == 0) ? "empty" : format;
 
 	// Handle state of scheduler and obtain the task name
-	bool FRflag;
 	char *	ProcID;
 	uint32_t MsgCRC;
 	if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
-		FRflag = 1;
+	if (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) {
+		ProcID = (char *) "preX";
+	} else {
 		ProcID = pcTaskGetName(NULL);
 		char * pcTmp  = ProcID;
 		while (*pcTmp) {
@@ -232,9 +233,6 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 				*pcTmp = '_';
 			++pcTmp;
 		}
-	} else {
-		FRflag = 0 ;
-		ProcID = (char *) "preX" ;
 	}
 
 	// Setup time, priority and related variables
