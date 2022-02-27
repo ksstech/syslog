@@ -181,6 +181,9 @@ static void IRAM_ATTR vSyslogDisConnect(void) {
 static void IRAM_ATTR vvSyslogPrintMessage(int McuID, char * ProcID, const char * MsgID, const char * format, va_list vArgs) {
 	int xLen = snprintfx(&sSyslog[McuID].buf2[0], SO_MEM(syslog_t, buf2), "%s %s - ", ProcID, MsgID);
 	xLen += vsnprintfx(&sSyslog[McuID].buf2[xLen], SO_MEM(syslog_t, buf2) - xLen, format, vArgs);
+	if (sSyslog[McuID].buf2[xLen-1] == CHR_LF) {
+		sSyslog[McuID].buf2[--xLen] = CHR_NUL;			// remove terminating [CR]LF
+	}
 	sSyslog[McuID].len2 = xLen;
 }
 
