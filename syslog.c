@@ -1,6 +1,5 @@
 /*
- * syslog.c
- * Copyright 2014-22 Andre M Maree / KSS Technologies (Pty) Ltd.
+ * syslog.c - Copyright 2014-22 Andre M Maree / KSS Technologies (Pty) Ltd.
  *
  ******************************************************************************************************************
  SYSLOG-MSG = HEADER SP STRUCTURED-DATA [SP MSG]
@@ -74,6 +73,10 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #include	<errno.h>
 #include	<string.h>
 
+#ifdef ESP_PLATFORM
+	#include	"esp_log.h"
+#endif
+
 #include	"syslog.h"
 #include	"hal_variables.h"
 #include	"printfx.h"									// +x_definitions +stdarg +stdint +stdio
@@ -82,13 +85,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #include	"x_errors_events.h"
 #include	"x_time.h"
 #include	"hal_network.h"
-
-#ifdef ESP_PLATFORM
-	#include	"esp_log.h"
-	#include	"esp32/rom/crc.h"					// ESP32 ROM routine
-#else
-	#include	"crc-barr.h"						// Barr group CRC
-#endif
+#include	"hal_storage.h"
 
 #define	debugFLAG					0xF000
 
@@ -108,8 +105,12 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 	#define SL_CORES 				1
 #endif
 
+// ######################################### Structures ############################################
+
+
 // ###################################### Global variables #########################################
 
+static netx_t sCtx = { 0 };
 static char SyslogColors[8] = {
 // 0 = Emergency	1 = Alert	2 = Critical	3 = Error
 	colourFG_RED, colourFG_RED, colourFG_RED, colourFG_RED,
@@ -131,7 +132,6 @@ typedef union __attribute__((packed)) {
 syslog_t sSyslog[SL_CORES];
 
 static SemaphoreHandle_t SyslogMutex ;
-static netx_t sSyslogCtx ;
 
 static uint32_t RptCRC = 0, RptCNT = 0;
 static uint64_t RptRUN = 0, RptUTC = 0;
@@ -151,21 +151,21 @@ static uint8_t RptPRI = 0;
 static int	IRAM_ATTR xSyslogConnect(void) {
 	if (bRtosCheckStatus(flagLX_STA) == 0)
 		return 0 ;
-	sSyslogCtx.pHost = HostInfo[ioB2GET(ioHostSLOG)].pName;
-	IF_myASSERT(debugPARAM, sSyslogCtx.pHost) ;
-	sSyslogCtx.sa_in.sin_family = AF_INET ;
-	sSyslogCtx.sa_in.sin_port   = htons(IP_PORT_SYSLOG_UDP) ;
-	sSyslogCtx.type				= SOCK_DGRAM ;
-	sSyslogCtx.d_flags			= 0 ;
-	sSyslogCtx.d_ndebug			= 1 ;					// disable debug in socketsX.c
-	int	iRV = xNetOpen(&sSyslogCtx) ;
+	sCtx.pHost = HostInfo[ioB2GET(ioHostSLOG)].pName;
+	IF_myASSERT(debugPARAM, sCtx.pHost) ;
+	sCtx.sa_in.sin_family	= AF_INET ;
+	sCtx.sa_in.sin_port		= htons(IP_PORT_SYSLOG_UDP) ;
+	sCtx.type				= SOCK_DGRAM ;
+	sCtx.d_flags			= 0 ;
+	sCtx.d_ndebug			= 1 ;						// disable debug in socketsX.c
+	int	iRV = xNetOpen(&sCtx) ;
 	if (iRV > erFAILURE) {
 		iRV = xNetSetNonBlocking(&sSyslogCtx, flagXNET_NONBLOCK) ;
 		if (iRV >= erSUCCESS) {
 			return 1;
 		}
 	}
-	xNetClose(&sSyslogCtx) ;
+	xNetClose(&sCtx) ;
 	return 0 ;
 }
 
@@ -173,8 +173,8 @@ static int	IRAM_ATTR xSyslogConnect(void) {
  * @brief	de-initialise the SysLog module
  */
 static void IRAM_ATTR vSyslogDisConnect(void) {
-	close(sSyslogCtx.sd);
-	sSyslogCtx.sd = -1;
+	close(sCtx.sd);
+	sCtx.sd = -1;
 	IF_RP(debugTRACK && ioB1GET(ioUpDown), "SLOG disconnect\n");
 }
 
@@ -325,9 +325,9 @@ int IRAM_ATTR xSyslogError(const char * pcFN, int iRV) {
  * @brief		report syslog related information
  */
 void vSyslogReport(void) {
-	if (sSyslogCtx.sd > 0) {
-		xNetReport(&sSyslogCtx, "SLOG", 0, 0, 0) ;
-		printfx("\tmaxTX=%u  CurRpt=%d\n", sSyslogCtx.maxTx, RptCNT) ;
+	if (sCtx.sd > 0) {
+		xNetReport(&sCtx, "SLOG", 0, 0, 0) ;
+		printfx("\tmaxTX=%u  CurRpt=%d\n", sCtx.maxTx, RptCNT) ;
 	}
 }
 
