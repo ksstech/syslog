@@ -81,7 +81,6 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #include	"hal_variables.h"
 #include	"printfx.h"									// +x_definitions +stdarg +stdint +stdio
 #include	"socketsX.h"
-#include	"FreeRTOS_Support.h"
 #include	"x_errors_events.h"
 #include	"x_time.h"
 #include	"hal_network.h"
@@ -97,8 +96,8 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 // ###################################### BUILD : CONFIG definitions ##############################
 
 // '<7>1 2021/10/21T12:34.567: cc50e38819ec_WROVERv4_5C9 #0 esp_timer halVARS_ReportFlags - '
-#define	SL_SIZEBUF1				120
-#define	SL_SIZEBUF2				880
+#define	SL_SIZEBUF					512
+
 #if defined(ESP_PLATFORM) && !defined(CONFIG_FREERTOS_UNICORE)
 	#define SL_CORES 				2
 #else
@@ -110,32 +109,18 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 
 // ###################################### Global variables #########################################
 
+static SemaphoreHandle_t SL_NetMux = 0, SL_VarMux = 0;
 static netx_t sCtx = { 0 };
+static uint32_t RptCRC = 0, RptCNT = 0;
+static uint64_t RptRUN = 0;
+static tsz_t RptUTC = { 0 };
+static uint8_t RptPRI = 0;
 static char SyslogColors[8] = {
 // 0 = Emergency	1 = Alert	2 = Critical	3 = Error
 	colourFG_RED, colourFG_RED, colourFG_RED, colourFG_RED,
 //	4 = Warning			5 = Notice		6 = Info		7 = Debug
 	colourFG_YELLOW, colourFG_GREEN, colourFG_MAGENTA, colourFG_CYAN,
 };
-
-typedef union __attribute__((packed)) {
-	struct {
-		char buf0[SL_SIZEBUF1 + SL_SIZEBUF2];
-		uint16_t len0, pad0;
-	};
-	struct {
-		char buf1[SL_SIZEBUF1];
-		char buf2[SL_SIZEBUF2];
-		uint16_t len1, len2;
-	};
-} syslog_t;
-syslog_t sSyslog[SL_CORES];
-
-static SemaphoreHandle_t SyslogMutex ;
-
-static uint32_t RptCRC = 0, RptCNT = 0;
-static uint64_t RptRUN = 0, RptUTC = 0;
-static uint8_t RptPRI = 0;
 
 // ###################################### Public functions #########################################
 
@@ -148,9 +133,9 @@ static uint8_t RptPRI = 0;
  * @brief	establish connection to the selected syslog host
  * @return	1 if successful else 0
  */
-static int	IRAM_ATTR xSyslogConnect(void) {
-	if (bRtosCheckStatus(flagLX_STA) == 0)
-		return 0 ;
+static int IRAM_ATTR xSyslogConnect(void) {
+	if (xRtosWaitStatusANY(flagLX_STA, pdMS_TO_TICKS(20)) != flagLX_STA)
+		return 0;
 	sCtx.pHost = HostInfo[ioB2GET(ioHostSLOG)].pName;
 	IF_myASSERT(debugPARAM, sCtx.pHost) ;
 	sCtx.sa_in.sin_family	= AF_INET ;
@@ -160,8 +145,32 @@ static int	IRAM_ATTR xSyslogConnect(void) {
 	sCtx.d_ndebug			= 1 ;						// disable debug in socketsX.c
 	int	iRV = xNetOpen(&sCtx) ;
 	if (iRV > erFAILURE) {
-		iRV = xNetSetNonBlocking(&sSyslogCtx, flagXNET_NONBLOCK) ;
-		if (iRV >= erSUCCESS) {
+		if (xNetSetNonBlocking(&sCtx, flagXNET_NONBLOCK) >= erSUCCESS) {
+			#if	(halUSE_LITTLEFS == 1)
+			// Check if buffered message file exists, if so send it....
+			if (allSYSFLAGS(sfLFS)) {
+				char * pBuf = pvRtosMalloc(SL_SIZEBUF);
+				xRtosSemaphoreTake(&LFSmux, portMAX_DELAY);
+				FILE * fp = fopen("syslog.txt", "r");
+				if (fp != 0) {
+					while (1) {
+						char * pRV = fgets(pBuf, SL_SIZEBUF, fp);
+						if (pRV != pBuf)
+							break;
+						int xLen = strlen(pBuf);
+						if (pBuf[xLen-1] == CHR_LF)
+							pBuf[--xLen] = CHR_NUL;							// remove terminating [CR]LF
+						iRV = sendto(sCtx.sd, pBuf, xLen, sCtx.flags, &sCtx.sa, sizeof(sCtx.sa_in));
+						vTaskDelay(pdMS_TO_TICKS(10));	// ensure WDT gets fed....
+					}
+				}
+				iRV = fclose(fp);
+				IF_myASSERT(debugRESULT, iRV == 0);
+				unlink("syslog.txt");
+				xRtosSemaphoreGive(&LFSmux);
+			}
+			#endif
+			IF_RP(debugTRACK && ioB1GET(ioUpDown), "SLOG connect\n");
 			return 1;
 		}
 	}
@@ -178,43 +187,46 @@ static void IRAM_ATTR vSyslogDisConnect(void) {
 	IF_RP(debugTRACK && ioB1GET(ioUpDown), "SLOG disconnect\n");
 }
 
-static void IRAM_ATTR vvSyslogPrintMessage(int McuID, char * ProcID, const char * MsgID, const char * format, va_list vArgs) {
-	int xLen = snprintfx(&sSyslog[McuID].buf2[0], SO_MEM(syslog_t, buf2), "%s %s - ", ProcID, MsgID);
-	xLen += vsnprintfx(&sSyslog[McuID].buf2[xLen], SO_MEM(syslog_t, buf2) - xLen, format, vArgs);
-	if (sSyslog[McuID].buf2[xLen-1] == CHR_LF) {
-		sSyslog[McuID].buf2[--xLen] = CHR_NUL;			// remove terminating [CR]LF
+static int IRAM_ATTR xvSyslogSendToHost(int PRI, tsz_t * psUTC, int McuID,
+	char * ProcID, const char * MsgID, char * pBuf, const char * format, va_list vaList) {
+	int iRV = 0;
+	int xLen = snprintfx(pBuf, SL_SIZEBUF, "<%u>1 %.Z %s #%d %s - - %s ", PRI, psUTC, nameSTA, McuID, ProcID, MsgID);
+	xLen += vsnprintfx(pBuf + xLen, SL_SIZEBUF - xLen - 1, format, vaList); // leave space for LF
+	if (pBuf[xLen-1] != CHR_LF) {
+		pBuf[xLen++] = CHR_LF;							// ensure terminating LF
+		pBuf[xLen] = CHR_NUL;
 	}
-	sSyslog[McuID].len2 = xLen;
-}
-
-static void IRAM_ATTR vSyslogPrintMessage(int McuID, char * ProcID, const char * MsgID, const char * format, ...) {
-    va_list vaList ;
-    va_start(vaList, format) ;
-    vvSyslogPrintMessage(McuID, ProcID, MsgID, format, vaList) ;
-    va_end(vaList) ;
-}
-
-static int IRAM_ATTR xSyslogSendMessage(int PRI, uint64_t UTC, int McuID) {
-	int xLen = snprintfx(&sSyslog[McuID].buf0[0], SO_MEM(syslog_t, buf0),
-			"<%u>1 %.R %s #%d %s", PRI, UTC, nameSTA, McuID, &sSyslog[McuID].buf2[0]);
-	if ((sSyslogCtx.sd > 0) || xSyslogConnect()) {		// LxSTA are up and connection established
-		iRV = sendto(sSyslogCtx.sd, &sSyslog[McuID].buf0[0], xLen, 0, &sSyslogCtx.sa, sizeof(sSyslogCtx.sa_in));
-		if (iRV == xLen) {
-			sSyslogCtx.maxTx = (xLen > sSyslogCtx.maxTx) ? xLen : sSyslogCtx.maxTx ;
+	if ((sCtx.sd > 0) || xSyslogConnect()) {			// LxSTA are up and connection established
+		while (pBuf[xLen-1] == CHR_LF || pBuf[xLen-1] == CHR_CR) {
+			pBuf[--xLen] = CHR_NUL;						// remove terminating CR/LF
+		}
+		xRtosSemaphoreTake(&SL_NetMux, portMAX_DELAY);
+		iRV = sendto(sCtx.sd, pBuf, xLen, sCtx.flags, &sCtx.sa, sizeof(sCtx.sa_in));
+		xRtosSemaphoreGive(&SL_NetMux);
+		if (iRV != erFAILURE) {
+			sCtx.maxTx = (iRV > sCtx.maxTx) ? iRV : sCtx.maxTx ;
 		} else {
 			vSyslogDisConnect();
 		}
+	} else {
+		#if	(halUSE_LITTLEFS == 1)
+		if (allSYSFLAGS(sfLFS)) {	// L2+3 STA down, no connection, append to file...
+			halFS_Write("syslog.txt", "a", pBuf);
+		}
+		#else
+			// No file system (available or initialised) to write to
+		#endif
 	}
-	#if	(halUSE_LITTLEFS == 1)
-	else if (allSYSFLAGS(sfLFS)) {	// LxSTA all down, no connection, append to file...
-		FILE * fp = fopen("syslog.txt", "a");
-		IF_myASSERT(debugRESULT, fp != 0);
-		iRV = fwrite(sSyslog[McuID].buf0, 1, xLen+1, fp);
-		fclose(fp);
-		IF_myASSERT(debugRESULT, iRV == xLen+1);
-	}
-	#endif
 	return iRV;
+}
+
+static int IRAM_ATTR xSyslogSendToHost(int PRI, tsz_t * psUTC, int McuID,
+	char * ProcID, const char * MsgID, char * pBuf, const char * format, ...) {
+    va_list vaList;
+    va_start(vaList, format);
+    int iRV = xvSyslogSendToHost(PRI, psUTC, McuID, ProcID, MsgID, pBuf, format, vaList);
+    va_end(vaList);
+    return iRV;
 }
 
 /**
@@ -224,20 +236,18 @@ static int IRAM_ATTR xSyslogSendMessage(int PRI, uint64_t UTC, int McuID) {
  * @param[in]	format string and parameters as per normal printf()
  * @return		number of characters sent to server
  */
-void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_list vArgs) {
-	// ANY message PRI/level above this option value WILL be ignored....
-	uint8_t MsgPRI = Level % 8;
-//	if (allSYSFLAGS(sfAPPSTAGE) && (Level % 8) > ioB3GET(ioSLOGhi))
-	if (MsgPRI > ioB3GET(ioSLOGhi))
-		return;
-
+void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_list vaList) {
 	// Fix up incorrectly formatted messages
 	MsgID = (MsgID == NULL) ? "null" : (*MsgID == 0) ? "empty" : MsgID;
 	format = (format == NULL) ? "null" : (*format == 0) ? "empty" : format;
 
+	// ANY message PRI/level above this option value WILL be ignored....
+	uint8_t MsgPRI = Level % 8;
+	if (MsgPRI > ioB3GET(ioSLOGhi))
+		return;
+
 	// Handle state of scheduler and obtain the task name
 	char *	ProcID;
-	uint32_t MsgCRC;
 	if (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) {
 		ProcID = (char *) "preX";
 	} else {
@@ -250,9 +260,8 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 		}
 	}
 
-	if (RunTime == 0ULL) {
+	if (RunTime == 0ULL)
 		RunTime = sTSZ.usecs = (uint64_t) esp_log_timestamp() * (uint64_t) MICROS_IN_MILLISEC;
-	}
 
 	#if defined(ESP_PLATFORM) && !defined(CONFIG_FREERTOS_UNICORE)
 	int McuID = cpu_hal_get_core_id();
@@ -260,39 +269,45 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 	int McuID = 0;					// default in case not ESP32 or scheduler not running
 	#endif
 
-	// Build the console formatted message into the buffer (basis for CRC comparison)
-	xRtosSemaphoreTake(&SyslogMutex, portMAX_DELAY);
-	vvSyslogPrintMessage(McuID, ProcID, MsgID, format, vArgs);
+	uint32_t MsgCRC = 0;
+	int xLen = crcprintfx(&MsgCRC, "%s %s ", ProcID, MsgID);	// "Task Function "
+	xLen += vcrcprintfx(&MsgCRC, format, vaList);				// "Task Function message parameters etc"
 
-	// Calc CRC to check for repeat message, handle accordingly
-	#if defined(ESP_PLATFORM)								// use ROM based CRC lookup table
-	MsgCRC = crc32_le(0, (uint8_t *) sSyslog[McuID].buf2, sSyslog[McuID].len2);
-	#else													// use fastest of external libraries
-	MsgCRC = crcSlow((uint8_t *) sSyslog[McuID].buf2, sSyslog[McuID].len2);
-	#endif
-
+	xRtosSemaphoreTake(&SL_VarMux, portMAX_DELAY);
 	if (MsgCRC == RptCRC && MsgPRI == RptPRI) {			// CRC & PRI same as previous message ?
 		++RptCNT;										// Yes, increment the repeat counter
 		RptRUN = RunTime;								// save timestamps of latest repeat
-		RptUTC = sTSZ.usecs;
+		RptUTC.usecs = sTSZ.usecs;
+		xRtosSemaphoreGive(&SL_VarMux);
 	} else {											// different message
-		if (RptCNT > 0) {								// previously skipped repeated messages ?
-			printfx("%C%!.3R: #%d Repeated %dx%C\n", SyslogColors[RptPRI & 7], RptRUN, McuID, RptCNT, 0);
-			if (FRflag && bSyslogCheckStatus(RptPRI)) {	// process skipped message to host
-				vSyslogPrintMessage(McuID, ProcID, MsgID, "Repeated %dx", RptCNT);
-				xSyslogSendMessage(RptPRI, RptUTC, McuID);
-				vvSyslogPrintMessage(McuID, ProcID, MsgID, format, vArgs);	// rebuild console message
-			}
-			RptCNT = 0;					// and reset the counter
-		}
-		// process new message...
+		// TmpCNT, TmpPRI, TmpRUN & TmpUTC used to accurately distinguish the "repeated ??x" message
+		uint8_t TmpCNT = RptCNT;
+		uint8_t TmpPRI = RptPRI;
+		uint64_t TmpRUN = RptRUN;
+		tsz_t TmpUTC = { .usecs = RptUTC.usecs, .pTZ = sTSZ.pTZ };
+		// Save current MsgCRC & MsgPRI for determining future repeated message
 		RptCRC = MsgCRC;
 		RptPRI = MsgPRI;
-		printfx("%C%!.3R: #%d %s%C\n", SyslogColors[MsgPRI & 7], RunTime, McuID, &sSyslog[McuID].buf2[0], 0);
-		if (FRflag && bSyslogCheckStatus(MsgPRI))
-			xSyslogSendMessage(MsgPRI, sTSZ.usecs, McuID);
+		RptCNT = 0;										// and reset the counter
+		xRtosSemaphoreGive(&SL_VarMux);
+		// Handle console message(s)
+		printfx_lock();
+		if (TmpCNT > 0)									// previously skipped repeated messages ?
+			printfx_nolock("%C%!.3R: #%d Repeated %dx%C\n", SyslogColors[TmpPRI], TmpRUN, McuID, TmpCNT, attrRESET);
+		printfx_nolock("%C%!.3R: #%d %s %s ", SyslogColors[MsgPRI], RunTime, McuID, ProcID, MsgID);
+		vprintfx_nolock(format, vaList);
+		printfx_nolock("%C\n", attrRESET);
+		printfx_unlock();
+
+		// Handle host message(s)
+		if (MsgPRI <= ioB3GET(ioSLhost)) {
+			char * pBuf = pvRtosMalloc(SL_SIZEBUF);
+			if (TmpCNT > 0)								// previously skipped repeated messages ?
+				xSyslogSendToHost(TmpPRI, &TmpUTC, McuID, ProcID, MsgID, pBuf, "Repeated %dx", TmpCNT);
+			xvSyslogSendToHost(MsgPRI, &sTSZ, McuID, ProcID, MsgID, pBuf, format, vaList);
+			vRtosFree(pBuf);
+		}
 	}
-	xRtosSemaphoreGive(&SyslogMutex);
 }
 
 /**
