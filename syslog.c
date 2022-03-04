@@ -112,8 +112,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 static SemaphoreHandle_t SL_NetMux = 0, SL_VarMux = 0;
 static netx_t sCtx = { 0 };
 static uint32_t RptCRC = 0, RptCNT = 0;
-static uint64_t RptRUN = 0;
-static tsz_t RptUTC = { 0 };
+static uint64_t RptRUN = 0, RptUTC = 0;
 static uint8_t RptPRI = 0;
 static char SyslogColors[8] = {
 // 0 = Emergency	1 = Alert	2 = Critical	3 = Error
@@ -187,15 +186,27 @@ static void IRAM_ATTR vSyslogDisConnect(void) {
 	IF_RP(debugTRACK && ioB1GET(ioUpDown), "SLOG disconnect\n");
 }
 
-static int IRAM_ATTR xvSyslogSendToHost(int PRI, tsz_t * psUTC, int McuID,
+#define	formatRFC5424	DRAM_STR("<%u>1 %.Z %s #%d %s - - %s ")
+#define formatCONSOLE 	DRAM_STR("%C%!.3R: #%d %s %s ")
+#define formatREPEATED	DRAM_STR("Repeated %dx")
+#define formatTERMINATE	DRAM_STR("%C\n")
+
+static int IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 	char * ProcID, const char * MsgID, char * pBuf, const char * format, va_list vaList) {
-	int iRV = 0;
-	int xLen = snprintfx(pBuf, SL_SIZEBUF, "<%u>1 %.Z %s #%d %s - - %s ", PRI, psUTC, nameSTA, McuID, ProcID, MsgID);
+	if (pBuf == NULL) {
+		printfx_lock();
+		printfx_nolock(formatCONSOLE, SyslogColors[PRI], psUTC->usecs, McuID, ProcID, MsgID);
+		printfx_nolock(formatREPEATED, format, vaList);
+		printfx_nolock(formatTERMINATE, attrRESET);
+		printfx_unlock();
+	}
+	int xLen = snprintfx(pBuf, SL_SIZEBUF, formatRFC5424, PRI, psUTC, nameSTA, McuID, ProcID, MsgID);
 	xLen += vsnprintfx(pBuf + xLen, SL_SIZEBUF - xLen - 1, format, vaList); // leave space for LF
 	if (pBuf[xLen-1] != CHR_LF) {
 		pBuf[xLen++] = CHR_LF;							// ensure terminating LF
 		pBuf[xLen] = CHR_NUL;
 	}
+	int iRV = 0;
 	if ((sCtx.sd > 0) || xSyslogConnect()) {			// LxSTA are up and connection established
 		while (pBuf[xLen-1] == CHR_LF || pBuf[xLen-1] == CHR_CR) {
 			pBuf[--xLen] = CHR_NUL;						// remove terminating CR/LF
@@ -220,11 +231,11 @@ static int IRAM_ATTR xvSyslogSendToHost(int PRI, tsz_t * psUTC, int McuID,
 	return iRV;
 }
 
-static int IRAM_ATTR xSyslogSendToHost(int PRI, tsz_t * psUTC, int McuID,
+static int IRAM_ATTR xSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 	char * ProcID, const char * MsgID, char * pBuf, const char * format, ...) {
     va_list vaList;
     va_start(vaList, format);
-    int iRV = xvSyslogSendToHost(PRI, psUTC, McuID, ProcID, MsgID, pBuf, format, vaList);
+    int iRV = xvSyslogSendMessage(PRI, psUTC, McuID, ProcID, MsgID, pBuf, format, vaList);
     va_end(vaList);
     return iRV;
 }
@@ -249,7 +260,7 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 	// Handle state of scheduler and obtain the task name
 	char *	ProcID;
 	if (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) {
-		ProcID = (char *) "preX";
+		ProcID = (char *) DRAM_STR("preX");
 	} else {
 		ProcID = pcTaskGetName(NULL);
 		char * pcTmp  = ProcID;
@@ -270,41 +281,43 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 	#endif
 
 	uint32_t MsgCRC = 0;
-	int xLen = crcprintfx(&MsgCRC, "%s %s ", ProcID, MsgID);	// "Task Function "
+	int xLen = crcprintfx(&MsgCRC, DRAM_STR("%s %s "), ProcID, MsgID);	// "Task Function "
 	xLen += vcrcprintfx(&MsgCRC, format, vaList);				// "Task Function message parameters etc"
 
 	xRtosSemaphoreTake(&SL_VarMux, portMAX_DELAY);
 	if (MsgCRC == RptCRC && MsgPRI == RptPRI) {			// CRC & PRI same as previous message ?
 		++RptCNT;										// Yes, increment the repeat counter
 		RptRUN = RunTime;								// save timestamps of latest repeat
-		RptUTC.usecs = sTSZ.usecs;
+		RptUTC = sTSZ.usecs;
 		xRtosSemaphoreGive(&SL_VarMux);
 	} else {											// different message
 		// TmpCNT, TmpPRI, TmpRUN & TmpUTC used to accurately distinguish the "repeated ??x" message
 		uint8_t TmpCNT = RptCNT;
 		uint8_t TmpPRI = RptPRI;
-		uint64_t TmpRUN = RptRUN;
-		tsz_t TmpUTC = { .usecs = RptUTC.usecs, .pTZ = sTSZ.pTZ };
 		// Save current MsgCRC & MsgPRI for determining future repeated message
 		RptCRC = MsgCRC;
 		RptPRI = MsgPRI;
 		RptCNT = 0;										// and reset the counter
+		// Start building & display/sending of message[s]
+		tsz_t TmpUTC = {.pTZ = sTSZ.pTZ };
 		xRtosSemaphoreGive(&SL_VarMux);
 		// Handle console message(s)
-		printfx_lock();
-		if (TmpCNT > 0)									// previously skipped repeated messages ?
-			printfx_nolock("%C%!.3R: #%d Repeated %dx%C\n", SyslogColors[TmpPRI], TmpRUN, McuID, TmpCNT, attrRESET);
-		printfx_nolock("%C%!.3R: #%d %s %s ", SyslogColors[MsgPRI], RunTime, McuID, ProcID, MsgID);
-		vprintfx_nolock(format, vaList);
-		printfx_nolock("%C\n", attrRESET);
-		printfx_unlock();
+		if (TmpCNT > 0) {								// previously skipped repeated messages
+			TmpUTC.usecs = RptRUN;
+			xSyslogSendMessage(TmpPRI, &TmpUTC, McuID, ProcID, MsgID, NULL, formatREPEATED, TmpCNT);
+		}
+		TmpUTC.usecs = RunTime;
+		xvSyslogSendMessage(MsgPRI, &TmpUTC, McuID, ProcID, MsgID, NULL, format, vaList);
 
 		// Handle host message(s)
 		if (MsgPRI <= ioB3GET(ioSLhost)) {
 			char * pBuf = pvRtosMalloc(SL_SIZEBUF);
-			if (TmpCNT > 0)								// previously skipped repeated messages ?
-				xSyslogSendToHost(TmpPRI, &TmpUTC, McuID, ProcID, MsgID, pBuf, "Repeated %dx", TmpCNT);
-			xvSyslogSendToHost(MsgPRI, &sTSZ, McuID, ProcID, MsgID, pBuf, format, vaList);
+			if (TmpCNT > 0) {							// previously skipped repeated messages ?
+				TmpUTC.usecs = RptUTC;
+				xSyslogSendMessage(TmpPRI, &TmpUTC, McuID, ProcID, MsgID, pBuf, formatREPEATED, TmpCNT);
+			}
+			TmpUTC.usecs = sTSZ.usecs;
+			xvSyslogSendMessage(MsgPRI, &sTSZ, McuID, ProcID, MsgID, pBuf, format, vaList);
 			vRtosFree(pBuf);
 		}
 	}
