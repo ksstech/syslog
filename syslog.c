@@ -196,7 +196,7 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 	if (pBuf == NULL) {
 		printfx_lock();
 		printfx_nolock(formatCONSOLE, SyslogColors[PRI], psUTC->usecs, McuID, ProcID, MsgID);
-		printfx_nolock(formatREPEATED, format, vaList);
+		vprintfx_nolock(format, vaList);
 		printfx_nolock(formatTERMINATE, attrRESET);
 		printfx_unlock();
 	}
