@@ -95,7 +95,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 
 // ###################################### BUILD : CONFIG definitions ##############################
 
-// '<7>1 2021/10/21T12:34.567: cc50e38819ec_WROVERv4_5C9 #0 esp_timer halVARS_ReportFlags - '
+// '<7>1 2021/10/21T12:34.567: cc50e38819ec_WROVERv4_5C9 #0 esp_timer halVARS_Report????? - '
 #define	SL_SIZEBUF					512
 
 #if defined(ESP_PLATFORM) && !defined(CONFIG_FREERTOS_UNICORE)
