@@ -191,7 +191,7 @@ static void IRAM_ATTR vSyslogDisConnect(void) {
 #define formatREPEATED	DRAM_STR("Repeated %dx")
 #define formatTERMINATE	DRAM_STR("%C\n")
 
-static int IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
+static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 	char * ProcID, const char * MsgID, char * pBuf, const char * format, va_list vaList) {
 	if (pBuf == NULL) {
 		printfx_lock();
@@ -228,16 +228,14 @@ static int IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 			// No file system (available or initialised) to write to
 		#endif
 	}
-	return iRV;
 }
 
-static int IRAM_ATTR xSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
+static void IRAM_ATTR xSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 	char * ProcID, const char * MsgID, char * pBuf, const char * format, ...) {
     va_list vaList;
     va_start(vaList, format);
-    int iRV = xvSyslogSendMessage(PRI, psUTC, McuID, ProcID, MsgID, pBuf, format, vaList);
+    xvSyslogSendMessage(PRI, psUTC, McuID, ProcID, MsgID, pBuf, format, vaList);
     va_end(vaList);
-    return iRV;
 }
 
 /**
