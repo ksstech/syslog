@@ -199,34 +199,35 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 		vprintfx_nolock(format, vaList);
 		printfx_nolock(formatTERMINATE, attrRESET);
 		printfx_unlock();
-	}
-	int xLen = snprintfx(pBuf, SL_SIZEBUF, formatRFC5424, PRI, psUTC, nameSTA, McuID, ProcID, MsgID);
-	xLen += vsnprintfx(pBuf + xLen, SL_SIZEBUF - xLen - 1, format, vaList); // leave space for LF
-	if (pBuf[xLen-1] != CHR_LF) {
-		pBuf[xLen++] = CHR_LF;							// ensure terminating LF
-		pBuf[xLen] = CHR_NUL;
-	}
-	int iRV = 0;
-	if ((sCtx.sd > 0) || xSyslogConnect()) {			// LxSTA are up and connection established
-		while (pBuf[xLen-1] == CHR_LF || pBuf[xLen-1] == CHR_CR) {
-			pBuf[--xLen] = CHR_NUL;						// remove terminating CR/LF
-		}
-		xRtosSemaphoreTake(&SL_NetMux, portMAX_DELAY);
-		iRV = sendto(sCtx.sd, pBuf, xLen, sCtx.flags, &sCtx.sa, sizeof(sCtx.sa_in));
-		xRtosSemaphoreGive(&SL_NetMux);
-		if (iRV != erFAILURE) {
-			sCtx.maxTx = (iRV > sCtx.maxTx) ? iRV : sCtx.maxTx ;
-		} else {
-			vSyslogDisConnect();
-		}
 	} else {
-		#if	(halUSE_LITTLEFS == 1)
-		if (allSYSFLAGS(sfLFS)) {	// L2+3 STA down, no connection, append to file...
-			halFS_Write("syslog.txt", "a", pBuf);
+		int xLen = snprintfx(pBuf, SL_SIZEBUF, formatRFC5424, PRI, psUTC, nameSTA, McuID, ProcID, MsgID);
+		xLen += vsnprintfx(pBuf + xLen, SL_SIZEBUF - xLen - 1, format, vaList); // leave space for LF
+		if (pBuf[xLen-1] != CHR_LF) {
+			pBuf[xLen++] = CHR_LF;							// ensure terminating LF
+			pBuf[xLen] = CHR_NUL;
 		}
-		#else
-			// No file system (available or initialised) to write to
-		#endif
+		if ((sCtx.sd > 0) || xSyslogConnect()) {			// LxSTA are up and connection established
+			while (pBuf[xLen-1] == CHR_LF || pBuf[xLen-1] == CHR_CR) {
+				pBuf[--xLen] = CHR_NUL;						// remove terminating CR/LF
+			}
+			xRtosSemaphoreTake(&SL_NetMux, portMAX_DELAY);
+			int iRV = sendto(sCtx.sd, pBuf, xLen, sCtx.flags, &sCtx.sa, sizeof(sCtx.sa_in));
+			xRtosSemaphoreGive(&SL_NetMux);
+			if (iRV != erFAILURE) {
+				sCtx.maxTx = (iRV > sCtx.maxTx) ? iRV : sCtx.maxTx ;
+			} else {
+				vSyslogDisConnect();
+			}
+		} else {
+			#if	(halUSE_LITTLEFS == 1)
+			if (allSYSFLAGS(sfLFS)) {	// L2+3 STA down, no connection, append to file...
+				halFS_Write("syslog.txt", "a", pBuf);
+			}
+			#else
+				// No file system (available or initialised) to write to
+			#endif
+		}
+
 	}
 }
 
