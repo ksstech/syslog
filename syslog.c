@@ -136,10 +136,11 @@ static int IRAM_ATTR xSyslogConnect(void) {
 	if (xRtosWaitStatusANY(flagLX_STA, pdMS_TO_TICKS(20)) != flagLX_STA)
 		return 0;
 	sCtx.pHost = HostInfo[ioB2GET(ioHostSLOG)].pName;
-	IF_myASSERT(debugPARAM, sCtx.pHost) ;
-	sCtx.sa_in.sin_family	= AF_INET ;
-	sCtx.sa_in.sin_port		= htons(IP_PORT_SYSLOG_UDP) ;
-	sCtx.type				= SOCK_DGRAM ;
+	IF_myASSERT(debugPARAM, sCtx.pHost);
+	sCtx.sa_in.sin_family = AF_INET;
+	sCtx.sa_in.sin_port = htons(IP_PORT_SYSLOG_UDP);
+	sCtx.type = SOCK_DGRAM;
+	sCtx.flags = SO_REUSEADDR;
 	sCtx.d_flags			= 0 ;
 	sCtx.d_ndebug			= 1 ;						// disable debug in socketsX.c
 	int	iRV = xNetOpen(&sCtx) ;
