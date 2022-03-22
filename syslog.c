@@ -282,7 +282,7 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 
 	uint32_t MsgCRC = 0;
 	int xLen = crcprintfx(&MsgCRC, DRAM_STR("%s %s "), ProcID, MsgID);	// "Task Function "
-	xLen += vcrcprintfx(&MsgCRC, format, vaList);				// "Task Function message parameters etc"
+	xLen += vcrcprintfx(&MsgCRC, format, vaList);		// "Task Function message parameters etc"
 
 	xRtosSemaphoreTake(&SL_VarMux, portMAX_DELAY);
 	if (MsgCRC == RptCRC && MsgPRI == RptPRI) {			// CRC & PRI same as previous message ?
