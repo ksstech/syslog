@@ -114,6 +114,7 @@ static netx_t sCtx = { 0 };
 static uint32_t RptCRC = 0, RptCNT = 0;
 static uint64_t RptRUN = 0, RptUTC = 0;
 static uint8_t RptPRI = 0;
+static char * RptTask, * RptFunc;
 static char SyslogColors[8] = {
 // 0 = Emergency	1 = Alert	2 = Critical	3 = Error
 	colourFG_RED, colourFG_RED, colourFG_RED, colourFG_RED,
@@ -257,7 +258,7 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 		return;
 
 	// Handle state of scheduler and obtain the task name
-	char *	ProcID;
+	char * ProcID;
 	if (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) {
 		ProcID = (char *) DRAM_STR("preX");
 	} else {
@@ -288,22 +289,15 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 		++RptCNT;										// Yes, increment the repeat counter
 		RptRUN = RunTime;								// save timestamps of latest repeat
 		RptUTC = sTSZ.usecs;
-		xRtosSemaphoreGive(&SL_VarMux);
+		RptTask = ProcID;
+		RptFunc = (char *) MsgID;
 	} else {											// different message
-		// TmpCNT, TmpPRI, TmpRUN & TmpUTC used to accurately distinguish the "repeated ??x" message
-		uint8_t TmpCNT = RptCNT;
-		uint8_t TmpPRI = RptPRI;
-		// Save current MsgCRC & MsgPRI for determining future repeated message
-		RptCRC = MsgCRC;
-		RptPRI = MsgPRI;
-		RptCNT = 0;										// and reset the counter
 		// Start building & display/sending of message[s]
 		tsz_t TmpUTC = {.pTZ = sTSZ.pTZ };
-		xRtosSemaphoreGive(&SL_VarMux);
 		// Handle console message(s)
-		if (TmpCNT > 0) {								// previously skipped repeated messages
+		if (RptCNT > 0) {								// previously skipped repeated messages
 			TmpUTC.usecs = RptRUN;
-			xSyslogSendMessage(TmpPRI, &TmpUTC, McuID, ProcID, MsgID, NULL, formatREPEATED, TmpCNT);
+			xSyslogSendMessage(RptPRI, &TmpUTC, McuID, RptTask, RptFunc, NULL, formatREPEATED, RptCNT);
 		}
 		TmpUTC.usecs = RunTime;
 		xvSyslogSendMessage(MsgPRI, &TmpUTC, McuID, ProcID, MsgID, NULL, format, vaList);
@@ -311,15 +305,19 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 		// Handle host message(s)
 		if (MsgPRI <= ioB3GET(ioSLhost)) {
 			char * pBuf = pvRtosMalloc(SL_SIZEBUF);
-			if (TmpCNT > 0) {							// previously skipped repeated messages ?
+			if (RptCNT > 0) {							// previously skipped repeated messages ?
 				TmpUTC.usecs = RptUTC;
-				xSyslogSendMessage(TmpPRI, &TmpUTC, McuID, ProcID, MsgID, pBuf, formatREPEATED, TmpCNT);
+				xSyslogSendMessage(RptPRI, &TmpUTC, McuID, RptTask, RptFunc, pBuf, formatREPEATED, RptCNT);
 			}
-			TmpUTC.usecs = sTSZ.usecs;
 			xvSyslogSendMessage(MsgPRI, &sTSZ, McuID, ProcID, MsgID, pBuf, format, vaList);
 			vRtosFree(pBuf);
 		}
+		// Save current MsgCRC & MsgPRI for determining future repeated message
+		RptCRC = MsgCRC;
+		RptPRI = MsgPRI;
+		RptCNT = 0;										// and reset the counter
 	}
+	xRtosSemaphoreGive(&SL_VarMux);
 }
 
 /**
