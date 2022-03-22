@@ -4,10 +4,8 @@
 
 #pragma once
 
-#include	<stdarg.h>
-#include	<stdint.h>
-#include	"hal_config.h"
-#include	"FreeRTOS_Support.h"
+#include <stdarg.h>
+#include "sdkconfig.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -15,7 +13,6 @@ extern "C" {
 
 // ############################################ macros ############################################
 
-#define	syslogHOSTNAME				"host.domain.tld"
 
 // ############################# Facilities & Severities definitions ###############################
 
