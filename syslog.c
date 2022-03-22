@@ -250,7 +250,6 @@ static void IRAM_ATTR xSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_list vaList) {
 	// Fix up incorrectly formatted messages
 	MsgID = (MsgID == NULL) ? "null" : (*MsgID == 0) ? "empty" : MsgID;
-	format = (format == NULL) ? "null" : (*format == 0) ? "empty" : format;
 
 	// ANY message PRI/level above this option value WILL be ignored....
 	uint8_t MsgPRI = Level % 8;
