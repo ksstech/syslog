@@ -249,16 +249,11 @@ static void IRAM_ATTR xSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
  * @return		number of characters sent to server
  */
 void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_list vaList) {
-	// Fix up incorrectly formatted messages
 	MsgID = (MsgID == NULL) ? "null" : (*MsgID == 0) ? "empty" : MsgID;
-
-	// ANY message PRI/level above this option value WILL be ignored....
-	uint8_t MsgPRI = Level % 8;
+	uint8_t MsgPRI = Level % 8;		// ANY message PRI/level > ioSLOGhi value WILL be discarded
 	if (MsgPRI > ioB3GET(ioSLOGhi))
 		return;
-
-	// Handle state of scheduler and obtain the task name
-	char * ProcID;
+	char * ProcID;					// Handle state of scheduler and obtain the task name
 	if (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) {
 		ProcID = (char *) DRAM_STR("preX");
 	} else {
@@ -270,7 +265,6 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 			++pcTmp;
 		}
 	}
-
 	if (RunTime == 0ULL)
 		RunTime = sTSZ.usecs = (uint64_t) esp_log_timestamp() * (uint64_t) MICROS_IN_MILLISEC;
 
@@ -291,8 +285,7 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 		RptUTC = sTSZ.usecs;
 		RptTask = ProcID;
 		RptFunc = (char *) MsgID;
-	} else {											// different message
-		// Start building & display/sending of message[s]
+	} else {											// Start building/display/sending of message[s]
 		tsz_t TmpUTC = {.pTZ = sTSZ.pTZ };
 		// Handle console message(s)
 		if (RptCNT > 0) {								// previously skipped repeated messages
@@ -302,8 +295,7 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 		TmpUTC.usecs = RunTime;
 		xvSyslogSendMessage(MsgPRI, &TmpUTC, McuID, ProcID, MsgID, NULL, format, vaList);
 
-		// Handle host message(s)
-		if (MsgPRI <= ioB3GET(ioSLhost)) {
+		if (MsgPRI <= ioB3GET(ioSLhost)) {				// Handle host message(s)
 			char * pBuf = pvRtosMalloc(SL_SIZEBUF);
 			if (RptCNT > 0) {							// previously skipped repeated messages ?
 				TmpUTC.usecs = RptUTC;
