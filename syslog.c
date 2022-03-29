@@ -278,13 +278,14 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 	int xLen = crcprintfx(&MsgCRC, DRAM_STR("%s %s "), ProcID, MsgID);	// "Task Function "
 	xLen += vcrcprintfx(&MsgCRC, format, vaList);		// "Task Function message parameters etc"
 
-	xRtosSemaphoreTake(&SL_VarMux, portMAX_DELAY);
 	if (MsgCRC == RptCRC && MsgPRI == RptPRI) {			// CRC & PRI same as previous message ?
+		xRtosSemaphoreTake(&SL_VarMux, portMAX_DELAY);
 		++RptCNT;										// Yes, increment the repeat counter
 		RptRUN = RunTime;								// save timestamps of latest repeat
 		RptUTC = sTSZ.usecs;
 		RptTask = ProcID;
 		RptFunc = (char *) MsgID;
+		xRtosSemaphoreGive(&SL_VarMux);
 	} else {											// Start building/display/sending of message[s]
 		tsz_t TmpUTC = {.pTZ = sTSZ.pTZ };
 		// Handle console message(s)
@@ -295,6 +296,7 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 		TmpUTC.usecs = RunTime;
 		xvSyslogSendMessage(MsgPRI, &TmpUTC, McuID, ProcID, MsgID, NULL, format, vaList);
 
+		xRtosSemaphoreTake(&SL_VarMux, portMAX_DELAY);
 		if (MsgPRI <= ioB3GET(ioSLhost)) {				// Handle host message(s)
 			char * pBuf = pvRtosMalloc(SL_SIZEBUF);
 			if (RptCNT > 0) {							// previously skipped repeated messages ?
@@ -308,8 +310,8 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 		RptCRC = MsgCRC;
 		RptPRI = MsgPRI;
 		RptCNT = 0;										// and reset the counter
+		xRtosSemaphoreGive(&SL_VarMux);
 	}
-	xRtosSemaphoreGive(&SL_VarMux);
 }
 
 /**
