@@ -260,8 +260,8 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 		ProcID = pcTaskGetName(NULL);
 		char * pcTmp  = ProcID;
 		while (*pcTmp) {
-			if (*pcTmp == ' ')
-				*pcTmp = '_';
+			if (*pcTmp == CHR_SPACE)
+				*pcTmp = CHR_UNDERSCORE;
 			++pcTmp;
 		}
 	}
@@ -359,7 +359,7 @@ void vSyslogBenchmark(void) {
 	char Test1[] = "SNTP vSntpTask ntp1.meraka.csir.co.za  2019-03-05T10:56:58.901Z  tOFF=78,873,521uS  tRTD=11,976uS" ;
 	char Test2[] = "01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz 01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" ;
 
-	uint32_t	crc1, crc2, crc3, crc4, crc5, crc6 ;
+	uint32_t crc1, crc2, crc3, crc4, crc5, crc6 ;
 	vSysTimerReset(1 << stSLOG, stCLOCKS, "SLOG", myUS_TO_CLOCKS(10), myUS_TO_CLOCKS(1000)) ;
 	xSysTimerStart(stSLOG) ;
 	crc1 = F_CRC_CalculaCheckSum((uint8_t *) Test1, sizeof(Test1)-1) ;
