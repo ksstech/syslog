@@ -98,10 +98,10 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 // '<7>1 2021/10/21T12:34.567: cc50e38819ec_WROVERv4_5C9 #0 esp_timer halVARS_Report????? - '
 #define	SL_SIZEBUF					512
 
-#if defined(ESP_PLATFORM) && !defined(CONFIG_FREERTOS_UNICORE)
-	#define SL_CORES 				2
-#else
+#ifdef CONFIG_FREERTOS_UNICORE
 	#define SL_CORES 				1
+#else
+	#define SL_CORES 				2
 #endif
 
 // ######################################### Structures ############################################
@@ -268,10 +268,10 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 	if (RunTime == 0ULL)
 		RunTime = sTSZ.usecs = (uint64_t) esp_log_timestamp() * (uint64_t) MICROS_IN_MILLISEC;
 
-	#if defined(ESP_PLATFORM) && !defined(CONFIG_FREERTOS_UNICORE)
-	int McuID = cpu_hal_get_core_id();
-	#else
+	#ifdef CONFIG_FREERTOS_UNICORE
 	int McuID = 0;					// default in case not ESP32 or scheduler not running
+	#else
+	int McuID = cpu_hal_get_core_id();
 	#endif
 
 	uint32_t MsgCRC = 0;
