@@ -107,9 +107,8 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 // ######################################### Structures ############################################
 
 
-// ###################################### Global variables #########################################
+// ####################################### Local variables #########################################
 
-static SemaphoreHandle_t SL_NetMux = 0, SL_VarMux = 0;
 static netx_t sCtx = { 0 };
 static uint32_t RptCRC = 0, RptCNT = 0;
 static uint64_t RptRUN = 0, RptUTC = 0;
@@ -121,6 +120,10 @@ static char SyslogColors[8] = {
 //	4 = Warning			5 = Notice		6 = Info		7 = Debug
 	colourFG_YELLOW, colourFG_GREEN, colourFG_MAGENTA, colourFG_CYAN,
 };
+
+// ###################################### Global variables #########################################
+
+SemaphoreHandle_t SL_NetMux = 0, SL_VarMux = 0;
 
 // ###################################### Public functions #########################################
 
@@ -229,7 +232,6 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 				// No file system (available or initialised) to write to
 			#endif
 		}
-
 	}
 }
 
@@ -274,43 +276,47 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 	int McuID = cpu_hal_get_core_id();
 	#endif
 
+	xRtosSemaphoreTake(&SL_VarMux, portMAX_DELAY);
 	uint32_t MsgCRC = 0;
 	int xLen = crcprintfx(&MsgCRC, DRAM_STR("%s %s "), ProcID, MsgID);	// "Task Function "
 	xLen += vcrcprintfx(&MsgCRC, format, vaList);		// "Task Function message parameters etc"
 
 	if (MsgCRC == RptCRC && MsgPRI == RptPRI) {			// CRC & PRI same as previous message ?
-		xRtosSemaphoreTake(&SL_VarMux, portMAX_DELAY);
 		++RptCNT;										// Yes, increment the repeat counter
 		RptRUN = RunTime;								// save timestamps of latest repeat
 		RptUTC = sTSZ.usecs;
 		RptTask = ProcID;
 		RptFunc = (char *) MsgID;
 		xRtosSemaphoreGive(&SL_VarMux);
-	} else {											// Start building/display/sending of message[s]
-		tsz_t TmpUTC = {.pTZ = sTSZ.pTZ };
-		// Handle console message(s)
-		if (RptCNT > 0) {								// previously skipped repeated messages
-			TmpUTC.usecs = RptRUN;
-			xSyslogSendMessage(RptPRI, &TmpUTC, McuID, RptTask, RptFunc, NULL, formatREPEATED, RptCNT);
-		}
-		TmpUTC.usecs = RunTime;
-		xvSyslogSendMessage(MsgPRI, &TmpUTC, McuID, ProcID, MsgID, NULL, format, vaList);
+	} else {											// Different CRC and/or PRI
+		// save trackers for immediate and future use...
+		RptCRC = MsgCRC;								// Save to use later
+		uint8_t TmpPRI = RptPRI;	RptPRI = MsgPRI;	// Save old to use now, new to use later
+		uint32_t TmpCNT = RptCNT;	RptCNT = 0;			// Save to use now, reset for next message
+		uint64_t TmpRUN = RptRUN;						// Save to use now
+		uint64_t TmpUTC = RptUTC;
+		char * TmpTask = RptTask;
+		char * TmpFunc = RptFunc;
+		xRtosSemaphoreGive(&SL_VarMux);
 
-		xRtosSemaphoreTake(&SL_VarMux, portMAX_DELAY);
-		if (MsgPRI <= ioB3GET(ioSLhost)) {				// Handle host message(s)
+		tsz_t TmpTSZ = {.pTZ = sTSZ.pTZ };
+		// Handle console message(s)
+		if (TmpCNT > 0) {
+			TmpTSZ.usecs = TmpRUN;						// repeated message + count
+			xSyslogSendMessage(TmpPRI, &TmpTSZ, McuID, TmpTask, TmpFunc, NULL, formatREPEATED, TmpCNT);
+		}
+		TmpTSZ.usecs = RunTime;							// New message
+		xvSyslogSendMessage(MsgPRI, &TmpTSZ, McuID, ProcID, MsgID, NULL, format, vaList);
+		// Handle host message(s)
+		if (MsgPRI <= ioB3GET(ioSLhost)) {				// filter based on higher priorities
 			char * pBuf = pvRtosMalloc(SL_SIZEBUF);
-			if (RptCNT > 0) {							// previously skipped repeated messages ?
-				TmpUTC.usecs = RptUTC;
-				xSyslogSendMessage(RptPRI, &TmpUTC, McuID, RptTask, RptFunc, pBuf, formatREPEATED, RptCNT);
+			if (TmpCNT > 0) {
+				TmpTSZ.usecs = TmpUTC;					// repeated message +  count
+				xSyslogSendMessage(TmpPRI, &TmpTSZ, McuID, TmpTask, TmpFunc, pBuf, formatREPEATED, TmpCNT);
 			}
 			xvSyslogSendMessage(MsgPRI, &sTSZ, McuID, ProcID, MsgID, pBuf, format, vaList);
 			vRtosFree(pBuf);
 		}
-		// Save current MsgCRC & MsgPRI for determining future repeated message
-		RptCRC = MsgCRC;
-		RptPRI = MsgPRI;
-		RptCNT = 0;										// and reset the counter
-		xRtosSemaphoreGive(&SL_VarMux);
 	}
 }
 
