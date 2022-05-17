@@ -253,10 +253,10 @@ static void IRAM_ATTR xSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
  * @return		number of characters sent to server
  */
 void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_list vaList) {
-	MsgID = (MsgID == NULL) ? "null" : (*MsgID == 0) ? "empty" : MsgID;
-	uint8_t MsgPRI = Level % 8;		// ANY message PRI/level > ioSLOGhi value WILL be discarded
+	u8_t MsgPRI = Level % 8;		// ANY message PRI/level > ioSLOGhi value WILL be discarded
 	if (MsgPRI > ioB3GET(ioSLOGhi))
 		return;
+	MsgID = (MsgID == NULL) ? "null" : (*MsgID == 0) ? "empty" : MsgID;
 	char * ProcID;					// Handle state of scheduler and obtain the task name
 	if (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) {
 		ProcID = (char *) DRAM_STR("preX");
