@@ -1,5 +1,5 @@
 /*
- * syslog.c - Copyright 2014-22 Andre M Maree / KSS Technologies (Pty) Ltd.
+ * syslog.c - Copyright 2014-22 Andre M. Maree / KSS Technologies (Pty) Ltd.
  *
  ******************************************************************************************************************
  SYSLOG-MSG = HEADER SP STRUCTURED-DATA [SP MSG]
