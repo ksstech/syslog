@@ -205,6 +205,8 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 		printfx_nolock(formatTERMINATE, attrRESET);
 		printfx_unlock();
 	} else {
+		if (*nameSTA == CHR_NUL)		// if very early message, WIFI init not yet done.
+			strcpy(nameSTA, "unknown");
 		int xLen = snprintfx(pBuf, SL_SIZEBUF, formatRFC5424, PRI, psUTC, nameSTA, McuID, ProcID, MsgID);
 		xLen += vsnprintfx(pBuf + xLen, SL_SIZEBUF - xLen - 1, format, vaList); // leave space for LF
 		if (pBuf[xLen-1] != CHR_LF) {
