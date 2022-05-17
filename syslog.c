@@ -191,7 +191,7 @@ static void IRAM_ATTR vSyslogDisConnect(void) {
 	IF_RP(debugTRACK && ioB1GET(ioUpDown), "SLOG disconnect\n");
 }
 
-#define	formatRFC5424	DRAM_STR("<%u>1 %.Z %s #%d %s - - %s ")
+#define	formatRFC5424	DRAM_STR("<%u>1 %.3Z %s #%d %s - - %s ")
 #define formatCONSOLE 	DRAM_STR("%C%!.3R: #%d %s %s ")
 #define formatREPEATED	DRAM_STR("Repeated %dx")
 #define formatTERMINATE	DRAM_STR("%C\n")
