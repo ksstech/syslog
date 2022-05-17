@@ -110,9 +110,9 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 // ####################################### Local variables #########################################
 
 static netx_t sCtx = { 0 };
-static uint32_t RptCRC = 0, RptCNT = 0;
-static uint64_t RptRUN = 0, RptUTC = 0;
-static uint8_t RptPRI = 0;
+static u32_t RptCRC = 0, RptCNT = 0;
+static u64_t RptRUN = 0, RptUTC = 0;
+static u8_t RptPRI = 0;
 static char * RptTask, * RptFunc;
 static char SyslogColors[8] = {
 // 0 = Emergency	1 = Alert	2 = Critical	3 = Error
@@ -268,7 +268,7 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 		}
 	}
 	if (RunTime == 0ULL)
-		RunTime = sTSZ.usecs = (uint64_t) esp_log_timestamp() * (uint64_t) MICROS_IN_MILLISEC;
+		RunTime = sTSZ.usecs = (u64_t) esp_log_timestamp() * (u64_t) MICROS_IN_MILLISEC;
 
 	#ifdef CONFIG_FREERTOS_UNICORE
 	int McuID = 0;					// default in case not ESP32 or scheduler not running
@@ -277,7 +277,7 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 	#endif
 
 	xRtosSemaphoreTake(&SL_VarMux, portMAX_DELAY);
-	uint32_t MsgCRC = 0;
+	u32_t MsgCRC = 0;
 	int xLen = crcprintfx(&MsgCRC, DRAM_STR("%s %s "), ProcID, MsgID);	// "Task Function "
 	xLen += vcrcprintfx(&MsgCRC, format, vaList);		// "Task Function message parameters etc"
 
@@ -291,10 +291,10 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 	} else {											// Different CRC and/or PRI
 		// save trackers for immediate and future use...
 		RptCRC = MsgCRC;								// Save to use later
-		uint8_t TmpPRI = RptPRI;	RptPRI = MsgPRI;	// Save old to use now, new to use later
-		uint32_t TmpCNT = RptCNT;	RptCNT = 0;			// Save to use now, reset for next message
-		uint64_t TmpRUN = RptRUN;						// Save to use now
-		uint64_t TmpUTC = RptUTC;
+		u8_t TmpPRI = RptPRI;	RptPRI = MsgPRI;	// Save old to use now, new to use later
+		u32_t TmpCNT = RptCNT;	RptCNT = 0;			// Save to use now, reset for next message
+		u64_t TmpRUN = RptRUN;						// Save to use now
+		u64_t TmpUTC = RptUTC;
 		char * TmpTask = RptTask;
 		char * TmpFunc = RptFunc;
 		xRtosSemaphoreGive(&SL_VarMux);
@@ -365,25 +365,25 @@ void vSyslogBenchmark(void) {
 	char Test1[] = "SNTP vSntpTask ntp1.meraka.csir.co.za  2019-03-05T10:56:58.901Z  tOFF=78,873,521uS  tRTD=11,976uS" ;
 	char Test2[] = "01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz 01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" ;
 
-	uint32_t crc1, crc2, crc3, crc4, crc5, crc6 ;
+	u32_t crc1, crc2, crc3, crc4, crc5, crc6 ;
 	vSysTimerReset(1 << stSLOG, stCLOCKS, "SLOG", myUS_TO_CLOCKS(10), myUS_TO_CLOCKS(1000)) ;
 	xSysTimerStart(stSLOG) ;
-	crc1 = F_CRC_CalculaCheckSum((uint8_t *) Test1, sizeof(Test1)-1) ;
-	crc4 = F_CRC_CalculaCheckSum((uint8_t *) Test2, sizeof(Test2)-1) ;
+	crc1 = F_CRC_CalculaCheckSum((u8_t *) Test1, sizeof(Test1)-1) ;
+	crc4 = F_CRC_CalculaCheckSum((u8_t *) Test2, sizeof(Test2)-1) ;
 	xSysTimerStop(stSLOG) ;
 	vSysTimerShow(1 << stSLOG) ;
 
 	vSysTimerReset(1 << stSLOG, stCLOCKS, "SLOG", myUS_TO_CLOCKS(10), myUS_TO_CLOCKS(1000)) ;
 	xSysTimerStart(stSLOG) ;
-	crc2 = crc32_le(0, (uint8_t *) Test1, sizeof(Test1)-1) ;
-	crc5 = crc32_le(0, (uint8_t *) Test2, sizeof(Test2)-1) ;
+	crc2 = crc32_le(0, (u8_t *) Test1, sizeof(Test1)-1) ;
+	crc5 = crc32_le(0, (u8_t *) Test2, sizeof(Test2)-1) ;
 	xSysTimerStop(stSLOG) ;
 	vSysTimerShow(1 << stSLOG) ;
 
 	vSysTimerReset(1 << stSLOG, stCLOCKS, "SLOG", myUS_TO_CLOCKS(10), myUS_TO_CLOCKS(1000)) ;
 	xSysTimerStart(stSLOG) ;
-	crc3 = crcSlow((uint8_t *) Test1, sizeof(Test1)-1) ;
-	crc6 = crcSlow((uint8_t *) Test2, sizeof(Test2)-1) ;
+	crc3 = crcSlow((u8_t *) Test1, sizeof(Test1)-1) ;
+	crc6 = crcSlow((u8_t *) Test2, sizeof(Test2)-1) ;
 	xSysTimerStop(stSLOG) ;
 	vSysTimerShow(1 << stSLOG) ;
 
