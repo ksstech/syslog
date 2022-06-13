@@ -132,6 +132,33 @@ SemaphoreHandle_t SL_NetMux = 0, SL_VarMux = 0;
  * seconds the crash can still occur. In order to minimise load on the IP stack the minimum severity
  * level should be set to NOTICE. */
 
+static void IRAM_ATTR vSyslogFileSend(void) {
+	char * pBuf = pvRtosMalloc(SL_SIZEBUF);
+	int iRV;
+	xRtosSemaphoreTake(&LFSmux, portMAX_DELAY);
+	FILE * fp = fopen("syslog.txt", "r");
+	if (fp != NULL) {
+		if (fseek(fp, 0L, SEEK_END) == 0 && ftell(fp) > 0L) {
+			rewind(fp);
+			while (1) {
+				char * pRV = fgets(pBuf, SL_SIZEBUF, fp);
+				if (pRV != pBuf)
+					break;
+				int xLen = strlen(pBuf);
+				if (pBuf[xLen-1] == CHR_LF)
+					pBuf[--xLen] = CHR_NUL;				// remove terminating [CR]LF
+				iRV = sendto(sCtx.sd, pBuf, xLen, sCtx.flags, &sCtx.sa, sizeof(sCtx.sa_in));
+				vTaskDelay(pdMS_TO_TICKS(10));			// ensure WDT gets fed....
+			}
+		}
+	}
+	iRV = fclose(fp);
+	unlink("syslog.txt");
+	xRtosSemaphoreGive(&LFSmux);
+	vRtosFree(pBuf);
+	IF_myASSERT(debugRESULT, iRV == 0);
+}
+
 /**
  * @brief	establish connection to the selected syslog host
  * @return	1 if successful else 0
@@ -152,28 +179,8 @@ static int IRAM_ATTR xSyslogConnect(void) {
 		if (xNetSetNonBlocking(&sCtx, flagXNET_NONBLOCK) >= erSUCCESS) {
 			IF_RP(debugTRACK && ioB1GET(ioUpDown), "SLOG connect\r\n");
 			#if	(halUSE_LITTLEFS == 1)
-			// Check if buffered message file exists, if so send it....
-			if (allSYSFLAGS(sfLFS)) {
-				char * pBuf = pvRtosMalloc(SL_SIZEBUF);
-				xRtosSemaphoreTake(&LFSmux, portMAX_DELAY);
-				FILE * fp = fopen("syslog.txt", "r");
-				if (fp != 0) {
-					while (1) {
-						char * pRV = fgets(pBuf, SL_SIZEBUF, fp);
-						if (pRV != pBuf)
-							break;
-						int xLen = strlen(pBuf);
-						if (pBuf[xLen-1] == CHR_LF)
-							pBuf[--xLen] = CHR_NUL;							// remove terminating [CR]LF
-						iRV = sendto(sCtx.sd, pBuf, xLen, sCtx.flags, &sCtx.sa, sizeof(sCtx.sa_in));
-						vTaskDelay(pdMS_TO_TICKS(10));	// ensure WDT gets fed....
-					}
-				}
-				iRV = fclose(fp);
-				IF_myASSERT(debugRESULT, iRV == 0);
-				unlink("syslog.txt");
-				xRtosSemaphoreGive(&LFSmux);
-			}
+			if (allSYSFLAGS(sfLFS))						// LFS initialized?
+				vSyslogFileSend();						// if syslog file exists, send it....
 			#endif
 			return 1;
 		}
