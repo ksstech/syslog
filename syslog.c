@@ -150,6 +150,7 @@ static int IRAM_ATTR xSyslogConnect(void) {
 	int	iRV = xNetOpen(&sCtx) ;
 	if (iRV > erFAILURE) {
 		if (xNetSetNonBlocking(&sCtx, flagXNET_NONBLOCK) >= erSUCCESS) {
+			IF_RP(debugTRACK && ioB1GET(ioUpDown), "SLOG connect\r\n");
 			#if	(halUSE_LITTLEFS == 1)
 			// Check if buffered message file exists, if so send it....
 			if (allSYSFLAGS(sfLFS)) {
@@ -174,7 +175,6 @@ static int IRAM_ATTR xSyslogConnect(void) {
 				xRtosSemaphoreGive(&LFSmux);
 			}
 			#endif
-			IF_RP(debugTRACK && ioB1GET(ioUpDown), "SLOG connect\n");
 			return 1;
 		}
 	}
@@ -188,13 +188,13 @@ static int IRAM_ATTR xSyslogConnect(void) {
 static void IRAM_ATTR vSyslogDisConnect(void) {
 	close(sCtx.sd);
 	sCtx.sd = -1;
-	IF_RP(debugTRACK && ioB1GET(ioUpDown), "SLOG disconnect\n");
+	IF_RP(debugTRACK && ioB1GET(ioUpDown), "SLOG disconnect\r\n");
 }
 
 #define	formatRFC5424	DRAM_STR("<%u>1 %.3Z %s #%d %s - - %s ")
 #define formatCONSOLE 	DRAM_STR("%C%!.3R: #%d %s %s ")
 #define formatREPEATED	DRAM_STR("Repeated %dx")
-#define formatTERMINATE	DRAM_STR("%C\n")
+#define formatTERMINATE	DRAM_STR("%C\r\n")
 
 static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 	char * ProcID, const char * MsgID, char * pBuf, const char * format, va_list vaList) {
@@ -354,7 +354,7 @@ int IRAM_ATTR xSyslogError(const char * pcFN, int iRV) {
 void vSyslogReport(void) {
 	if (sCtx.sd > 0) {
 		xNetReport(&sCtx, "SLOG", 0, 0, 0) ;
-		printfx("\tmaxTX=%u  CurRpt=%d\n", sCtx.maxTx, RptCNT) ;
+		printfx("\tmaxTX=%u  CurRpt=%d\r\n", sCtx.maxTx, RptCNT) ;
 	}
 }
 
@@ -389,7 +389,7 @@ void vSyslogBenchmark(void) {
 	xSysTimerStop(stSLOG) ;
 	vSysTimerShow(1 << stSLOG) ;
 
-	printfx("CRC #1=%u  #2=%u  #3=%u\n", crc1, crc2, crc3) ;
-	printfx("CRC #4=%u  #5=%u  #6=%u\n", crc4, crc5, crc6) ;
+	printfx("CRC #1=%u  #2=%u  #3=%u\r\n", crc1, crc2, crc3) ;
+	printfx("CRC #4=%u  #5=%u  #6=%u\r\n", crc4, crc5, crc6) ;
 }
 #endif
