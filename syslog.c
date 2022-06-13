@@ -145,8 +145,8 @@ static int IRAM_ATTR xSyslogConnect(void) {
 	sCtx.sa_in.sin_port = htons(IP_PORT_SYSLOG_UDP);
 	sCtx.type = SOCK_DGRAM;
 	sCtx.flags = SO_REUSEADDR;
-	sCtx.d_flags			= 0 ;
-	sCtx.d_ndebug			= 1 ;						// disable debug in socketsX.c
+	sCtx.d_flags = 0;
+	sCtx.d_ndebug = 1;				// disable debug in socketsX.c
 	int	iRV = xNetOpen(&sCtx) ;
 	if (iRV > erFAILURE) {
 		if (xNetSetNonBlocking(&sCtx, flagXNET_NONBLOCK) >= erSUCCESS) {
