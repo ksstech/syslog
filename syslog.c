@@ -130,9 +130,55 @@ SemaphoreHandle_t SL_NetMux = 0, SL_VarMux = 0;
 /* In the case where the log level is set to DEBUG in ESP-IDF the volume of messages being generated
  * could flood the IP stack and cause watchdog timeouts. Even if the timeout is changed from 5 to 10
  * seconds the crash can still occur. In order to minimise load on the IP stack the minimum severity
- * level should be set to NOTICE. */
+ * level should be set to NOTICE.
+ */
 
-static void IRAM_ATTR vSyslogFileSend(void) {
+/**
+ * @brief	establish connection to the selected syslog host
+ * @return	1 if successful else 0
+ */
+static int IRAM_ATTR xSyslogConnect(void) {
+	if ((xTaskGetSchedulerState() != taskSCHEDULER_RUNNING) ||
+		(xRtosWaitStatusANY(flagLX_STA, pdMS_TO_TICKS(20)) != flagLX_STA))
+		return 0;
+	if (sCtx.sd > 0)
+		return 1;
+	sCtx.pHost = HostInfo[ioB2GET(ioHostSLOG)].pName;
+	IF_myASSERT(debugPARAM, sCtx.pHost);
+	sCtx.sa_in.sin_family = AF_INET;
+	sCtx.sa_in.sin_port = htons(IP_PORT_SYSLOG_UDP);
+	sCtx.type = SOCK_DGRAM;
+	sCtx.flags = SO_REUSEADDR;
+	sCtx.d_flags = 0;
+	sCtx.d_ndebug = 1;				// disable debug in socketsX.c
+	int	iRV = xNetOpen(&sCtx) ;
+	if (iRV > erFAILURE) {
+		if (xNetSetNonBlocking(&sCtx, flagXNET_NONBLOCK) >= erSUCCESS) {
+			IF_P(debugTRACK && ioB1GET(ioUpDown), "[SLOG] Connect\r\n");
+			return 1;
+		}
+	}
+	xNetClose(&sCtx) ;
+	return 0 ;
+}
+
+/**
+ * @brief	de-initialise the SysLog module
+ */
+static void IRAM_ATTR vSyslogDisConnect(void) {
+	close(sCtx.sd);
+	sCtx.sd = -1;
+	IF_P(debugTRACK && ioB1GET(ioUpDown), "[SLOG] disconnect\r\n");
+}
+
+#define	formatRFC5424	DRAM_STR("<%u>1 %.3Z %s #%d %s - - %s ")
+#define formatCONSOLE 	DRAM_STR("%C%!.3R: #%d %s %s ")
+#define formatREPEATED	DRAM_STR("Repeated %dx")
+#define formatTERMINATE	DRAM_STR("%C\r\n")
+
+void vSyslogFileSend(void) {
+	if (xSyslogConnect() == 0)
+		return;
 	char * pBuf = pvRtosMalloc(SL_SIZEBUF);
 	int iRV;
 	xRtosSemaphoreTake(&LFSmux, portMAX_DELAY);
@@ -150,6 +196,7 @@ static void IRAM_ATTR vSyslogFileSend(void) {
 				iRV = sendto(sCtx.sd, pBuf, xLen, sCtx.flags, &sCtx.sa, sizeof(sCtx.sa_in));
 				vTaskDelay(pdMS_TO_TICKS(10));			// ensure WDT gets fed....
 			}
+			clrSYSFLAGS(sfSLOG_LFS);
 		}
 	}
 	iRV = fclose(fp);
@@ -158,50 +205,6 @@ static void IRAM_ATTR vSyslogFileSend(void) {
 	vRtosFree(pBuf);
 	IF_myASSERT(debugRESULT, iRV == 0);
 }
-
-/**
- * @brief	establish connection to the selected syslog host
- * @return	1 if successful else 0
- */
-static int IRAM_ATTR xSyslogConnect(void) {
-	if (xRtosWaitStatusANY(flagLX_STA, pdMS_TO_TICKS(20)) != flagLX_STA)
-		return 0;
-	sCtx.pHost = HostInfo[ioB2GET(ioHostSLOG)].pName;
-	IF_myASSERT(debugPARAM, sCtx.pHost);
-	sCtx.sa_in.sin_family = AF_INET;
-	sCtx.sa_in.sin_port = htons(IP_PORT_SYSLOG_UDP);
-	sCtx.type = SOCK_DGRAM;
-	sCtx.flags = SO_REUSEADDR;
-	sCtx.d_flags = 0;
-	sCtx.d_ndebug = 1;				// disable debug in socketsX.c
-	int	iRV = xNetOpen(&sCtx) ;
-	if (iRV > erFAILURE) {
-		if (xNetSetNonBlocking(&sCtx, flagXNET_NONBLOCK) >= erSUCCESS) {
-			IF_RP(debugTRACK && ioB1GET(ioUpDown), "SLOG connect\r\n");
-			#if	(halUSE_LITTLEFS == 1)
-			if (allSYSFLAGS(sfLFS))						// LFS initialized?
-				vSyslogFileSend();						// if syslog file exists, send it....
-			#endif
-			return 1;
-		}
-	}
-	xNetClose(&sCtx) ;
-	return 0 ;
-}
-
-/**
- * @brief	de-initialise the SysLog module
- */
-static void IRAM_ATTR vSyslogDisConnect(void) {
-	close(sCtx.sd);
-	sCtx.sd = -1;
-	IF_RP(debugTRACK && ioB1GET(ioUpDown), "SLOG disconnect\r\n");
-}
-
-#define	formatRFC5424	DRAM_STR("<%u>1 %.3Z %s #%d %s - - %s ")
-#define formatCONSOLE 	DRAM_STR("%C%!.3R: #%d %s %s ")
-#define formatREPEATED	DRAM_STR("Repeated %dx")
-#define formatTERMINATE	DRAM_STR("%C\r\n")
 
 static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 	char * ProcID, const char * MsgID, char * pBuf, const char * format, va_list vaList) {
@@ -220,10 +223,9 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 			pBuf[xLen++] = CHR_LF;							// ensure terminating LF
 			pBuf[xLen] = CHR_NUL;
 		}
-		if ((sCtx.sd > 0) || xSyslogConnect()) {			// LxSTA are up and connection established
-			while (pBuf[xLen-1] == CHR_LF || pBuf[xLen-1] == CHR_CR) {
+		if (xSyslogConnect()) {		// Scheduler running, LxSTA up and connection established
+			while (pBuf[xLen-1] == CHR_LF || pBuf[xLen-1] == CHR_CR)
 				pBuf[--xLen] = CHR_NUL;						// remove terminating CR/LF
-			}
 			xRtosSemaphoreTake(&SL_NetMux, portMAX_DELAY);
 			int iRV = sendto(sCtx.sd, pBuf, xLen, sCtx.flags, &sCtx.sa, sizeof(sCtx.sa_in));
 			xRtosSemaphoreGive(&SL_NetMux);
@@ -236,6 +238,7 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 			#if	(halUSE_LITTLEFS == 1)
 			if (allSYSFLAGS(sfLFS)) {	// L2+3 STA down, no connection, append to file...
 				halFS_Write("syslog.txt", "a", pBuf);
+				setSYSFLAGS(sfSLOG_LFS);
 			}
 			#else
 				// No file system (available or initialised) to write to

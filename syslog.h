@@ -86,6 +86,7 @@ extern SemaphoreHandle_t SL_NetMux, SL_VarMux;
 
 // ###################################### function prototypes ######################################
 
+void vSyslogFileSend(void);
 void xvSyslog(int Priority, const char * MsgID, const char * format, va_list args) ;
 void vSyslog(int Priority, const char * MsgID, const char * format, ...) ;
 int xSyslogError(const char * pcFN, int eCode);
