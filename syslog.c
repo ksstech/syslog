@@ -70,21 +70,21 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
  *		SL_CRIT/ALRT/EMER() reserved for unrecoverable errors that should result in a system restart
  */
 
-#include	<errno.h>
-#include	<string.h>
+#include <errno.h>
+//#include <string.h>
 
 #ifdef ESP_PLATFORM
-	#include	"esp_log.h"
+	#include "esp_log.h"
 #endif
 
-#include	"syslog.h"
-#include	"hal_variables.h"
-#include	"printfx.h"									// +x_definitions +stdarg +stdint +stdio
-#include	"socketsX.h"
-#include	"x_errors_events.h"
-#include	"x_time.h"
-#include	"hal_network.h"
-#include	"hal_storage.h"
+#include "syslog.h"
+#include "hal_variables.h"
+#include "printfx.h"									// +x_definitions +stdarg +stdint +stdio
+#include "socketsX.h"
+#include "x_errors_events.h"
+#include "x_time.h"
+#include "hal_network.h"
+#include "hal_storage.h"
 
 #define	debugFLAG					0xF000
 
@@ -371,7 +371,7 @@ void vSyslogReport(void) {
 // #################################### Test and benchmark routines ################################
 
 #if 0
-#include	"crc.h"										// private component
+#include "crc.h"										// private component
 
 void vSyslogBenchmark(void) {
 	char Test1[] = "SNTP vSntpTask ntp1.meraka.csir.co.za  2019-03-05T10:56:58.901Z  tOFF=78,873,521uS  tRTD=11,976uS" ;
