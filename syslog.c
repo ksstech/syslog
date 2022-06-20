@@ -71,7 +71,6 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
  */
 
 #include <errno.h>
-//#include <string.h>
 
 #ifdef ESP_PLATFORM
 	#include "esp_log.h"
