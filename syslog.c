@@ -150,15 +150,14 @@ static int IRAM_ATTR xSyslogConnect(void) {
 	sCtx.flags = SO_REUSEADDR;
 	sCtx.d_flags = 0;
 	sCtx.d_ndebug = 1;				// disable debug in socketsX.c
-	int	iRV = xNetOpen(&sCtx) ;
 	if (iRV > erFAILURE) {
 		if (xNetSetNonBlocking(&sCtx, flagXNET_NONBLOCK) >= erSUCCESS) {
 			IF_P(debugTRACK && ioB1GET(ioUpDown), "[SLOG] Connect\r\n");
 			return 1;
 		}
 	}
-	xNetClose(&sCtx) ;
-	return 0 ;
+	xNetClose(&sCtx);
+	return 0;
 }
 
 /**
