@@ -55,6 +55,9 @@ extern "C" {
 
 // ############################## Syslog formatting/calling macros #################################
 
+#ifndef CONFIG_LOG_MAXIMUM_LEVEL				// remove Eclipse warning if sdkconfig.h not existing
+	#define CONFIG_LOG_MAXIMUM_LEVEL 3
+#endif
 #define	SL_LEVEL					(CONFIG_LOG_MAXIMUM_LEVEL + 2)
 #define	SL_LEV_DEF					(CONFIG_LOG_DEFAULT_LEVEL + 2)
 
