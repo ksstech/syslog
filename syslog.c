@@ -284,7 +284,7 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 	#ifdef CONFIG_FREERTOS_UNICORE
 	int McuID = 0;					// default in case not ESP32 or scheduler not running
 	#else
-	int McuID = cpu_hal_get_core_id();
+	int McuID = esp_cpu_get_core_id();
 	#endif
 
 	xRtosSemaphoreTake(&SL_VarMux, portMAX_DELAY);
