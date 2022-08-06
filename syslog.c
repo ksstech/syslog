@@ -175,6 +175,7 @@ static void IRAM_ATTR vSyslogDisConnect(void) {
 #define formatREPEATED	DRAM_STR("Repeated %dx")
 #define formatTERMINATE	DRAM_STR("%C\r\n")
 
+#if (halUSE_LITTLEFS > 0)
 void vSyslogFileSend(void) {
 	if (xSyslogConnect() == 0)
 		return;
@@ -204,6 +205,7 @@ void vSyslogFileSend(void) {
 	vRtosFree(pBuf);
 	IF_myASSERT(debugRESULT, iRV == 0);
 }
+#endif
 
 static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 	char * ProcID, const char * MsgID, char * pBuf, const char * format, va_list vaList) {
