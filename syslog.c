@@ -208,6 +208,8 @@ void vSyslogFileSend(void) {
 
 static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 	char * ProcID, const char * MsgID, char * pBuf, const char * format, va_list vaList) {
+	const TickType_t tWait = pdMS_TO_TICKS(1000);
+	int iRV;
 	if (pBuf == NULL) {
 		printfx_lock();
 		printfx_nolock(formatCONSOLE, SyslogColors[PRI], psUTC->usecs, McuID, ProcID, MsgID);
@@ -226,13 +228,14 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 		if (xSyslogConnect()) {		// Scheduler running, LxSTA up and connection established
 			while (pBuf[xLen-1] == CHR_LF || pBuf[xLen-1] == CHR_CR)
 				pBuf[--xLen] = CHR_NUL;						// remove terminating CR/LF
-			xRtosSemaphoreTake(&SL_NetMux, portMAX_DELAY);
-			int iRV = sendto(sCtx.sd, pBuf, xLen, sCtx.flags, &sCtx.sa, sizeof(sCtx.sa_in));
-			xRtosSemaphoreGive(&SL_NetMux);
-			if (iRV != erFAILURE) {
-				sCtx.maxTx = (iRV > sCtx.maxTx) ? iRV : sCtx.maxTx ;
-			} else {
-				vSyslogDisConnect();
+			if (xRtosSemaphoreTake(&SL_NetMux, tWait) == pdTRUE) {
+				iRV = xNetSend(&sCtx, (u8_t *)pBuf, xLen);
+				xRtosSemaphoreGive(&SL_NetMux);
+				if (iRV != erFAILURE) {
+					sCtx.maxTx = (iRV > sCtx.maxTx) ? iRV : sCtx.maxTx;
+				} else {
+					vSyslogDisConnect();
+				}
 			}
 		} else {
 			#if	(halUSE_LITTLEFS == 1)
