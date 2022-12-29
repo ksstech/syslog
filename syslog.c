@@ -70,20 +70,20 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
  *		SL_CRIT/ALRT/EMER() reserved for unrecoverable errors that should result in a system restart
  */
 
-#include <errno.h>
-
-#ifdef ESP_PLATFORM
-	#include "esp_log.h"
-#endif
-
+#include "main.h"
 #include "syslog.h"
-#include "hal_variables.h"
 #include "printfx.h"									// +x_definitions +stdarg +stdint +stdio
 #include "socketsX.h"
 #include "x_errors_events.h"
 #include "x_time.h"
 #include "hal_network.h"
 #include "hal_storage.h"
+
+#include <errno.h>
+
+#ifdef ESP_PLATFORM
+	#include "esp_log.h"
+#endif
 
 #define	debugFLAG					0xF000
 
