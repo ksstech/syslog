@@ -152,10 +152,11 @@ static int IRAM_ATTR xSyslogConnect(void) {
 	int	iRV = xNetOpen(&sCtx);
 	if (iRV >= erSUCCESS) {
 		if (xNetSetRecvTO(&sCtx, flagXNET_NONBLOCK) >= erSUCCESS) {
-			IF_P(debugTRACK && ioB1GET(ioUpDown), "[SLOG] Connect\r\n");
+			setSYSFLAGS(sfSYSLOG);
 			return 1;
 		}
 	}
+	clrSYSFLAGS(sfSYSLOG);
 	xNetClose(&sCtx);
 	return 0;
 }
