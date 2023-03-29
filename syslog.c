@@ -1,5 +1,5 @@
 /*
- * syslog.c - Copyright 2014-22 Andre M. Maree / KSS Technologies (Pty) Ltd.
+ * syslog.c - Copyright 2014-23 Andre M. Maree / KSS Technologies (Pty) Ltd.
  *
  ******************************************************************************************************************
  SYSLOG-MSG = HEADER SP STRUCTURED-DATA [SP MSG]
@@ -70,14 +70,15 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
  *		SL_CRIT/ALRT/EMER() reserved for unrecoverable errors that should result in a system restart
  */
 
-#include "main.h"
-#include "syslog.h"
-#include "printfx.h"									// +x_definitions +stdarg +stdint +stdio
-#include "socketsX.h"
-#include "x_errors_events.h"
-#include "x_time.h"
+#include "hal_variables.h"
+
 #include "hal_network.h"
 #include "hal_storage.h"
+#include "printfx.h"									// +x_definitions +stdarg +stdint +stdio
+#include "socketsX.h"
+#include "syslog.h"
+#include "x_errors_events.h"
+#include "x_time.h"
 
 #include <errno.h>
 
