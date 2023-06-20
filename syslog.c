@@ -139,7 +139,7 @@ SemaphoreHandle_t SL_NetMux = 0, SL_VarMux = 0;
  */
 static int IRAM_ATTR xSyslogConnect(void) {
 	if ((xTaskGetSchedulerState() != taskSCHEDULER_RUNNING) ||
-		(xRtosWaitStatusANY(flagLX_STA, pdMS_TO_TICKS(20)) != flagLX_STA))
+		(xRtosWaitStatusANY(flagL23_STA, pdMS_TO_TICKS(20)) != flagL23_STA))
 		return 0;
 	if (sCtx.sd > 0)
 		return 1;
