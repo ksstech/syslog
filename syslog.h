@@ -61,8 +61,6 @@ extern "C" {
 #define	SL_LEVEL					(CONFIG_LOG_MAXIMUM_LEVEL + 2)
 #define	SL_LEV_DEF					(CONFIG_LOG_DEFAULT_LEVEL + 2)
 
-//#define SL_LOG(x, f, ...) if (SL_LEVEL>=(x)) do{ vSyslog(x,__FUNCTION__ ,f,##__VA_ARGS__); } while(0)
-//#define SL_LOG(x, f, ...) if (SL_LEVEL >= (x)) vSyslog(x,__FUNCTION__ ,f,##__VA_ARGS__);
 #define SL_LOG(x, f, ...) do{ if (SL_LEVEL>=(x)) vSyslog(x,__FUNCTION__,f,##__VA_ARGS__); } while(0)
 
 #define	SL_EMER(f, ...)				SL_LOG(SL_SEV_EMERGENCY, f, ##__VA_ARGS__)
