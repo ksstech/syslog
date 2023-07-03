@@ -104,6 +104,11 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 	#define SL_CORES 				2
 #endif
 
+#define	formatRFC5424	DRAM_STR("<%u>1 %.3Z %s #%d %s - - %s ")
+#define formatCONSOLE 	DRAM_STR("%C%!.3R: #%d %s %s ")
+#define formatREPEATED	DRAM_STR("Repeated %dx")
+#define formatTERMINATE	DRAM_STR("%C\r\n")
+
 // ######################################### Structures ############################################
 
 
@@ -139,7 +144,7 @@ SemaphoreHandle_t SL_NetMux = 0, SL_VarMux = 0;
  */
 static int IRAM_ATTR xSyslogConnect(void) {
 	if ((xTaskGetSchedulerState() != taskSCHEDULER_RUNNING) ||
-		(xRtosWaitStatusANY(flagL23_STA, pdMS_TO_TICKS(20)) != flagL23_STA))
+		bRtosWaitStatusALL(flagLX_STA, pdMS_TO_TICKS(20)) == 0)
 		return 0;
 	if (sCtx.sd > 0)
 		return 1;
@@ -168,15 +173,9 @@ static int IRAM_ATTR xSyslogConnect(void) {
 static void IRAM_ATTR vSyslogDisConnect(void) {
 	close(sCtx.sd);
 	sCtx.sd = -1;
-	IF_P(debugTRACK && ioB1GET(ioUpDown), "[SLOG] disconnect\r\n");
+	IF_CP(debugTRACK && ioB1GET(ioUpDown), "[SLOG] disconnect\r\n");
 }
 
-#define	formatRFC5424	DRAM_STR("<%u>1 %.3Z %s #%d %s - - %s ")
-#define formatCONSOLE 	DRAM_STR("%C%!.3R: #%d %s %s ")
-#define formatREPEATED	DRAM_STR("Repeated %dx")
-#define formatTERMINATE	DRAM_STR("%C\r\n")
-
-#if (halUSE_LITTLEFS > 0)
 void vSyslogFileSend(void) {
 	if (xSyslogConnect() == 0)
 		return;
@@ -206,18 +205,26 @@ void vSyslogFileSend(void) {
 	vRtosFree(pBuf);
 	IF_myASSERT(debugRESULT, iRV == 0);
 }
-#endif
 
 static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 	char * ProcID, const char * MsgID, char * pBuf, const char * format, va_list vaList) {
 	const TickType_t tWait = pdMS_TO_TICKS(1000);
 	int iRV;
 	if (pBuf == NULL) {
+#if 0
+		char tmpBuf[512];
+		report_t sRprt = { tmpBuf, 512, .sFM.u32Val = makeMASK12x20(1,1,1,1,1,1,1,1,1,1,1,1,0) };
+		wprintfx(&sRprt, formatCONSOLE, SyslogColors[PRI], psUTC->usecs, McuID, ProcID, MsgID);
+		wvprintfx(&sRprt, format, vaList);
+		wprintfx(&sRprt, formatTERMINATE, attrRESET);
+		printfx_nolock("%s", tmpBuf);
+#else
 		printfx_lock();
 		printfx_nolock(formatCONSOLE, SyslogColors[PRI], psUTC->usecs, McuID, ProcID, MsgID);
 		vprintfx_nolock(format, vaList);
 		printfx_nolock(formatTERMINATE, attrRESET);
 		printfx_unlock();
+#endif
 	} else {
 		if (*nameSTA == CHR_NUL)		// if very early message, WIFI init not yet done.
 			strcpy(nameSTA, "unknown");
@@ -228,8 +235,9 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 			pBuf[xLen] = CHR_NUL;
 		}
 		if (xSyslogConnect()) {		// Scheduler running, LxSTA up and connection established
-			while (pBuf[xLen-1] == CHR_LF || pBuf[xLen-1] == CHR_CR)
+			while ((pBuf[xLen-1] == CHR_LF) || (pBuf[xLen-1] == CHR_CR)) {
 				pBuf[--xLen] = CHR_NUL;						// remove terminating CR/LF
+			}
 			if (xRtosSemaphoreTake(&SL_NetMux, tWait) == pdTRUE) {
 				iRV = xNetSend(&sCtx, (u8_t *)pBuf, xLen);
 				xRtosSemaphoreGive(&SL_NetMux);
@@ -315,8 +323,8 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 		char * TmpTask = RptTask;
 		char * TmpFunc = RptFunc;
 		xRtosSemaphoreGive(&SL_VarMux);
-
 		tsz_t TmpTSZ = {.pTZ = sTSZ.pTZ };
+
 		// Handle console message(s)
 		if (TmpCNT > 0) {
 			TmpTSZ.usecs = TmpRUN;						// repeated message + count
@@ -324,11 +332,13 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 		}
 		TmpTSZ.usecs = RunTime;							// New message
 		xvSyslogSendMessage(MsgPRI, &TmpTSZ, McuID, ProcID, MsgID, NULL, format, vaList);
+
 		// Handle host message(s)
 		if (MsgPRI <= ioB3GET(ioSLhost)) {				// filter based on higher priorities
+
 			char * pBuf = pvRtosMalloc(SL_SIZEBUF);
 			if (TmpCNT > 0) {
-				TmpTSZ.usecs = TmpUTC;					// repeated message +  count
+				TmpTSZ.usecs = TmpUTC;					// repeated message + count
 				xSyslogSendMessage(TmpPRI, &TmpTSZ, McuID, TmpTask, TmpFunc, pBuf, formatREPEATED, TmpCNT);
 			}
 			xvSyslogSendMessage(MsgPRI, &sTSZ, McuID, ProcID, MsgID, pBuf, format, vaList);
@@ -364,7 +374,7 @@ int IRAM_ATTR xSyslogError(const char * pcFN, int iRV) {
 }
 
 /**
- * @brief		report syslog related information
+ * @brief	report syslog related information
  */
 void vSyslogReport(void) {
 	if (sCtx.sd > 0) {
