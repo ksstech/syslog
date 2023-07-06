@@ -211,20 +211,20 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 	const TickType_t tWait = pdMS_TO_TICKS(1000);
 	int iRV;
 	if (pBuf == NULL) {
-#if 0
+		#if 0
 		char tmpBuf[512];
 		report_t sRprt = { tmpBuf, 512, .sFM.u32Val = makeMASK12x20(1,1,1,1,1,1,1,1,1,1,1,1,0) };
 		wprintfx(&sRprt, formatCONSOLE, SyslogColors[PRI], psUTC->usecs, McuID, ProcID, MsgID);
 		wvprintfx(&sRprt, format, vaList);
 		wprintfx(&sRprt, formatTERMINATE, attrRESET);
 		printfx_nolock("%s", tmpBuf);
-#else
+		#else
 		printfx_lock();
 		printfx_nolock(formatCONSOLE, SyslogColors[PRI], psUTC->usecs, McuID, ProcID, MsgID);
 		vprintfx_nolock(format, vaList);
 		printfx_nolock(formatTERMINATE, attrRESET);
 		printfx_unlock();
-#endif
+		#endif
 	} else {
 		if (*nameSTA == CHR_NUL)		// if very early message, WIFI init not yet done.
 			strcpy(nameSTA, "unknown");
