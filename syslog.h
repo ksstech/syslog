@@ -83,6 +83,10 @@ extern "C" {
 #define	IF_SL_INFO(x, f, ...)		if (x) SL_INFO(f, ##__VA_ARGS__)
 #define	IF_SL_DBG(x, f, ...)		if (x) SL_DBG(f, ##__VA_ARGS__)
 
+#define IF_SL_ERROR(x, y)			if (x) do { if (SL_SEV_ERROR <= SL_LEVEL)	\
+										return xSyslogError(__FUNCTION__, y);	\
+									} while(0)
+
 // ###################################### Global variables #########################################
 
 extern SemaphoreHandle_t SL_NetMux, SL_VarMux;
