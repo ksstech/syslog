@@ -219,11 +219,11 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 		wprintfx(&sRprt, formatTERMINATE, attrRESET);
 		printfx_nolock("%s", tmpBuf);
 		#else
-		printfx_lock();
+		printfx_lock(NULL);
 		printfx_nolock(formatCONSOLE, SyslogColors[PRI], psUTC->usecs, McuID, ProcID, MsgID);
 		vprintfx_nolock(format, vaList);
 		printfx_nolock(formatTERMINATE, attrRESET);
-		printfx_unlock();
+		printfx_unlock(NULL);
 		#endif
 	} else {
 		if (*nameSTA == CHR_NUL)		// if very early message, WIFI init not yet done.
