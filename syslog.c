@@ -210,13 +210,14 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 	const TickType_t tWait = pdMS_TO_TICKS(1000);
 	int iRV;
 	if (pBuf == NULL) {
-		#if 0
-		char tmpBuf[512];
-		report_t sRprt = { tmpBuf, 512, .sFM.u32Val = makeMASK12x20(1,1,1,1,1,1,1,1,1,1,1,1,0) };
+		#if (buildNEW_CODE == 1)
+		char * tmpBuf = malloc(SL_SIZEBUF);
+		report_t sRprt = { tmpBuf, SL_SIZEBUF, .sFM.u32Val = makeMASK12x20(1,1,1,1,1,1,1,1,1,1,1,1,0) };
 		wprintfx(&sRprt, formatCONSOLE, SyslogColors[PRI], psUTC->usecs, McuID, ProcID, MsgID);
 		wvprintfx(&sRprt, format, vaList);
 		wprintfx(&sRprt, formatTERMINATE, attrRESET);
-		printfx_nolock("%s", tmpBuf);
+		printfx("%s", tmpBuf);
+		free(tmpBuf);
 
 		#else
 
