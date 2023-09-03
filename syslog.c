@@ -177,8 +177,7 @@ static void IRAM_ATTR vSyslogDisConnect(void) {
 }
 
 void vSyslogFileSend(void) {
-	if (xSyslogConnect() == 0)
-		return;
+	if (xSyslogConnect() == 0) return;
 	char * pBuf = pvRtosMalloc(SL_SIZEBUF);
 	int iRV;
 	xRtosSemaphoreTake(&LFSmux, portMAX_DELAY);
@@ -218,7 +217,9 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 		wvprintfx(&sRprt, format, vaList);
 		wprintfx(&sRprt, formatTERMINATE, attrRESET);
 		printfx_nolock("%s", tmpBuf);
+
 		#else
+
 		printfx_lock(NULL);
 		printfx_nolock(formatCONSOLE, SyslogColors[PRI], psUTC->usecs, McuID, ProcID, MsgID);
 		vprintfx_nolock(format, vaList);
@@ -226,18 +227,16 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 		printfx_unlock(NULL);
 		#endif
 	} else {
-		if (*nameSTA == CHR_NUL)		// if very early message, WIFI init not yet done.
-			strcpy(nameSTA, "unknown");
+		if (!nameSTA[0]) strcpy(nameSTA, "unknown");	// if very early message, WIFI init not yet done.
 		int xLen = snprintfx(pBuf, SL_SIZEBUF, formatRFC5424, PRI, psUTC, nameSTA, McuID, ProcID, MsgID);
 		xLen += vsnprintfx(pBuf + xLen, SL_SIZEBUF - xLen - 1, format, vaList); // leave space for LF
 		if (pBuf[xLen-1] != CHR_LF) {
 			pBuf[xLen++] = CHR_LF;							// ensure terminating LF
 			pBuf[xLen] = CHR_NUL;
 		}
-		if (xSyslogConnect()) {		// Scheduler running, LxSTA up and connection established
-			while ((pBuf[xLen-1] == CHR_LF) || (pBuf[xLen-1] == CHR_CR)) {
-				pBuf[--xLen] = CHR_NUL;						// remove terminating CR/LF
-			}
+
+		if (xSyslogConnect()) {							// Scheduler running, LxSTA up and connection established
+			while (pBuf[xLen-1]==CHR_LF || pBuf[xLen-1]==CHR_CR) pBuf[--xLen] = CHR_NUL;	// remove terminating CR/LF
 			if (xRtosSemaphoreTake(&SL_NetMux, tWait) == pdTRUE) {
 				iRV = xNetSend(&sCtx, (u8_t *)pBuf, xLen);
 				xRtosSemaphoreGive(&SL_NetMux);
@@ -247,14 +246,13 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 					vSyslogDisConnect();
 				}
 			}
+
 		} else {
 			#if	(halUSE_LITTLEFS == 1)
 			if (allSYSFLAGS(sfLFS)) {	// L2+3 STA down, no connection, append to file...
 				halFS_Write("syslog.txt", "a", pBuf);
 				setSYSFLAGS(sfSLOG_LFS);
 			}
-			#else
-				// No file system (available or initialised) to write to
 			#endif
 		}
 	}
@@ -316,9 +314,9 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 	} else {											// Different CRC and/or PRI
 		// save trackers for immediate and future use...
 		RptCRC = MsgCRC;								// Save to use later
-		u8_t TmpPRI = RptPRI;	RptPRI = MsgPRI;	// Save old to use now, new to use later
-		u32_t TmpCNT = RptCNT;	RptCNT = 0;			// Save to use now, reset for next message
-		u64_t TmpRUN = RptRUN;						// Save to use now
+		u8_t TmpPRI = RptPRI; RptPRI = MsgPRI;			// Save old to use now, new to use later
+		u32_t TmpCNT = RptCNT; RptCNT = 0;				// Save to use now, reset for next message
+		u64_t TmpRUN = RptRUN;							// Save to use now
 		u64_t TmpUTC = RptUTC;
 		char * TmpTask = RptTask;
 		char * TmpFunc = RptFunc;
@@ -335,7 +333,6 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 
 		// Handle host message(s)
 		if (MsgPRI <= ioB3GET(ioSLhost)) {				// filter based on higher priorities
-
 			char * pBuf = pvRtosMalloc(SL_SIZEBUF);
 			if (TmpCNT > 0) {
 				TmpTSZ.usecs = TmpUTC;					// repeated message + count
