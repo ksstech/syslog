@@ -231,10 +231,6 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 		if (!nameSTA[0]) strcpy(nameSTA, "unknown");	// if very early message, WIFI init not yet done.
 		int xLen = snprintfx(pBuf, SL_SIZEBUF, formatRFC5424, PRI, psUTC, nameSTA, McuID, ProcID, MsgID);
 		xLen += vsnprintfx(pBuf + xLen, SL_SIZEBUF - xLen - 1, format, vaList); // leave space for LF
-		if (pBuf[xLen-1] != CHR_LF) {
-			pBuf[xLen++] = CHR_LF;							// ensure terminating LF
-			pBuf[xLen] = CHR_NUL;
-		}
 
 		if (xSyslogConnect()) {							// Scheduler running, LxSTA up and connection established
 			while (pBuf[xLen-1]==CHR_LF || pBuf[xLen-1]==CHR_CR) pBuf[--xLen] = CHR_NUL;	// remove terminating CR/LF
@@ -250,7 +246,8 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 
 		} else {
 			#if	(halUSE_LITTLEFS == 1)
-			if (allSYSFLAGS(sfLFS)) {	// L2+3 STA down, no connection, append to file...
+			if (pBuf[xLen-1] != CHR_LF) { pBuf[xLen++] = CHR_LF; pBuf[xLen] = CHR_NUL; }	// append LF if required
+			if (allSYSFLAGS(sfLFS)) {					// L2+3 STA down, no connection, append to file...
 				halFS_Write("syslog.txt", "a", pBuf);
 				setSYSFLAGS(sfSLOG_LFS);
 			}
