@@ -216,7 +216,7 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 		wprintfx(&sRprt, formatCONSOLE, SyslogColors[PRI], psUTC->usecs, McuID, ProcID, MsgID);
 		wvprintfx(&sRprt, format, vaList);
 		wprintfx(&sRprt, formatTERMINATE, attrRESET);
-		printfx("%s", tmpBuf);
+		printfx_nolock("%s", tmpBuf);
 		free(tmpBuf);
 
 		#else
