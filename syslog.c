@@ -189,7 +189,7 @@ void vSyslogFileSend(void) {
 				iRV = sendto(sCtx.sd, pBuf, xLen, sCtx.flags, &sCtx.sa, sizeof(sCtx.sa_in));
 				vTaskDelay(pdMS_TO_TICKS(10));			// ensure WDT gets fed....
 			}
-			clrSYSFLAGS(sfSLOG_LFS);
+			xRtosClearDevice(devMASK_LFS_SL);
 		}
 	}
 	iRV = fclose(fp);
@@ -238,9 +238,9 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 		} else {
 			#if	(halUSE_LITTLEFS == 1)
 			if (pBuf[xLen-1] != CHR_LF) { pBuf[xLen++] = CHR_LF; pBuf[xLen] = CHR_NUL; }	// append LF if required
-			if (allSYSFLAGS(sfLFS)) {					// L2+3 STA down, no connection, append to file...
+			if (bRtosCheckDevice(devMASK_LFS)) {		// L2+3 STA down, no connection, append to file...
 				halFS_Write("syslog.txt", "a", pBuf);
-				setSYSFLAGS(sfSLOG_LFS);
+				xRtosSetDevice(devMASK_LFS_SL);
 			}
 			#endif
 		}
