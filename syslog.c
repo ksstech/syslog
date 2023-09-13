@@ -146,8 +146,7 @@ static int IRAM_ATTR xSyslogConnect(void) {
 	if ((xTaskGetSchedulerState() != taskSCHEDULER_RUNNING) ||
 		bRtosWaitStatusALL(flagLX_STA, pdMS_TO_TICKS(20)) == 0)
 		return 0;
-	if (sCtx.sd > 0)
-		return 1;
+	if (sCtx.sd > 0) return 1;
 	sCtx.pHost = HostInfo[ioB2GET(ioHostSLOG)].pName;
 	IF_myASSERT(debugPARAM, sCtx.pHost);
 	sCtx.sa_in.sin_family = AF_INET;
@@ -157,9 +156,7 @@ static int IRAM_ATTR xSyslogConnect(void) {
 	sCtx.d = (netx_dbg_t) { .sl = 1 };
 	int	iRV = xNetOpen(&sCtx);
 	if (iRV >= erSUCCESS) {
-		if (xNetSetRecvTO(&sCtx, flagXNET_NONBLOCK) >= erSUCCESS) {
-			return 1;
-		}
+		if (xNetSetRecvTO(&sCtx, flagXNET_NONBLOCK) >= erSUCCESS) return 1;
 	}
 	xNetClose(&sCtx);
 	return 0;
@@ -188,8 +185,7 @@ void vSyslogFileSend(void) {
 				if (pRV != pBuf)
 					break;
 				int xLen = strlen(pBuf);
-				if (pBuf[xLen-1] == CHR_LF)
-					pBuf[--xLen] = CHR_NUL;				// remove terminating [CR]LF
+				if (pBuf[xLen-1] == CHR_LF) pBuf[--xLen] = CHR_NUL;			// remove terminating [CR]LF
 				iRV = sendto(sCtx.sd, pBuf, xLen, sCtx.flags, &sCtx.sa, sizeof(sCtx.sa_in));
 				vTaskDelay(pdMS_TO_TICKS(10));			// ensure WDT gets fed....
 			}
@@ -235,11 +231,8 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 			if (xRtosSemaphoreTake(&SL_NetMux, tWait) == pdTRUE) {
 				iRV = xNetSend(&sCtx, (u8_t *)pBuf, xLen);
 				xRtosSemaphoreGive(&SL_NetMux);
-				if (iRV != erFAILURE) {
-					sCtx.maxTx = (iRV > sCtx.maxTx) ? iRV : sCtx.maxTx;
-				} else {
-					vSyslogDisConnect();
-				}
+				if (iRV != erFAILURE) sCtx.maxTx = (iRV > sCtx.maxTx) ? iRV : sCtx.maxTx;
+				else vSyslogDisConnect();
 			}
 
 		} else {
@@ -271,8 +264,7 @@ static void IRAM_ATTR xSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
  */
 void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_list vaList) {
 	u8_t MsgPRI = Level % 8;		// ANY message PRI/level > ioSLOGhi value WILL be discarded
-	if (MsgPRI > ioB3GET(ioSLOGhi))
-		return;
+	if (MsgPRI > ioB3GET(ioSLOGhi)) return;
 	MsgID = (MsgID == NULL) ? "null" : (*MsgID == 0) ? "empty" : MsgID;
 	char * ProcID;					// Handle state of scheduler and obtain the task name
 	if (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) {
@@ -281,13 +273,11 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 		ProcID = pcTaskGetName(NULL);
 		char * pcTmp  = ProcID;
 		while (*pcTmp) {
-			if (*pcTmp == CHR_SPACE)
-				*pcTmp = CHR_UNDERSCORE;
+			if (*pcTmp == CHR_SPACE) *pcTmp = CHR_UNDERSCORE;
 			++pcTmp;
 		}
 	}
-	if (RunTime == 0ULL)
-		RunTime = sTSZ.usecs = (u64_t) esp_log_timestamp() * (u64_t) MICROS_IN_MILLISEC;
+	if (RunTime == 0ULL) RunTime = sTSZ.usecs = (u64_t) esp_log_timestamp() * (u64_t) MICROS_IN_MILLISEC;
 
 	#ifdef CONFIG_FREERTOS_UNICORE
 	int McuID = 0;					// default in case not ESP32 or scheduler not running
