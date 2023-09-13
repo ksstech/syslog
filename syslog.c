@@ -204,7 +204,6 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 	const TickType_t tWait = pdMS_TO_TICKS(1000);
 	int iRV;
 	if (pBuf == NULL) {
-		#if (buildNEW_CODE == 1)
 		char * tmpBuf = malloc(SL_SIZEBUF);
 		report_t sRprt = { tmpBuf, SL_SIZEBUF, .sFM.u32Val = makeMASK12x20(1,1,1,1,1,1,1,1,1,1,1,1,0) };
 		wprintfx(&sRprt, formatCONSOLE, SyslogColors[PRI], psUTC->usecs, McuID, ProcID, MsgID);
@@ -212,15 +211,6 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 		wprintfx(&sRprt, formatTERMINATE, attrRESET);
 		printfx_nolock("%s", tmpBuf);
 		free(tmpBuf);
-
-		#else
-
-		printfx_lock(NULL);
-		printfx_nolock(formatCONSOLE, SyslogColors[PRI], psUTC->usecs, McuID, ProcID, MsgID);
-		vprintfx_nolock(format, vaList);
-		printfx_nolock(formatTERMINATE, attrRESET);
-		printfx_unlock(NULL);
-		#endif
 	} else {
 		if (!nameSTA[0]) strcpy(nameSTA, "unknown");	// if very early message, WIFI init not yet done.
 		int xLen = snprintfx(pBuf, SL_SIZEBUF, formatRFC5424, PRI, psUTC, nameSTA, McuID, ProcID, MsgID);
