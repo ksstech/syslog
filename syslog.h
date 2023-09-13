@@ -83,9 +83,9 @@ extern "C" {
 #define	IF_SL_INFO(x, f, ...)		if (x) SL_INFO(f, ##__VA_ARGS__)
 #define	IF_SL_DBG(x, f, ...)		if (x) SL_DBG(f, ##__VA_ARGS__)
 
-#define IF_SL_ERROR(x, y)			if (x) do { if (SL_SEV_ERROR <= SL_LEVEL)	\
-										return xSyslogError(__FUNCTION__, y);	\
-									} while(0)
+#define __ERROR(X)					return xSyslogError(__FUNCTION__, X)
+#define SL_ERROR(X)					do { if (SL_SEV_ERROR <= SL_LEVEL) __ERROR(X);} while(0)
+#define IF_SL_ERROR(T,X)			if (T) SL_ERROR(X)
 
 // ###################################### Global variables #########################################
 
