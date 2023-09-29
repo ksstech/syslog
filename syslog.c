@@ -70,15 +70,16 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
  *		SL_CRIT/ALRT/EMER() reserved for unrecoverable errors that should result in a system restart
  */
 
+#include "hal_config.h"
+
 #include "certificates.h"
-#include "hal_variables.h"
 #include "hal_network.h"
+#include "hal_options.h"
 #include "hal_storage.h"
 #include "printfx.h"									// +x_definitions +stdarg +stdint +stdio
 #include "socketsX.h"
 #include "syslog.h"
 #include "x_errors_events.h"
-#include "x_time.h"
 
 #include <errno.h>
 
@@ -143,8 +144,7 @@ SemaphoreHandle_t SL_NetMux = 0, SL_VarMux = 0;
  * @return	1 if successful else 0
  */
 static int IRAM_ATTR xSyslogConnect(void) {
-	if ((xTaskGetSchedulerState() != taskSCHEDULER_RUNNING) ||
-		bRtosWaitStatusALL(flagLX_STA, pdMS_TO_TICKS(20)) == 0)
+	if (xTaskGetSchedulerState() != taskSCHEDULER_RUNNING || !xRtosWaitStatus(flagLX_STA, pdMS_TO_TICKS(20)))
 		return 0;
 	if (sCtx.sd > 0) return 1;
 	sCtx.pHost = HostInfo[ioB2GET(ioHostSLOG)].pName;
