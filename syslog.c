@@ -228,7 +228,7 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 		} else {
 			#if	(halUSE_LITTLEFS == 1)
 			if (pBuf[xLen-1] != CHR_LF) { pBuf[xLen++] = CHR_LF; pBuf[xLen] = CHR_NUL; }	// append LF if required
-			if (bRtosCheckDevice(devMASK_LFS)) {		// L2+3 STA down, no connection, append to file...
+			if (xRtosCheckDevice(devMASK_LFS)) {		// L2+3 STA down, no connection, append to file...
 				halFS_Write("syslog.txt", "a", pBuf);
 				xRtosSetDevice(devMASK_LFS_SL);
 			}
