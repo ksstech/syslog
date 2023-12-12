@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-22 Andre M. Maree / KSS Technologies (Pty) Ltd.
+ * syslog.h - Copyright(c) 2014-23 Andre M. Maree / KSS Technologies (Pty) Ltd.
  */
 
 #pragma once
