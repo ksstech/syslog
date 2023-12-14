@@ -97,7 +97,8 @@ void vSyslogFileSend(void);
 void xvSyslog(int Priority, const char * MsgID, const char * format, va_list args);
 void vSyslog(int Priority, const char * MsgID, const char * format, ...);
 int xSyslogError(const char * pcFN, int eCode);
-void vSyslogReport(report_t * psR);
+struct report_t;
+void vSyslogReport(struct report_t * psR);
 
 #ifdef __cplusplus
 }
