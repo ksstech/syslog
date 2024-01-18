@@ -61,31 +61,29 @@ extern "C" {
 #define	SL_LEVEL					(CONFIG_LOG_MAXIMUM_LEVEL + 2)
 #define	SL_LEV_DEF					(CONFIG_LOG_DEFAULT_LEVEL + 2)
 
-#define SL_LOG(x, f, ...) 			do { if ((x) <= SL_LEVEL) 							\
-											vSyslog(x,__FUNCTION__,f,##__VA_ARGS__);	\
-									} while(0)
+#define SL_LOG(lvl, fmt, ...) 		do { if ((lvl) <= SL_LEVEL) vSyslog(lvl,__FUNCTION__,fmt,##__VA_ARGS__);}while(0)
 
-#define	SL_EMER(f, ...)				SL_LOG(SL_SEV_EMERGENCY, f, ##__VA_ARGS__)
-#define	SL_ALRT(f, ...)				SL_LOG(SL_SEV_ALERT, f, ##__VA_ARGS__)
-#define	SL_CRIT(f, ...)				SL_LOG(SL_SEV_CRITICAL, f, ##__VA_ARGS__)
-#define	SL_ERR(f, ...)				SL_LOG(SL_SEV_ERROR, f, ##__VA_ARGS__)
-#define	SL_WARN(f, ...)				SL_LOG(SL_SEV_WARNING, f, ##__VA_ARGS__)
-#define	SL_NOT(f, ...)				SL_LOG(SL_SEV_NOTICE, f, ##__VA_ARGS__)
-#define	SL_INFO(f, ...)				SL_LOG(SL_SEV_INFO, f, ##__VA_ARGS__)
-#define	SL_DBG(f, ...)				SL_LOG(SL_SEV_DEBUG, f, ##__VA_ARGS__)
+#define	SL_EMER(fmt, ...)			SL_LOG(SL_SEV_EMERGENCY, fmt, ##__VA_ARGS__)
+#define	SL_ALRT(fmt, ...)			SL_LOG(SL_SEV_ALERT, fmt, ##__VA_ARGS__)
+#define	SL_CRIT(fmt, ...)			SL_LOG(SL_SEV_CRITICAL, fmt, ##__VA_ARGS__)
+#define	SL_ERR(fmt, ...)			SL_LOG(SL_SEV_ERROR, fmt, ##__VA_ARGS__)
+#define	SL_WARN(fmt, ...)			SL_LOG(SL_SEV_WARNING, fmt, ##__VA_ARGS__)
+#define	SL_NOT(fmt, ...)			SL_LOG(SL_SEV_NOTICE, fmt, ##__VA_ARGS__)
+#define	SL_INFO(fmt, ...)			SL_LOG(SL_SEV_INFO, fmt, ##__VA_ARGS__)
+#define	SL_DBG(fmt, ...)			SL_LOG(SL_SEV_DEBUG, fmt, ##__VA_ARGS__)
 
-#define	IF_SL_EMER(x, f, ...)		if (x) SL_EMER(f, ##__VA_ARGS__)
-#define	IF_SL_ALRT(x, f, ...)		if (x) SL_ALRT(f, ##__VA_ARGS__)
-#define	IF_SL_CRIT(x, f, ...)		if (x) SL_CRIT(f, ##__VA_ARGS__)
-#define	IF_SL_ERR(x, f, ...)		if (x) SL_ERR(f, ##__VA_ARGS__)
-#define	IF_SL_WARN(x, f, ...)		if (x) SL_WARN(f, ##__VA_ARGS__)
-#define	IF_SL_NOT(x, f, ...)		if (x) SL_NOT(f, ##__VA_ARGS__)
-#define	IF_SL_INFO(x, f, ...)		if (x) SL_INFO(f, ##__VA_ARGS__)
-#define	IF_SL_DBG(x, f, ...)		if (x) SL_DBG(f, ##__VA_ARGS__)
+#define	IF_SL_EMER(tst, fmt, ...)	if (tst) SL_EMER(fmt, ##__VA_ARGS__)
+#define	IF_SL_ALRT(tst, fmt, ...)	if (tst) SL_ALRT(fmt, ##__VA_ARGS__)
+#define	IF_SL_CRIT(tst, fmt, ...)	if (tst) SL_CRIT(fmt, ##__VA_ARGS__)
+#define	IF_SL_ERR(tst, fmt, ...)	if (tst) SL_ERR(fmt, ##__VA_ARGS__)
+#define	IF_SL_WARN(tst, fmt, ...)	if (tst) SL_WARN(fmt, ##__VA_ARGS__)
+#define	IF_SL_NOT(tst, fmt, ...)	if (tst) SL_NOT(fmt, ##__VA_ARGS__)
+#define	IF_SL_INFO(tst, fmt, ...)	if (tst) SL_INFO(fmt, ##__VA_ARGS__)
+#define	IF_SL_DBG(tst, fmt, ...)	if (tst) SL_DBG(fmt, ##__VA_ARGS__)
 
-#define __ERROR(X)					return xSyslogError(__FUNCTION__, X)
-#define SL_ERROR(X)					do { if (SL_SEV_ERROR <= SL_LEVEL) __ERROR(X);} while(0)
-#define IF_SL_ERROR(T,X)			if (T) SL_ERROR(X)
+#define __ERROR(err)				return xSyslogError(__FUNCTION__, err)
+#define SL_ERROR(err)				do { if (SL_SEV_ERROR <= SL_LEVEL) __ERROR(err);} while(0)
+#define IF_SL_ERROR(tst, err)		if (tst) SL_ERROR(err)
 
 // ###################################### Global variables #########################################
 
