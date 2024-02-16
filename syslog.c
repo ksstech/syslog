@@ -168,7 +168,6 @@ static int IRAM_ATTR xSyslogConnect(void) {
 static void IRAM_ATTR vSyslogDisConnect(void) {
 	close(sCtx.sd);
 	sCtx.sd = -1;
-	IF_CP(debugTRACK && ioB1GET(ioUpDown), "[SLOG] disconnect\r\n");
 }
 
 void vSyslogFileSend(void) {
