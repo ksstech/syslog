@@ -55,13 +55,29 @@ extern "C" {
 
 // ############################## Syslog formatting/calling macros #################################
 
-#ifndef CONFIG_LOG_MAXIMUM_LEVEL				// remove Eclipse warning if sdkconfig.h not existing
-	#define CONFIG_LOG_MAXIMUM_LEVEL 3
-#endif
-#define	SL_LEVEL					(CONFIG_LOG_MAXIMUM_LEVEL + 2)
-#define	SL_LEV_DEF					(CONFIG_LOG_DEFAULT_LEVEL + 2)
+/* IDF	SL
+ *	0	0
+ *		1
+ *		2
+ *	1	3
+ *	2	4
+ *	3	5
+ *	4	6
+ *	5	7
+ */
 
-#define SL_LOG(lvl, fmt, ...) 		do { if ((lvl) <= SL_LEVEL) vSyslog(lvl,__FUNCTION__,fmt,##__VA_ARGS__);}while(0)
+#if (CONFIG_LOG_DEFAULT_LEVEL > 0)
+	#define	SL_LEV_DEF					(CONFIG_LOG_DEFAULT_LEVEL + 2)
+#else
+	#define	SL_LEV_DEF					(CONFIG_LOG_DEFAULT_LEVEL)
+#endif
+#if (CONFIG_LOG_MAXIMUM_LEVEL > 0)
+	#define	SL_LEVEL_MAX				(CONFIG_LOG_MAXIMUM_LEVEL + 2)
+#else
+	#define	SL_LEVEL_MAX				(CONFIG_LOG_MAXIMUM_LEVEL)
+#endif
+
+#define SL_LOG(lvl, fmt, ...) 		do { if ((lvl) <= SL_LEVEL_MAX) vSyslog(lvl,__FUNCTION__,fmt,##__VA_ARGS__);}while(0)
 
 #define	SL_EMER(fmt, ...)			SL_LOG(SL_SEV_EMERGENCY, fmt, ##__VA_ARGS__)
 #define	SL_ALRT(fmt, ...)			SL_LOG(SL_SEV_ALERT, fmt, ##__VA_ARGS__)
@@ -82,7 +98,7 @@ extern "C" {
 #define	IF_SL_DBG(tst, fmt, ...)	if (tst) SL_DBG(fmt, ##__VA_ARGS__)
 
 #define __ERROR(err)				return xSyslogError(__FUNCTION__, err)
-#define SL_ERROR(err)				do { if (SL_SEV_ERROR <= SL_LEVEL) __ERROR(err);} while(0)
+#define SL_ERROR(err)				do { if (SL_SEV_ERROR <= SL_LEVEL_MAX) __ERROR(err);} while(0)
 #define IF_SL_ERROR(tst, err)		if (tst) SL_ERROR(err)
 
 // ###################################### Global variables #########################################
