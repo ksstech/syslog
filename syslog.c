@@ -1,7 +1,6 @@
-/*
- * syslog.c - Copyright 2014-24 Andre M. Maree / KSS Technologies (Pty) Ltd.
- *
- ******************************************************************************************************************
+// syslog.c - Copyright 2014-24 Andre M. Maree / KSS Technologies (Pty) Ltd.
+
+/*******************************************************************************************************************
  SYSLOG-MSG = HEADER SP STRUCTURED-DATA [SP MSG]
 
  HEADER = PRI VERSION SP TIMESTAMP SP HOSTNAME SP APP-NAME SP PROCID SP MSGID
