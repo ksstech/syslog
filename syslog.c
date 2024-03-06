@@ -143,8 +143,10 @@ SemaphoreHandle_t SL_NetMux = 0, SL_VarMux = 0;
  * @return	1 if successful else 0
  */
 static int IRAM_ATTR xSyslogConnect(void) {
-	if (xTaskGetSchedulerState() != taskSCHEDULER_RUNNING || !xRtosWaitStatus(flagLX_STA, pdMS_TO_TICKS(20)))
+	if ((xTaskGetSchedulerState() != taskSCHEDULER_RUNNING) ||
+		(xRtosWaitStatus(flagLX_STA, pdMS_TO_TICKS(20)) == 0)) {
 		return 0;
+	}
 	if (sCtx.sd > 0) return 1;
 	sCtx.pHost = HostInfo[ioB2GET(ioHostSLOG)].pName;
 	IF_myASSERT(debugPARAM, sCtx.pHost);
