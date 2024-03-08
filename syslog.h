@@ -67,17 +67,27 @@ extern "C" {
  */
 
 #if (CONFIG_LOG_DEFAULT_LEVEL > 0)
-	#define	SL_LEV_DEF					(CONFIG_LOG_DEFAULT_LEVEL + 2)
+	#define	SL_LEV_DEF				(CONFIG_LOG_DEFAULT_LEVEL + 2)
 #else
-	#define	SL_LEV_DEF					(CONFIG_LOG_DEFAULT_LEVEL)
+	#define	SL_LEV_DEF				CONFIG_LOG_DEFAULT_LEVEL
 #endif
 #if (CONFIG_LOG_MAXIMUM_LEVEL > 0)
-	#define	SL_LEVEL_MAX				(CONFIG_LOG_MAXIMUM_LEVEL + 2)
+	#define	SL_LEVEL_MAX			(CONFIG_LOG_MAXIMUM_LEVEL + 2)
 #else
-	#define	SL_LEVEL_MAX				(CONFIG_LOG_MAXIMUM_LEVEL)
+	#define	SL_LEVEL_MAX			CONFIG_LOG_MAXIMUM_LEVEL
+#endif
+// Calculate Syslog Level for options module
+#if (SL_LEV_DEF < 7)
+	#define SL_LEV_OPT				(SL_LEV_DEF+1)
+#else
+	#define SL_LEV_OPT				SL_LEV_DEF
 #endif
 
-#define SL_LOG(lvl, fmt, ...) 		do { if ((lvl) <= SL_LEVEL_MAX) vSyslog(lvl,__FUNCTION__,fmt,##__VA_ARGS__);}while(0)
+#define SL_LOG(lvl, fmt, ...) 		do { 													\
+										if ((lvl) <= SL_LEVEL_MAX) {						\
+											vSyslog(lvl,__FUNCTION__,fmt,##__VA_ARGS__);	\
+										}													\
+									} while(0)
 
 #define	SL_EMER(fmt, ...)			SL_LOG(SL_SEV_EMERGENCY, fmt, ##__VA_ARGS__)
 #define	SL_ALRT(fmt, ...)			SL_LOG(SL_SEV_ALERT, fmt, ##__VA_ARGS__)
