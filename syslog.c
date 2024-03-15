@@ -69,7 +69,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
  *		SL_CRIT/ALRT/EMER() reserved for unrecoverable errors that should result in a system restart
  */
 
-#include "hal_config.h"
+#include "hal_platform.h"
 
 #include "certificates.h"
 #include "hal_network.h"
