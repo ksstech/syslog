@@ -51,15 +51,15 @@ extern "C" {
 
 // ############################## Syslog formatting/calling macros #################################
 
-/* IDF	SL
- *	0	0
- *		1
- *		2
- *	1	3
- *	2	4
- *	3	5
- *	4	6
- *	5	7
+/* ESP-IDF map to SysLog
+ *	0/None		->	0/Emergency
+ *					1/Alert
+ *					2/Critical
+ *	1/Error		->	3/Error
+ *	2/Warning	->	4/Warning
+ *	3/Info		->	5/Notice
+ *	4/Debug		->	6/Info
+ *	5/Verbose	->	7/Debug
  */
 #if (CONFIG_LOG_DEFAULT_LEVEL > 0)	
 	#define	SL_LEV_DEF				(CONFIG_LOG_DEFAULT_LEVEL + 2)
