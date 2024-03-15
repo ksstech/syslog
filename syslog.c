@@ -279,10 +279,11 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 		while (*pcTmp) {
 			if (*pcTmp == CHR_SPACE) *pcTmp = CHR_UNDERSCORE;
 			++pcTmp;
-		}
+		} */
 	}
-	if (RunTime == 0ULL) RunTime = sTSZ.usecs = (u64_t) esp_log_timestamp() * (u64_t) MICROS_IN_MILLISEC;
-
+	if (RunTime == 0ULL) {
+		RunTime = sTSZ.usecs = (u64_t) esp_log_timestamp() * (u64_t) MICROS_IN_MILLISEC;
+	}
 	#ifdef CONFIG_FREERTOS_UNICORE
 	int McuID = 0;					// default in case not ESP32 or scheduler not running
 	#else
