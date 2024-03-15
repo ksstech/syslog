@@ -1,20 +1,16 @@
-/*
- * syslog.h - Copyright(c) 2014-24 Andre M. Maree / KSS Technologies (Pty) Ltd.
- */
+// syslog.h
 
 #pragma once
 
 #include <stdarg.h>
-
 #include "sdkconfig.h"
-
 #include "FreeRTOS_Support.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// ############################################ macros ############################################
+// ########################################### Macros #############################################
 
 
 // ############################# Facilities & Severities definitions ###############################
@@ -65,12 +61,12 @@ extern "C" {
  *	4	6
  *	5	7
  */
-
-#if (CONFIG_LOG_DEFAULT_LEVEL > 0)
+#if (CONFIG_LOG_DEFAULT_LEVEL > 0)	
 	#define	SL_LEV_DEF				(CONFIG_LOG_DEFAULT_LEVEL + 2)
 #else
 	#define	SL_LEV_DEF				CONFIG_LOG_DEFAULT_LEVEL
 #endif
+
 #if (CONFIG_LOG_MAXIMUM_LEVEL > 0)
 	#define	SL_LEVEL_MAX			(CONFIG_LOG_MAXIMUM_LEVEL + 2)
 #else
