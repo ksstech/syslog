@@ -275,7 +275,7 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
 		ProcID = (char *) DRAM_STR("preX");
 	} else {
 		ProcID = pcTaskGetName(NULL);
-		char * pcTmp  = ProcID;
+/*		char * pcTmp  = ProcID;
 		while (*pcTmp) {
 			if (*pcTmp == CHR_SPACE) *pcTmp = CHR_UNDERSCORE;
 			++pcTmp;
