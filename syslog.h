@@ -64,19 +64,24 @@ extern "C" {
 #if (CONFIG_LOG_DEFAULT_LEVEL > 0)	
 	#define	SL_LEV_DEF				(CONFIG_LOG_DEFAULT_LEVEL + 2)
 #else
-	#define	SL_LEV_DEF				CONFIG_LOG_DEFAULT_LEVEL
+	#define	SL_LEV_DEF				(CONFIG_LOG_DEFAULT_LEVEL)
 #endif
 
 #if (CONFIG_LOG_MAXIMUM_LEVEL > 0)
 	#define	SL_LEVEL_MAX			(CONFIG_LOG_MAXIMUM_LEVEL + 2)
 #else
-	#define	SL_LEVEL_MAX			CONFIG_LOG_MAXIMUM_LEVEL
+	#define	SL_LEVEL_MAX			(CONFIG_LOG_MAXIMUM_LEVEL)
 #endif
-// Calculate Syslog Level for options module
-#if (SL_LEV_DEF < 7)
-	#define SL_LEV_OPT				(SL_LEV_DEF+1)
+
+#if (SL_LEV_DEF < 6)
+	#define SL_LEV_CONSOLE			(SL_LEV_DEF+2)
+	#define SL_LEV_HOST				(SL_LEV_DEF+1)
+#elif (SL_LEV_DEF < 7)
+	#define SL_LEV_CONSOLE			(SL_LEV_DEF+1)
+	#define SL_LEV_HOST				(SL_LEV_DEF)
 #else
-	#define SL_LEV_OPT				SL_LEV_DEF
+	#define SL_LEV_CONSOLE			(SL_LEV_DEF)
+	#define SL_LEV_HOST				(SL_LEV_DEF)
 #endif
 
 #define SL_LOG(lvl, fmt, ...) 		do { 													\
