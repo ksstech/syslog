@@ -219,9 +219,6 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 		int xLen = snprintfx(pBuf, SL_SIZEBUF, formatRFC5424, PRI, psUTC, nameSTA, McuID, ProcID, MsgID);
 		xLen += vsnprintfx(pBuf + xLen, SL_SIZEBUF - xLen - 1, format, vaList); // leave space for LF
 		
-		// If APPSTAGE not yet set, cannot send to Syslog host NOR to LFS file
-		if (allSYSFLAGS(sfAPPSTAGE) == 0) return;
-
 		if (xSyslogConnect()) {							// Scheduler running, LxSTA up and connection established
 			while (pBuf[xLen-1]==CHR_LF || pBuf[xLen-1]==CHR_CR)
 				pBuf[--xLen] = CHR_NUL;			// remove terminating CR/LF
