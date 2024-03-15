@@ -211,7 +211,11 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 		wprintfx(&sRprt, formatTERMINATE, attrRESET);
 		printfx("%s", ConsoleBuf);
 	} else {
-		if (!nameSTA[0]) strcpy(nameSTA, "unknown");	// if very early message, WIFI init not yet done.
+		// If APPSTAGE not yet set, cannot send to Syslog host NOR to LFS file
+		if (allSYSFLAGS(sfAPPSTAGE) == 0)
+			return;
+		if (!nameSTA[0])
+			strcpy(nameSTA, "unknown");		// if very early message, WIFI init not yet done.
 		int xLen = snprintfx(pBuf, SL_SIZEBUF, formatRFC5424, PRI, psUTC, nameSTA, McuID, ProcID, MsgID);
 		xLen += vsnprintfx(pBuf + xLen, SL_SIZEBUF - xLen - 1, format, vaList); // leave space for LF
 		
@@ -219,23 +223,31 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 		if (allSYSFLAGS(sfAPPSTAGE) == 0) return;
 
 		if (xSyslogConnect()) {							// Scheduler running, LxSTA up and connection established
-			while (pBuf[xLen-1]==CHR_LF || pBuf[xLen-1]==CHR_CR) pBuf[--xLen] = CHR_NUL;	// remove terminating CR/LF
+			while (pBuf[xLen-1]==CHR_LF || pBuf[xLen-1]==CHR_CR)
+				pBuf[--xLen] = CHR_NUL;			// remove terminating CR/LF
 			if (xRtosSemaphoreTake(&SL_NetMux, tWait) == pdTRUE) {
 				iRV = xNetSend(&sCtx, (u8_t *)pBuf, xLen);
 				xRtosSemaphoreGive(&SL_NetMux);
-				if (iRV != erFAILURE) sCtx.maxTx = (iRV > sCtx.maxTx) ? iRV : sCtx.maxTx;
-				else vSyslogDisConnect();
+				if (iRV != erFAILURE) {
+					sCtx.maxTx = (iRV > sCtx.maxTx) ? iRV : sCtx.maxTx;
+				} else {
+					vSyslogDisConnect();
+				}
 			}
 
-		} else {
-			#if	(halUSE_LITTLEFS == 1)
-			if (pBuf[xLen-1] != CHR_LF) { pBuf[xLen++] = CHR_LF; pBuf[xLen] = CHR_NUL; }	// append LF if required
+		}
+		#if	(halUSE_LITTLEFS == 1)
+		else {
+			if (pBuf[xLen-1] != CHR_LF) {
+				pBuf[xLen++] = CHR_LF;
+				pBuf[xLen] = CHR_NUL;	// append LF if required
+			}
 			if (xRtosCheckDevice(devMASK_LFS)) {		// L2+3 STA down, no connection, append to file...
 				halFS_Write("syslog.txt", "a", pBuf);
 				xRtosSetDevice(devMASK_LFS_SL);
 			}
-			#endif
 		}
+		#endif
 	}
 }
 
