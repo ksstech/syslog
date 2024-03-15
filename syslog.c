@@ -125,6 +125,7 @@ static char SyslogColors[8] = {
 //	4 = Warning			5 = Notice		6 = Info		7 = Debug
 	colourFG_YELLOW, colourFG_GREEN, colourFG_MAGENTA, colourFG_CYAN,
 };
+static char ConsoleBuf[SL_SIZEBUF];
 
 // ###################################### Global variables #########################################
 
@@ -204,13 +205,11 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 	const TickType_t tWait = pdMS_TO_TICKS(1000);
 	int iRV;
 	if (pBuf == NULL) {
-		char * tmpBuf = malloc(SL_SIZEBUF);
-		report_t sRprt = { tmpBuf, SL_SIZEBUF, .sFM.u32Val = makeMASK12x20(1,1,1,1,1,1,1,1,1,1,1,1,0) };
+		report_t sRprt = { ConsoleBuf, SL_SIZEBUF };
 		wprintfx(&sRprt, formatCONSOLE, SyslogColors[PRI], psUTC->usecs, McuID, ProcID, MsgID);
 		wvprintfx(&sRprt, format, vaList);
 		wprintfx(&sRprt, formatTERMINATE, attrRESET);
-		printfx("%s", tmpBuf);
-		free(tmpBuf);
+		printfx("%s", ConsoleBuf);
 	} else {
 		if (!nameSTA[0]) strcpy(nameSTA, "unknown");	// if very early message, WIFI init not yet done.
 		int xLen = snprintfx(pBuf, SL_SIZEBUF, formatRFC5424, PRI, psUTC, nameSTA, McuID, ProcID, MsgID);
