@@ -104,8 +104,8 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 	#define SL_CORES 				2
 #endif
 
-#define	formatRFC5424	DRAM_STR("<%u>1 %.3Z %s #%d %s - - %s ")
-#define formatCONSOLE 	DRAM_STR("%C%!.3R: #%d %s %s ")
+#define	formatRFC5424	DRAM_STR("<%u>1 %.3Z %s %d %s - - %s ")
+#define formatCONSOLE 	DRAM_STR("%C%!.3R %d %s %s ")
 #define formatREPEATED	DRAM_STR("Repeated %dx")
 #define formatTERMINATE	DRAM_STR("%C\r\n")
 
