@@ -73,10 +73,7 @@ extern "C" {
 	#define	SL_LEVEL_MAX			(CONFIG_LOG_MAXIMUM_LEVEL)
 #endif
 
-#if (SL_LEV_DEF < 6)
-	#define SL_LEV_CONSOLE			(SL_LEV_DEF+2)
-	#define SL_LEV_HOST				(SL_LEV_DEF+1)
-#elif (SL_LEV_DEF < 7)
+#if (SL_LEV_DEF < 4) && (configPRODUCTION == 0)
 	#define SL_LEV_CONSOLE			(SL_LEV_DEF+1)
 	#define SL_LEV_HOST				(SL_LEV_DEF)
 #else
