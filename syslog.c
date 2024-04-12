@@ -175,6 +175,14 @@ static void IRAM_ATTR vSyslogDisConnect(void) {
 	sCtx.sd = -1;
 }
 
+void vSyslogFileCheckSize(void) {
+	ssize_t Size = halSTORAGE_FileGetSize("/syslog.txt");
+	if (Size < 0) return;
+	if (Size < 10240) { xRtosSetDevice(devMASK_LFS_SL); return; }
+	unlink("/syslog.txt");
+	xRtosClearDevice(devMASK_LFS_SL);
+}
+
 void vSyslogFileSend(void) {
 	if (xSyslogConnect() == 0) return;
 	int iRV = erSUCCESS;
