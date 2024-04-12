@@ -365,7 +365,6 @@ int IRAM_ATTR xSyslogError(const char *pcFN, int iRV) {
  */
 void vSyslogReport(report_t *psR) {
 	if (sCtx.sd > 0) {
-		xNetReport(psR, &sCtx, "SLOG", 0, 0, 0) ;
 		xNetReport(psR, &sCtx, "SLOG", 0, 0, 0);
 		wprintfx(psR, "\tmaxTX=%zu  CurRpt=%lu\r\n", sCtx.maxTx, RptCNT);
 	}
