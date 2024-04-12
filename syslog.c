@@ -188,24 +188,25 @@ void vSyslogFileSend(void) {
 	int iRV = erSUCCESS;
 	xRtosSemaphoreTake(&LFSmux, portMAX_DELAY);
 	FILE *fp = fopen("syslog.txt", "r");
+	if (fp) {
 		if (fseek(fp, 0L, SEEK_END) == 0 && ftell(fp) > 0L) {
 			rewind(fp);
+			char *pBuf = pvRtosMalloc(SL_SIZEBUF);
 			while (1) {
-				char * pRV = fgets(pBuf, SL_SIZEBUF, fp);
-				if (pRV != pBuf)
-					break;
+				char *pRV = fgets(pBuf, SL_SIZEBUF, fp);
+				if (pRV != pBuf) break;
 				int xLen = strlen(pBuf);
-				if (pBuf[xLen-1] == CHR_LF) pBuf[--xLen] = CHR_NUL;			// remove terminating [CR]LF
+				if (pBuf[xLen - 1] == CHR_LF) pBuf[--xLen] = CHR_NUL; // remove terminating [CR]LF
 				iRV = sendto(sCtx.sd, pBuf, xLen, sCtx.flags, &sCtx.sa, sizeof(sCtx.sa_in));
-				vTaskDelay(pdMS_TO_TICKS(10));			// ensure WDT gets fed....
+				vTaskDelay(pdMS_TO_TICKS(10)); // ensure WDT gets fed....
 			}
+			vRtosFree(pBuf);
 			xRtosClearDevice(devMASK_LFS_SL);
 		}
+		iRV = fclose(fp);
+		unlink("syslog.txt");
 	}
-	iRV = fclose(fp);
-	unlink("syslog.txt");
 	xRtosSemaphoreGive(&LFSmux);
-	vRtosFree(pBuf);
 	IF_myASSERT(debugRESULT, iRV == 0);
 }
 
