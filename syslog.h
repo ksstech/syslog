@@ -61,6 +61,14 @@ extern "C" {
  *	4/Debug		->	6/Info
  *	5/Verbose	->	7/Debug
  */
+#ifndef CONFIG_LOG_DEFAULT_LEVEL
+	#define	CONFIG_LOG_DEFAULT_LEVEL	2
+#endif
+
+#ifndef CONFIG_LOG_MAXIMUM_LEVEL
+	#define	CONFIG_LOG_MAXIMUM_LEVEL	4
+#endif
+
 #if (CONFIG_LOG_DEFAULT_LEVEL > 0)	
 	#define	SL_LEV_DEF				(CONFIG_LOG_DEFAULT_LEVEL + 2)
 #else
@@ -74,6 +82,9 @@ extern "C" {
 #endif
 
 #if (SL_LEV_DEF < 4) && (configPRODUCTION == 0)
+	#define SL_LEV_CONSOLE			(SL_LEV_DEF+2)
+	#define SL_LEV_HOST				(SL_LEV_DEF+1)
+#elif (SL_LEV_DEF < 5) && (configPRODUCTION == 0)
 	#define SL_LEV_CONSOLE			(SL_LEV_DEF+1)
 	#define SL_LEV_HOST				(SL_LEV_DEF)
 #else
@@ -116,6 +127,7 @@ extern SemaphoreHandle_t SL_NetMux, SL_VarMux;
 // ###################################### function prototypes ######################################
 
 void vSyslogFileSend(void);
+void vSyslogFileCheckSize(void);
 void xvSyslog(int Priority, const char * MsgID, const char * format, va_list args);
 void vSyslog(int Priority, const char * MsgID, const char * format, ...);
 int xSyslogError(const char * pcFN, int eCode);
