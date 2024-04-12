@@ -75,7 +75,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #include "hal_network.h"
 #include "hal_options.h"
 #include "hal_storage.h"
-#include "printfx.h"									// +x_definitions +stdarg +stdint +stdio
+#include "printfx.h" // +x_definitions +stdarg +stdint +stdio
 #include "socketsX.h"
 #include "syslog.h"
 #include "x_errors_events.h"
@@ -83,47 +83,50 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #include <errno.h>
 
 #ifdef ESP_PLATFORM
-	#include "esp_log.h"
+#include "esp_log.h"
 #endif
 
-#define	debugFLAG					0xF000
+// ####################################### Macros ##################################################
 
-#define	debugTIMING					(debugFLAG_GLOBAL & debugFLAG & 0x1000)
-#define	debugTRACK					(debugFLAG_GLOBAL & debugFLAG & 0x2000)
-#define	debugPARAM					(debugFLAG_GLOBAL & debugFLAG & 0x4000)
-#define	debugRESULT					(debugFLAG_GLOBAL & debugFLAG & 0x8000)
+#define debugFLAG 0xF000
+#define debugTIMING (debugFLAG_GLOBAL & debugFLAG & 0x1000)
+#define debugTRACK (debugFLAG_GLOBAL & debugFLAG & 0x2000)
+#define debugPARAM (debugFLAG_GLOBAL & debugFLAG & 0x4000)
+#define debugRESULT (debugFLAG_GLOBAL & debugFLAG & 0x8000)
 
 // ###################################### BUILD : CONFIG definitions ##############################
 
 // '<7>1 2021/10/21T12:34.567: cc50e38819ec_WROVERv4_5C9 #0 esp_timer halVARS_Report????? - '
-#define	SL_SIZEBUF					512
+#define SL_SIZEBUF 512
 
 #ifdef CONFIG_FREERTOS_UNICORE
-	#define SL_CORES 				1
+#define SL_CORES 1
 #else
-	#define SL_CORES 				2
+#define SL_CORES 2
 #endif
 
-#define	formatRFC5424	DRAM_STR("<%u>1 %.3Z %s %d %s - - %s ")
-#define formatCONSOLE 	DRAM_STR("%C%!.3R %d %s %s ")
-#define formatREPEATED	DRAM_STR("Repeated %dx")
-#define formatTERMINATE	DRAM_STR("%C\r\n")
+#define formatRFC5424 DRAM_STR("<%u>1 %.3Z %s %d %s - - %s ")
+#define formatCONSOLE DRAM_STR("%C%!.3R %d %s %s ")
+#define formatREPEATED DRAM_STR("Repeated %dx")
+#define formatTERMINATE DRAM_STR("%C\r\n")
 
 // ######################################### Structures ############################################
-
-
 // ####################################### Local variables #########################################
 
-static netx_t sCtx = { 0 };
+static netx_t sCtx = {0};
 static u32_t RptCRC = 0, RptCNT = 0;
 static u64_t RptRUN = 0, RptUTC = 0;
 static u8_t RptPRI = 0;
-static char * RptTask, * RptFunc;
+static char *RptTask, *RptFunc;
 static char SyslogColors[8] = {
-// 0 = Emergency	1 = Alert	2 = Critical	3 = Error
-	colourFG_RED, colourFG_RED, colourFG_RED, colourFG_RED,
-//	4 = Warning			5 = Notice		6 = Info		7 = Debug
-	colourFG_YELLOW, colourFG_GREEN, colourFG_MAGENTA, colourFG_CYAN,
+	colourFG_RED,					// Emergency
+	colourFG_RED,					// Alert
+	colourFG_RED,					// Critical
+	colourFG_RED,					// Error
+	colourFG_YELLOW,				// Warning
+	colourFG_GREEN,					// Notice
+	colourFG_MAGENTA,				// Info
+	colourFG_CYAN,					// Debug
 };
 static char ConsoleBuf[SL_SIZEBUF];
 
@@ -155,8 +158,8 @@ static int IRAM_ATTR xSyslogConnect(void) {
 	sCtx.sa_in.sin_port = htons(IP_PORT_SYSLOG_UDP);
 	sCtx.type = SOCK_DGRAM;
 	sCtx.flags = SO_REUSEADDR;
-	sCtx.d = (netx_dbg_t) { .sl = 1 };
-	int	iRV = xNetOpen(&sCtx);
+	sCtx.d = (netx_dbg_t){.sl = 1};
+	int iRV = xNetOpen(&sCtx);
 	if (iRV >= erSUCCESS) {
 		if (xNetSetRecvTO(&sCtx, flagXNET_NONBLOCK) >= erSUCCESS) return 1;
 	}
@@ -174,11 +177,9 @@ static void IRAM_ATTR vSyslogDisConnect(void) {
 
 void vSyslogFileSend(void) {
 	if (xSyslogConnect() == 0) return;
-	char * pBuf = pvRtosMalloc(SL_SIZEBUF);
-	int iRV;
+	int iRV = erSUCCESS;
 	xRtosSemaphoreTake(&LFSmux, portMAX_DELAY);
-	FILE * fp = fopen("syslog.txt", "r");
-	if (fp != NULL) {
+	FILE *fp = fopen("syslog.txt", "r");
 		if (fseek(fp, 0L, SEEK_END) == 0 && ftell(fp) > 0L) {
 			rewind(fp);
 			while (1) {
@@ -200,28 +201,27 @@ void vSyslogFileSend(void) {
 	IF_myASSERT(debugRESULT, iRV == 0);
 }
 
-static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
-	char * ProcID, const char * MsgID, char * pBuf, const char * format, va_list vaList) {
+static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t *psUTC, int McuID, char *ProcID, const char *MsgID, 
+										  char *pBuf, const char *format, va_list vaList) {
 	const TickType_t tWait = pdMS_TO_TICKS(1000);
 	int iRV;
 	if (pBuf == NULL) {
-		report_t sRprt = { ConsoleBuf, SL_SIZEBUF };
+		report_t sRprt = {ConsoleBuf, SL_SIZEBUF};
 		wprintfx(&sRprt, formatCONSOLE, SyslogColors[PRI], psUTC->usecs, McuID, ProcID, MsgID);
 		wvprintfx(&sRprt, format, vaList);
 		wprintfx(&sRprt, formatTERMINATE, attrRESET);
 		printfx("%s", ConsoleBuf);
 	} else {
 		// If APPSTAGE not yet set, cannot send to Syslog host NOR to LFS file
-		if (allSYSFLAGS(sfAPPSTAGE) == 0)
-			return;
+		if (allSYSFLAGS(sfAPPSTAGE) == 0) return;
 		if (!nameSTA[0])
-			strcpy(nameSTA, "unknown");		// if very early message, WIFI init not yet done.
+			strcpy(nameSTA, "unknown"); // if very early message, WIFI init not yet done.
 		int xLen = snprintfx(pBuf, SL_SIZEBUF, formatRFC5424, PRI, psUTC, nameSTA, McuID, ProcID, MsgID);
 		xLen += vsnprintfx(pBuf + xLen, SL_SIZEBUF - xLen - 1, format, vaList); // leave space for LF
-		
-		if (xSyslogConnect()) {							// Scheduler running, LxSTA up and connection established
-			while (pBuf[xLen-1]==CHR_LF || pBuf[xLen-1]==CHR_CR)
-				pBuf[--xLen] = CHR_NUL;			// remove terminating CR/LF
+
+		if (xSyslogConnect()) { // Scheduler running, LxSTA up and connection established
+			while (pBuf[xLen - 1] == CHR_LF || pBuf[xLen - 1] == CHR_CR)
+				pBuf[--xLen] = CHR_NUL; // remove terminating CR/LF
 			if (xRtosSemaphoreTake(&SL_NetMux, tWait) == pdTRUE) {
 				iRV = xNetSend(&sCtx, (u8_t *)pBuf, xLen);
 				xRtosSemaphoreGive(&SL_NetMux);
@@ -231,15 +231,14 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 					vSyslogDisConnect();
 				}
 			}
-
 		}
-		#if	(halUSE_LITTLEFS == 1)
+		#if (halUSE_LITTLEFS == 1)
 		else {
-			if (pBuf[xLen-1] != CHR_LF) {
+			if (pBuf[xLen - 1] != CHR_LF) {
 				pBuf[xLen++] = CHR_LF;
-				pBuf[xLen] = CHR_NUL;	// append LF if required
+				pBuf[xLen] = CHR_NUL; // append LF if required
 			}
-			if (xRtosCheckDevice(devMASK_LFS)) {		// L2+3 STA down, no connection, append to file...
+			if (xRtosCheckDevice(devMASK_LFS)) { // L2+3 STA down, no connection, append to file...
 				halFS_Write("syslog.txt", "a", pBuf);
 				xRtosSetDevice(devMASK_LFS_SL);
 			}
@@ -248,12 +247,12 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
 	}
 }
 
-static void IRAM_ATTR xSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
-	char * ProcID, const char * MsgID, char * pBuf, const char * format, ...) {
-    va_list vaList;
-    va_start(vaList, format);
-    xvSyslogSendMessage(PRI, psUTC, McuID, ProcID, MsgID, pBuf, format, vaList);
-    va_end(vaList);
+static void IRAM_ATTR xSyslogSendMessage(int PRI, tsz_t *psUTC, int McuID,
+										 char *ProcID, const char *MsgID, char *pBuf, const char *format, ...) {
+	va_list vaList;
+	va_start(vaList, format);
+	xvSyslogSendMessage(PRI, psUTC, McuID, ProcID, MsgID, pBuf, format, vaList);
+	va_end(vaList);
 }
 
 /**
@@ -263,67 +262,70 @@ static void IRAM_ATTR xSyslogSendMessage(int PRI, tsz_t * psUTC, int McuID,
  * @param[in]	format string and parameters as per normal printf()
  * @return		number of characters sent to server
  */
-void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_list vaList) {
-	u8_t MsgPRI = Level % 8;		// ANY message PRI/level > ioSLOGhi value WILL be discarded
+void IRAM_ATTR xvSyslog(int Level, const char *MsgID, const char *format, va_list vaList) {
+	u8_t MsgPRI = Level % 8; // ANY message PRI/level > ioSLOGhi value WILL be discarded
 	if (MsgPRI > ioB3GET(ioSLOGhi)) return;
-	MsgID = (MsgID == NULL) ? "null" : (*MsgID == 0) ? "empty" : MsgID;
-	char * ProcID;					// Handle state of scheduler and obtain the task name
+	MsgID = (MsgID == NULL) ? "null" : (*MsgID == 0) ? "empty"
+													 : MsgID;
+	char *ProcID; // Handle state of scheduler and obtain the task name
 	if (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) {
-		ProcID = (char *) DRAM_STR("preX");
+		ProcID = (char *)DRAM_STR("preX");
 	} else {
 		ProcID = pcTaskGetName(NULL);
-/*		char * pcTmp  = ProcID;
+	/*	char * pcTmp  = ProcID;
 		while (*pcTmp) {
 			if (*pcTmp == CHR_SPACE) *pcTmp = CHR_UNDERSCORE;
 			++pcTmp;
 		} */
 	}
 	if (RunTime == 0ULL) {
-		RunTime = sTSZ.usecs = (u64_t) esp_log_timestamp() * (u64_t) MICROS_IN_MILLISEC;
+		RunTime = sTSZ.usecs = (u64_t)esp_log_timestamp() * (u64_t)MICROS_IN_MILLISEC;
 	}
 	#ifdef CONFIG_FREERTOS_UNICORE
-	int McuID = 0;					// default in case not ESP32 or scheduler not running
+	int McuID = 0; // default in case not ESP32 or scheduler not running
 	#else
 	int McuID = esp_cpu_get_core_id();
 	#endif
 
 	xRtosSemaphoreTake(&SL_VarMux, portMAX_DELAY);
 	u32_t MsgCRC = 0;
-	int xLen = crcprintfx(&MsgCRC, DRAM_STR("%s %s "), ProcID, MsgID);	// "Task Function "
-	xLen += vcrcprintfx(&MsgCRC, format, vaList);		// "Task Function message parameters etc"
+	int xLen = crcprintfx(&MsgCRC, DRAM_STR("%s %s "), ProcID, MsgID); // "Task Function "
+	xLen += vcrcprintfx(&MsgCRC, format, vaList);					   // "Task Function message parameters etc"
 
-	if (MsgCRC == RptCRC && MsgPRI == RptPRI) {			// CRC & PRI same as previous message ?
-		++RptCNT;										// Yes, increment the repeat counter
-		RptRUN = RunTime;								// save timestamps of latest repeat
+	if (MsgCRC == RptCRC && MsgPRI == RptPRI) {					  // CRC & PRI same as previous message ?
+		++RptCNT;		  // Yes, increment the repeat counter
+		RptRUN = RunTime; // save timestamps of latest repeat
 		RptUTC = sTSZ.usecs;
 		RptTask = ProcID;
-		RptFunc = (char *) MsgID;
+		RptFunc = (char *)MsgID;
 		xRtosSemaphoreGive(&SL_VarMux);
-	} else {											// Different CRC and/or PRI
+	} else { // Different CRC and/or PRI
 		// save trackers for immediate and future use...
-		RptCRC = MsgCRC;								// Save to use later
-		u8_t TmpPRI = RptPRI; RptPRI = MsgPRI;			// Save old to use now, new to use later
-		u32_t TmpCNT = RptCNT; RptCNT = 0;				// Save to use now, reset for next message
-		u64_t TmpRUN = RptRUN;							// Save to use now
+		RptCRC = MsgCRC; // Save to use later
+		u8_t TmpPRI = RptPRI;
+		RptPRI = MsgPRI; // Save old to use now, new to use later
+		u32_t TmpCNT = RptCNT;
+		RptCNT = 0;			   // Save to use now, reset for next message
+		u64_t TmpRUN = RptRUN; // Save to use now
 		u64_t TmpUTC = RptUTC;
-		char * TmpTask = RptTask;
-		char * TmpFunc = RptFunc;
+		char *TmpTask = RptTask;
+		char *TmpFunc = RptFunc;
 		xRtosSemaphoreGive(&SL_VarMux);
-		tsz_t TmpTSZ = {.pTZ = sTSZ.pTZ };
+		tsz_t TmpTSZ = {.pTZ = sTSZ.pTZ};
 
 		// Handle console message(s)
 		if (TmpCNT > 0) {
-			TmpTSZ.usecs = TmpRUN;						// repeated message + count
+			TmpTSZ.usecs = TmpRUN; // repeated message + count
 			xSyslogSendMessage(TmpPRI, &TmpTSZ, McuID, TmpTask, TmpFunc, NULL, formatREPEATED, TmpCNT);
 		}
-		TmpTSZ.usecs = RunTime;							// New message
+		TmpTSZ.usecs = RunTime; // New message
 		xvSyslogSendMessage(MsgPRI, &TmpTSZ, McuID, ProcID, MsgID, NULL, format, vaList);
 
 		// Handle host message(s)
-		if (MsgPRI <= ioB3GET(ioSLhost)) {				// filter based on higher priorities
-			char * pBuf = pvRtosMalloc(SL_SIZEBUF);
+		if (MsgPRI <= ioB3GET(ioSLhost)) { // filter based on higher priorities
+			char *pBuf = pvRtosMalloc(SL_SIZEBUF);
 			if (TmpCNT > 0) {
-				TmpTSZ.usecs = TmpUTC;					// repeated message + count
+				TmpTSZ.usecs = TmpUTC; // repeated message + count
 				xSyslogSendMessage(TmpPRI, &TmpTSZ, McuID, TmpTask, TmpFunc, pBuf, formatREPEATED, TmpCNT);
 			}
 			xvSyslogSendMessage(MsgPRI, &sTSZ, McuID, ProcID, MsgID, pBuf, format, vaList);
@@ -341,19 +343,19 @@ void IRAM_ATTR xvSyslog(int Level, const char * MsgID, const char * format, va_l
  * @param[out]	none
  * @return		number of characters displayed(if only to console) or send(if to server)
  */
-void IRAM_ATTR vSyslog(int Level, const char * MsgID, const char * format, ...) {
-    va_list vaList ;
-    va_start(vaList, format) ;
-	xvSyslog(Level, MsgID, format, vaList) ;
-    va_end(vaList) ;
+void IRAM_ATTR vSyslog(int Level, const char *MsgID, const char *format, ...) {
+	va_list vaList;
+	va_start(vaList, format);
+	xvSyslog(Level, MsgID, format, vaList);
+	va_end(vaList);
 }
 
-int IRAM_ATTR xSyslogError(const char * pcFN, int iRV) {
+int IRAM_ATTR xSyslogError(const char *pcFN, int iRV) {
 	#ifdef ESP_PLATFORM
 	vSyslog(SL_SEV_ERROR, pcFN, "iRV=%d (%s)", iRV, esp_err_to_name(iRV));
 	return (iRV > 0) ? -iRV : iRV;
 	#else
-	vSyslog(SL_SEV_ERROR, pcFN, "iRV=0x%X (%s)", iRV, strerr(iRV)) ;
+	vSyslog(SL_SEV_ERROR, pcFN, "iRV=0x%X (%s)", iRV, strerr(iRV));
 	return iRV;
 	#endif
 }
@@ -361,17 +363,18 @@ int IRAM_ATTR xSyslogError(const char * pcFN, int iRV) {
 /**
  * @brief	report syslog related information
  */
-void vSyslogReport(report_t * psR) {
+void vSyslogReport(report_t *psR) {
 	if (sCtx.sd > 0) {
 		xNetReport(psR, &sCtx, "SLOG", 0, 0, 0) ;
-		wprintfx(psR, "\tmaxTX=%zu  CurRpt=%lu\r\n", sCtx.maxTx, RptCNT) ;
+		xNetReport(psR, &sCtx, "SLOG", 0, 0, 0);
+		wprintfx(psR, "\tmaxTX=%zu  CurRpt=%lu\r\n", sCtx.maxTx, RptCNT);
 	}
 }
 
 // #################################### Test and benchmark routines ################################
 
 #if 0
-#include "crc.h"										// private component
+#include "crc.h"
 
 void vSyslogBenchmark(void) {
 	char Test1[] = "SNTP vSntpTask ntp1.meraka.csir.co.za  2019-03-05T10:56:58.901Z  tOFF=78,873,521uS  tRTD=11,976uS" ;
