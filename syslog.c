@@ -191,7 +191,7 @@ void vSyslogFileSend(void) {
 	if (fp) {
 		if (fseek(fp, 0L, SEEK_END) == 0 && ftell(fp) > 0L) {
 			rewind(fp);
-			char *pBuf = pvRtosMalloc(SL_SIZEBUF);
+			char *pBuf = malloc(SL_SIZEBUF);
 			while (1) {
 				char *pRV = fgets(pBuf, SL_SIZEBUF, fp);
 				if (pRV != pBuf) break;
@@ -200,7 +200,7 @@ void vSyslogFileSend(void) {
 				iRV = sendto(sCtx.sd, pBuf, xLen, sCtx.flags, &sCtx.sa, sizeof(sCtx.sa_in));
 				vTaskDelay(pdMS_TO_TICKS(10)); // ensure WDT gets fed....
 			}
-			vRtosFree(pBuf);
+			free(pBuf);
 			xRtosClearDevice(devMASK_LFS_SL);
 		}
 		iRV = fclose(fp);
@@ -332,13 +332,13 @@ void IRAM_ATTR xvSyslog(int Level, const char *MsgID, const char *format, va_lis
 
 		// Handle host message(s)
 		if (MsgPRI <= ioB3GET(ioSLhost)) { // filter based on higher priorities
-			char *pBuf = pvRtosMalloc(SL_SIZEBUF);
+			char *pBuf = malloc(SL_SIZEBUF);
 			if (TmpCNT > 0) {
 				TmpTSZ.usecs = TmpUTC; // repeated message + count
 				xSyslogSendMessage(TmpPRI, &TmpTSZ, McuID, TmpTask, TmpFunc, pBuf, formatREPEATED, TmpCNT);
 			}
 			xvSyslogSendMessage(MsgPRI, &sTSZ, McuID, ProcID, MsgID, pBuf, format, vaList);
-			vRtosFree(pBuf);
+			free(pBuf);
 		}
 	}
 }
@@ -346,7 +346,7 @@ void IRAM_ATTR xvSyslog(int Level, const char *MsgID, const char *format, va_lis
 /**
  * Writes an RFC formatted message to syslog host
  * @brief		if syslog not up and running, write to stdout
- * @brief		avoid using pvRtosMalloc() or similar since also called from error/crash handlers
+ * @brief		avoid using malloc() or similar since also called from error/crash handlers
  * @param[in]	Priority, ProcID and MsgID as defined by RFC
  * @param[in]	format string and parameters as per normal printf()
  * @param[out]	none
