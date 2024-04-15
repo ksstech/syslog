@@ -215,7 +215,7 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t *psUTC, int McuID, char
 	const TickType_t tWait = pdMS_TO_TICKS(1000);
 	int iRV;
 	if (pBuf == NULL) {
-		report_t sRprt = {ConsoleBuf, SL_SIZEBUF};
+		report_t sRprt = { .pcBuf = ConsoleBuf, .Size = SL_SIZEBUF};
 		wprintfx(&sRprt, formatCONSOLE, SyslogColors[PRI], psUTC->usecs, McuID, ProcID, MsgID);
 		wvprintfx(&sRprt, format, vaList);
 		wprintfx(&sRprt, formatTERMINATE, attrRESET);
