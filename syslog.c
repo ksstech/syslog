@@ -310,12 +310,12 @@ void IRAM_ATTR xvSyslog(int Level, const char *MsgID, const char *format, va_lis
 		xRtosSemaphoreGive(&SL_VarMux);
 	} else { // Different CRC and/or PRI
 		// save trackers for immediate and future use...
-		RptCRC = MsgCRC; // Save to use later
+		RptCRC = MsgCRC;
 		u8_t TmpPRI = RptPRI;
-		RptPRI = MsgPRI; // Save old to use now, new to use later
+		RptPRI = MsgPRI;
 		u32_t TmpCNT = RptCNT;
-		RptCNT = 0;			   // Save to use now, reset for next message
-		u64_t TmpRUN = RptRUN; // Save to use now
+		RptCNT = 0;
+		u64_t TmpRUN = RptRUN;
 		u64_t TmpUTC = RptUTC;
 		char *TmpTask = RptTask;
 		char *TmpFunc = RptFunc;
