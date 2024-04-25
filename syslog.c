@@ -217,13 +217,14 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t *psUTC, int McuID, char
 	if (pBuf == NULL) {
 		report_t sRpt = {
 			.pcBuf = ConsoleBuf, 
-			.Size = reportSIZE(0,0,0,1,SL_SIZEBUF),
+			.Size = reportSIZE(0,0,0,0,0,1,SL_SIZEBUF),
 			.sFM.u32Val = 0,
 		};
-		wprintfx(&sRpt, formatCONSOLE, SyslogColors[PRI], psUTC->usecs, McuID, ProcID, MsgID);
-		wvprintfx(&sRpt, format, vaList);
-		wprintfx(&sRpt, formatTERMINATE, attrRESET);
-		printfx("%s", ConsoleBuf);
+		report_t * psR = &sRpt;
+		wprintfx(psR, formatCONSOLE, SyslogColors[PRI], psUTC->usecs, McuID, ProcID, MsgID);
+		wvprintfx(psR, format, vaList);
+		wprintfx(psR, formatTERMINATE, attrRESET);
+		wprintfx(NULL, "%s", ConsoleBuf);
 	} else {
 		// If APPSTAGE not yet set, cannot send to Syslog host NOR to LFS file
 		if (allSYSFLAGS(sfAPPSTAGE) == 0) return;
