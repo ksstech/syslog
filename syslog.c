@@ -97,7 +97,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 // ###################################### BUILD : CONFIG definitions ##############################
 
 // '<7>1 2021/10/21T12:34.567: cc50e38819ec_WROVERv4_5C9 #0 esp_timer halVARS_Report????? - '
-#define SL_SIZEBUF 512
+#define SL_SIZEBUF				512
 
 #ifdef CONFIG_FREERTOS_UNICORE
 #define SL_CORES 1
@@ -228,13 +228,13 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t *psUTC, int McuID, char
 		// If APPSTAGE not yet set, cannot send to Syslog host NOR to LFS file
 		if (allSYSFLAGS(sfAPPSTAGE) == 0) return;
 		if (!nameSTA[0])
-			strcpy(nameSTA, "unknown"); // if very early message, WIFI init not yet done.
+			strcpy(nameSTA, "unknown");					// very early message, WIFI not initialized
 		int xLen = snprintfx(pBuf, SL_SIZEBUF, formatRFC5424, PRI, psUTC, nameSTA, McuID, ProcID, MsgID);
 		xLen += vsnprintfx(pBuf + xLen, SL_SIZEBUF - xLen - 1, format, vaList); // leave space for LF
 
-		if (xSyslogConnect()) { // Scheduler running, LxSTA up and connection established
+		if (xSyslogConnect()) {							// Scheduler running, LxSTA up and connected
 			while (pBuf[xLen - 1] == CHR_LF || pBuf[xLen - 1] == CHR_CR)
-				pBuf[--xLen] = CHR_NUL; // remove terminating CR/LF
+				pBuf[--xLen] = CHR_NUL;					// remove terminating CR/LF
 			if (xRtosSemaphoreTake(&SL_NetMux, tWait) == pdTRUE) {
 				iRV = xNetSend(&sCtx, (u8_t *)pBuf, xLen);
 				xRtosSemaphoreGive(&SL_NetMux);
@@ -248,10 +248,10 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t *psUTC, int McuID, char
 		#if (halUSE_LITTLEFS == 1)
 		else {
 			if (pBuf[xLen - 1] != CHR_LF) {
-				pBuf[xLen++] = CHR_LF;
-				pBuf[xLen] = CHR_NUL; // append LF if required
+				pBuf[xLen++] = CHR_LF;					// append LF if required
+				pBuf[xLen] = CHR_NUL;					// and terminate
 			}
-			if (xRtosCheckDevice(devMASK_LFS)) { // L2+3 STA down, no connection, append to file...
+			if (xRtosCheckDevice(devMASK_LFS)) { 		// L2+3 STA down, append to file...
 				halFS_Write("syslog.txt", "a", pBuf);
 				xRtosSetDevice(devMASK_LFS_SL);
 			}
