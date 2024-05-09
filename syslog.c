@@ -67,7 +67,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
  *		SL_WARN() to inform on concerns such as values closely approaching threshold
  *		SL_ERR() for errors that the system can/will recover from automatically
  *		SL_CRIT/ALRT/EMER() reserved for unrecoverable errors that should result in a system restart
- */
+*/
 
 #include "hal_platform.h"
 
@@ -140,18 +140,19 @@ SemaphoreHandle_t SL_NetMux = 0, SL_VarMux = 0;
  * could flood the IP stack and cause watchdog timeouts. Even if the timeout is changed from 5 to 10
  * seconds the crash can still occur. In order to minimise load on the IP stack the minimum severity
  * level should be set to NOTICE.
- */
+*/
 
 /**
  * @brief	establish connection to the selected syslog host
  * @return	1 if successful else 0
- */
+*/
 static int IRAM_ATTR xSyslogConnect(void) {
 	if ((xTaskGetSchedulerState() != taskSCHEDULER_RUNNING) ||
 		(xRtosWaitStatus(flagLX_STA, pdMS_TO_TICKS(20)) == 0)) {
 		return 0;
 	}
-	if (sCtx.sd > 0) return 1;
+	if (sCtx.sd > 0)
+		return 1;
 	sCtx.pHost = HostInfo[ioB2GET(ioHostSLOG)].pName;
 	IF_myASSERT(debugPARAM, sCtx.pHost);
 	sCtx.sa_in.sin_family = AF_INET;
@@ -161,7 +162,9 @@ static int IRAM_ATTR xSyslogConnect(void) {
 	sCtx.d = (netx_dbg_t){.sl = 1};
 	int iRV = xNetOpen(&sCtx);
 	if (iRV >= erSUCCESS) {
-		if (xNetSetRecvTO(&sCtx, flagXNET_NONBLOCK) >= erSUCCESS) return 1;
+		if (xNetSetRecvTO(&sCtx, flagXNET_NONBLOCK) >= erSUCCESS) {
+			return 1;
+		}
 	}
 	xNetClose(&sCtx);
 	return 0;
@@ -169,16 +172,23 @@ static int IRAM_ATTR xSyslogConnect(void) {
 
 /**
  * @brief	de-initialise the SysLog module
- */
+*/
 static void IRAM_ATTR vSyslogDisConnect(void) {
 	close(sCtx.sd);
 	sCtx.sd = -1;
 }
 
+/**
+ * 
+*/
 void vSyslogFileCheckSize(void) {
 	ssize_t Size = halSTORAGE_FileGetSize("/syslog.txt");
-	if (Size < 0) return;
-	if (Size < 10240) { xRtosSetDevice(devMASK_LFS_SL); return; }
+	if (Size < 0)
+		return;
+	if (Size < 10240) {
+		xRtosSetDevice(devMASK_LFS_SL); 
+		return;
+	}
 	unlink("/syslog.txt");
 	xRtosClearDevice(devMASK_LFS_SL);
 }
@@ -275,7 +285,7 @@ static void IRAM_ATTR xSyslogSendMessage(int PRI, tsz_t *psUTC, int McuID,
  * @param[in]	Priority and MsgID as defined by RFC
  * @param[in]	format string and parameters as per normal printf()
  * @return		number of characters sent to server
- */
+*/
 void IRAM_ATTR xvSyslog(int Level, const char *MsgID, const char *format, va_list vaList) {
 	u8_t MsgPRI = Level % 8; // ANY message PRI/level > ioSLOGhi value WILL be discarded
 	if (MsgPRI > ioB3GET(ioSLOGhi)) return;
@@ -290,7 +300,7 @@ void IRAM_ATTR xvSyslog(int Level, const char *MsgID, const char *format, va_lis
 		while (*pcTmp) {
 			if (*pcTmp == CHR_SPACE) *pcTmp = CHR_UNDERSCORE;
 			++pcTmp;
-		} */
+		}*/
 	}
 	if (RunTime == 0ULL) {
 		RunTime = sTSZ.usecs = (u64_t)esp_log_timestamp() * (u64_t)MICROS_IN_MILLISEC;
@@ -356,7 +366,7 @@ void IRAM_ATTR xvSyslog(int Level, const char *MsgID, const char *format, va_lis
  * @param[in]	format string and parameters as per normal printf()
  * @param[out]	none
  * @return		number of characters displayed(if only to console) or send(if to server)
- */
+*/
 void IRAM_ATTR vSyslog(int Level, const char *MsgID, const char *format, ...) {
 	va_list vaList;
 	va_start(vaList, format);
@@ -376,7 +386,7 @@ int IRAM_ATTR xSyslogError(const char *pcFN, int iRV) {
 
 /**
  * @brief	report syslog related information
- */
+*/
 void vSyslogReport(report_t *psR) {
 	if (sCtx.sd > 0) {
 		xNetReport(psR, &sCtx, "SLOG", 0, 0, 0);
