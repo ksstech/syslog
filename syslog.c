@@ -237,7 +237,8 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t *psUTC, int McuID, char
 		wprintfx(NULL, "%s", ConsoleBuf);
 	} else {
 		// If APPSTAGE not yet set, cannot send to Syslog host NOR to LFS file
-		if (allSYSFLAGS(sfAPPSTAGE) == 0) return;
+		if (allSYSFLAGS(sfAPPSTAGE) == 0)
+			return;
 		if (!nameSTA[0])
 			strcpy(nameSTA, "unknown");					// very early message, WIFI not initialized
 		int xLen = snprintfx(pBuf, SL_SIZEBUF, formatRFC5424, PRI, psUTC, nameSTA, McuID, ProcID, MsgID);
@@ -296,11 +297,6 @@ void IRAM_ATTR xvSyslog(int Level, const char *MsgID, const char *format, va_lis
 		ProcID = (char *)DRAM_STR("preX");
 	} else {
 		ProcID = pcTaskGetName(NULL);
-	/*	char * pcTmp  = ProcID;
-		while (*pcTmp) {
-			if (*pcTmp == CHR_SPACE) *pcTmp = CHR_UNDERSCORE;
-			++pcTmp;
-		}*/
 	}
 	if (RunTime == 0ULL) {
 		RunTime = sTSZ.usecs = (u64_t)esp_log_timestamp() * (u64_t)MICROS_IN_MILLISEC;
