@@ -159,7 +159,7 @@ static int IRAM_ATTR xSyslogConnect(void) {
 	sCtx.sa_in.sin_port = htons(IP_PORT_SYSLOG_UDP);
 	sCtx.type = SOCK_DGRAM;
 	sCtx.flags = SO_REUSEADDR;
-	sCtx.d = (netx_dbg_t){.sl = 1};
+	sCtx.bSyslog = 1;
 	int iRV = xNetOpen(&sCtx);
 	if (iRV >= erSUCCESS) {
 		if (xNetSetRecvTO(&sCtx, flagXNET_NONBLOCK) >= erSUCCESS) {
