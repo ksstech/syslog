@@ -154,7 +154,7 @@ static int IRAM_ATTR xSyslogConnect(void) {
 	if (sCtx.sd > 0)
 		return 1;
 	sCtx.pHost = HostInfo[ioB2GET(ioHostSLOG)].pName;
-	IF_myASSERT(debugPARAM, sCtx.pHost);
+	IF_myASSERT(debugTRACK, sCtx.pHost);
 	sCtx.sa_in.sin_family = AF_INET;
 	sCtx.sa_in.sin_port = htons(IP_PORT_SYSLOG_UDP);
 	sCtx.type = SOCK_DGRAM;
