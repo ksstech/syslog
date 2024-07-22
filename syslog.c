@@ -267,7 +267,7 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t *psUTC, int McuID, char
 				pBuf[xLen] = CHR_NUL;					// and terminate
 			}
 			if (xRtosCheckDevice(devMASK_LFS)) { 		// L2+3 STA down, append to file...
-				halFS_Write("syslog.txt", "a", pBuf);
+				halSTORAGE_FileWrite("syslog.txt", "a", pBuf);
 				xRtosSetDevice(devMASK_LFS_SL);
 			}
 		}
