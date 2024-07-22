@@ -117,7 +117,7 @@ static netx_t sCtx = {0};
 static u32_t RptCRC = 0, RptCNT = 0;
 static u64_t RptRUN = 0, RptUTC = 0;
 static u8_t RptPRI = 0;
-static char *RptTask, *RptFunc;
+static const char *RptTask, *RptFunc;
 static char SyslogColors[8] = {
 	colourFG_RED,					// Emergency
 	colourFG_RED,					// Alert
@@ -222,7 +222,7 @@ void vSyslogFileSend(void) {
 	IF_myASSERT(debugRESULT, iRV == 0);
 }
 
-static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t *psUTC, int McuID, char *ProcID, const char *MsgID, 
+static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t *psUTC, int McuID, const char *ProcID, const char *MsgID, 
 										  char *pBuf, const char *format, va_list vaList) {
 	const TickType_t tWait = pdMS_TO_TICKS(1000);
 	int iRV;
@@ -274,8 +274,8 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t *psUTC, int McuID, char
 	}
 }
 
-static void IRAM_ATTR xSyslogSendMessage(int PRI, tsz_t *psUTC, int McuID,
-										 char *ProcID, const char *MsgID, char *pBuf, const char *format, ...) {
+static void IRAM_ATTR xSyslogSendMessage(int PRI, tsz_t *psUTC, int McuID, const char *ProcID,
+										 const char *MsgID, char *pBuf, const char *format, ...) {
 	va_list vaList;
 	va_start(vaList, format);
 	xvSyslogSendMessage(PRI, psUTC, McuID, ProcID, MsgID, pBuf, format, vaList);
@@ -323,8 +323,8 @@ void IRAM_ATTR xvSyslog(int Level, const char *MsgID, const char *format, va_lis
 		RptCNT = 0;
 		u64_t TmpRUN = RptRUN;
 		u64_t TmpUTC = RptUTC;
-		char *TmpTask = RptTask;
-		char *TmpFunc = RptFunc;
+		const char *TmpTask = RptTask;
+		const char *TmpFunc = RptFunc;
 		xRtosSemaphoreGive(&SL_VarMux);
 		tsz_t TmpTSZ = {.pTZ = sTSZ.pTZ};
 
