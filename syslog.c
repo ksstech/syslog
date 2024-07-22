@@ -136,11 +136,10 @@ SemaphoreHandle_t SL_NetMux = 0, SL_VarMux = 0;
 
 // ###################################### Public functions #########################################
 
-/* In the case where the log level is set to DEBUG in ESP-IDF the volume of messages being generated
- * could flood the IP stack and cause watchdog timeouts. Even if the timeout is changed from 5 to 10
- * seconds the crash can still occur. In order to minimise load on the IP stack the minimum severity
- * level should be set to NOTICE.
-*/
+// In the case where the log level is set to DEBUG in ESP-IDF the volume of messages being generated
+// could flood the IP stack and cause watchdog timeouts. Even if the timeout is changed from 5 to 10
+// seconds the crash can still occur. In order to minimise load on the IP stack the minimum severity
+// level should be set to NOTICE.
 
 /**
  * @brief	establish connection to the selected syslog host
