@@ -194,7 +194,8 @@ void vSyslogFileCheckSize(void) {
 }
 
 void vSyslogFileSend(void) {
-	if (xSyslogConnect() == 0) return;
+	if (xSyslogConnect() == 0)
+		return;
 	int iRV = erSUCCESS;
 	xRtosSemaphoreTake(&LFSmux, portMAX_DELAY);
 	FILE *fp = fopen("syslog.txt", "r");
@@ -204,11 +205,13 @@ void vSyslogFileSend(void) {
 			char *pBuf = malloc(SL_SIZEBUF);
 			while (1) {
 				char *pRV = fgets(pBuf, SL_SIZEBUF, fp);
-				if (pRV != pBuf) break;
+				if (pRV != pBuf)
+					break;
 				int xLen = strlen(pBuf);
-				if (pBuf[xLen - 1] == CHR_LF) pBuf[--xLen] = CHR_NUL; // remove terminating [CR]LF
+				if (pBuf[xLen - 1] == CHR_LF)
+					pBuf[--xLen] = CHR_NUL;				// remove terminating [CR]LF
 				iRV = sendto(sCtx.sd, pBuf, xLen, sCtx.flags, &sCtx.sa, sizeof(sCtx.sa_in));
-				vTaskDelay(pdMS_TO_TICKS(10)); // ensure WDT gets fed....
+				vTaskDelay(pdMS_TO_TICKS(10));			// ensure WDT gets fed....
 			}
 			free(pBuf);
 			xRtosClearDevice(devMASK_LFS_SL);
@@ -239,7 +242,7 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t *psUTC, int McuID, char
 		// If APPSTAGE not yet set, cannot send to Syslog host NOR to LFS file
 		if (allSYSFLAGS(sfAPPSTAGE) == 0)
 			return;
-		if (!nameSTA[0])
+		if (nameSTA[0] == 0)
 			strcpy(nameSTA, "unknown");					// very early message, WIFI not initialized
 		int xLen = snprintfx(pBuf, SL_SIZEBUF, formatRFC5424, PRI, psUTC, nameSTA, McuID, ProcID, MsgID);
 		xLen += vsnprintfx(pBuf + xLen, SL_SIZEBUF - xLen - 1, format, vaList); // leave space for LF
@@ -289,7 +292,6 @@ static void IRAM_ATTR xSyslogSendMessage(int PRI, tsz_t *psUTC, int McuID,
 */
 void IRAM_ATTR xvSyslog(int Level, const char *MsgID, const char *format, va_list vaList) {
 	u8_t MsgPRI = Level % 8; // ANY message PRI/level > ioSLOGhi value WILL be discarded
-	if (MsgPRI > ioB3GET(ioSLOGhi)) return;
 	MsgID = (MsgID == NULL) ? "null" : (*MsgID == 0) ? "empty"
 													 : MsgID;
 	char *ProcID; // Handle state of scheduler and obtain the task name
@@ -297,6 +299,8 @@ void IRAM_ATTR xvSyslog(int Level, const char *MsgID, const char *format, va_lis
 		ProcID = (char *)DRAM_STR("preX");
 	} else {
 		ProcID = pcTaskGetName(NULL);
+	if (MsgPRI > ioB3GET(ioSLOGhi)) {
+		return;
 	}
 	if (RunTime == 0ULL) {
 		RunTime = sTSZ.usecs = (u64_t)esp_log_timestamp() * (u64_t)MICROS_IN_MILLISEC;

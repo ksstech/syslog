@@ -117,7 +117,7 @@ extern "C" {
 #define	IF_SL_DBG(tst, fmt, ...)	if (tst) SL_DBG(fmt, ##__VA_ARGS__)
 
 #define __ERROR(err)				return xSyslogError(__FUNCTION__, err)
-#define SL_ERROR(err)				do { if (SL_SEV_ERROR <= SL_LEVEL_MAX) __ERROR(err);} while(0)
+#define SL_ERROR(err) do { if (SL_SEV_ERROR <= SL_LEVEL_MAX) __ERROR(err); } while(0)
 #define IF_SL_ERROR(tst, err)		if (tst) SL_ERROR(err)
 
 // ###################################### Global variables #########################################
