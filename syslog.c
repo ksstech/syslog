@@ -301,11 +301,7 @@ void IRAM_ATTR xvSyslog(int Level, const char *MsgID, const char *format, va_lis
 	if (RunTime == 0ULL) {
 		RunTime = sTSZ.usecs = (u64_t)esp_log_timestamp() * (u64_t)MICROS_IN_MILLISEC;
 	}
-	#ifdef CONFIG_FREERTOS_UNICORE
-	int McuID = 0; // default in case not ESP32 or scheduler not running
-	#else
 	int McuID = esp_cpu_get_core_id();
-	#endif
 
 	xRtosSemaphoreTake(&SL_VarMux, portMAX_DELAY);
 	u32_t MsgCRC = 0;
