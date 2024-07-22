@@ -292,7 +292,6 @@ static void IRAM_ATTR xSyslogSendMessage(int PRI, tsz_t *psUTC, int McuID,
 */
 void IRAM_ATTR xvSyslog(int Level, const char *MsgID, const char *format, va_list vaList) {
 	u8_t MsgPRI = Level % 8; // ANY message PRI/level > ioSLOGhi value WILL be discarded
-	MsgID = (MsgID == NULL) ? "null" : (*MsgID == 0) ? "empty"
 													 : MsgID;
 	char *ProcID; // Handle state of scheduler and obtain the task name
 	if (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) {
@@ -302,6 +301,7 @@ void IRAM_ATTR xvSyslog(int Level, const char *MsgID, const char *format, va_lis
 	if (MsgPRI > ioB3GET(ioSLOGhi)) {
 		return;
 	}
+	MsgID = (MsgID == NULL) ? "null" : (*MsgID == 0) ? "empty" : MsgID;
 	if (RunTime == 0ULL) {
 		RunTime = sTSZ.usecs = (u64_t)esp_log_timestamp() * (u64_t)MICROS_IN_MILLISEC;
 	}
