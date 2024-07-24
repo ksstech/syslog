@@ -74,7 +74,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #include "certificates.h"
 #include "hal_network.h"
 #include "hal_options.h"
-#include "hal_storage.h"
+#include "hal_flash.h"
 #include "printfx.h" // +x_definitions +stdarg +stdint +stdio
 #include "socketsX.h"
 #include "syslog.h"
@@ -181,7 +181,7 @@ static void IRAM_ATTR vSyslogDisConnect(void) {
  * 
 */
 void vSyslogFileCheckSize(void) {
-	ssize_t Size = halSTORAGE_FileGetSize("/syslog.txt");
+	ssize_t Size = halFlashFileGetSize("/syslog.txt");
 	if (Size < 0)
 		return;
 	if (Size < 10240) {
@@ -266,7 +266,7 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t *psUTC, int McuID, cons
 				pBuf[xLen] = CHR_NUL;					// and terminate
 			}
 			if (xRtosCheckDevice(devMASK_LFS)) { 		// L2+3 STA down, append to file...
-				halSTORAGE_FileWrite("syslog.txt", "a", pBuf);
+				halFlashFileWrite("syslog.txt", "a", pBuf);
 				xRtosSetDevice(devMASK_LFS_SL);
 			}
 		}
