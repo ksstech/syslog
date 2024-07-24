@@ -116,7 +116,7 @@ extern "C" {
 #define	IF_SL_INFO(tst, fmt, ...)	if (tst) SL_INFO(fmt, ##__VA_ARGS__)
 #define	IF_SL_DBG(tst, fmt, ...)	if (tst) SL_DBG(fmt, ##__VA_ARGS__)
 
-#define SL_ERROR(err) 			xSyslogError(__FUNCTION__, err)
+#define SL_ERROR(err) 				xSyslogError(__FUNCTION__, err)
 
 // ###################################### Global variables #########################################
 
