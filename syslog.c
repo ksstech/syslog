@@ -70,12 +70,12 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 */
 
 #include "hal_platform.h"
-
 #include "certificates.h"
 #include "hal_network.h"
 #include "hal_options.h"
 #include "hal_flash.h"
-#include "printfx.h" // +x_definitions +stdarg +stdint +stdio
+#include "hal_stdio.h"
+#include "printfx.h"
 #include "socketsX.h"
 #include "syslog.h"
 #include "x_errors_events.h"
@@ -128,7 +128,6 @@ static char SyslogColors[8] = {
 	colourFG_MAGENTA,				// Info
 	colourFG_CYAN,					// Debug
 };
-static char ConsoleBuf[SL_SIZEBUF];
 
 // ###################################### Global variables #########################################
 
@@ -228,15 +227,16 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t *psUTC, int McuID, cons
 	int iRV;
 	if (pBuf == NULL) {
 		report_t sRpt = {
-			.pcBuf = ConsoleBuf, 
-			.Size = repSIZE_SET(0,0,0,0,sgrANSI,0,SL_SIZEBUF),
+			.pcBuf = NULL, 
+			.Size = repSIZE_SET(0,0,0,1,sgrANSI,0,0),
 			.sFM.u32Val = 0,
 		};
 		report_t * psR = &sRpt;
+		xRtosSemaphoreTake(&shUARTmux, portMAX_DELAY);
 		wprintfx(psR, formatCONSOLE, xpfSGR(0,0,SyslogColors[PRI],0), psUTC->usecs, McuID, ProcID, MsgID);
 		wvprintfx(psR, format, vaList);
 		wprintfx(psR, formatTERMINATE, xpfSGR(0,0,attrRESET,0));
-		wprintfx(NULL, "%s", ConsoleBuf);
+		xRtosSemaphoreGive(&shUARTmux);
 	} else {
 		// If APPSTAGE not yet set, cannot send to Syslog host NOR to LFS file
 		if (allSYSFLAGS(sfAPPSTAGE) == 0)
@@ -258,10 +258,9 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t *psUTC, int McuID, cons
 					vSyslogDisConnect();
 				}
 			}
-		}
+		} else {
 		#if (halUSE_LITTLEFS == 1)
-		else {
-			if (pBuf[xLen - 1] != CHR_LF) {
+			if (pBuf[xLen-1] != CHR_LF) {
 				pBuf[xLen++] = CHR_LF;					// append LF if required
 				pBuf[xLen] = CHR_NUL;					// and terminate
 			}
@@ -269,8 +268,8 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t *psUTC, int McuID, cons
 				halFlashFileWrite("syslog.txt", "a", pBuf);
 				xRtosSetDevice(devMASK_LFS_SL);
 			}
-		}
 		#endif
+		}
 	}
 }
 
@@ -366,13 +365,18 @@ void IRAM_ATTR vSyslog(int Level, const char *MsgID, const char *format, ...) {
 }
 
 int IRAM_ATTR xSyslogError(const char *pcFN, int iRV) {
-	#ifdef ESP_PLATFORM
-	vSyslog(SL_SEV_ERROR, pcFN, "iRV=%d (%s)", iRV, esp_err_to_name(iRV));
-	return (iRV > 0) ? -iRV : iRV;
+#ifdef ESP_PLATFORM
+	#ifdef LWIP_PROVIDE_ERRNO
+	const char * pccMsg = INRANGE(EPERM, iRV, ENOTRECOVERABLE) ? lwip_strerr(iRV) : esp_err_to_name(iRV);
 	#else
+	const char * pccMsg = esp_err_to_name(iRV);
+	#endif
+	vSyslog(SL_SEV_ERROR, pcFN, "iRV=%d (%s)", iRV, pccMsg);
+	return (iRV > 0) ? -iRV : iRV;
+#else
 	vSyslog(SL_SEV_ERROR, pcFN, "iRV=0x%X (%s)", iRV, strerr(iRV));
 	return iRV;
-	#endif
+#endif
 }
 
 /**

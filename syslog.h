@@ -120,7 +120,7 @@ extern "C" {
 
 // ###################################### Global variables #########################################
 
-extern SemaphoreHandle_t SL_NetMux, SL_VarMux;
+extern SemaphoreHandle_t SL_NetMux, SL_VarMux;			// public to enable semaphore un/lock tracking
 
 // ###################################### function prototypes ######################################
 
