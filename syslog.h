@@ -10,9 +10,6 @@
 extern "C" {
 #endif
 
-// ########################################### Macros #############################################
-
-
 // ############################# Facilities & Severities definitions ###############################
 
 #define		SL_FAC_KERNEL			0			// kernel messages
@@ -49,54 +46,15 @@ extern "C" {
 #define		SL_SEV_INFO				6			// Informational: informational messages
 #define		SL_SEV_DEBUG			7			// Debug: debug-level messages
 
+#ifndef SL_LEVEL_MAX
+	#define SL_LEVEL_MAX			7
+#endif
+
 // ############################## Syslog formatting/calling macros #################################
 
-/* ESP-IDF map to SysLog
- *	0/None		->	0/Emergency
- *					1/Alert
- *					2/Critical
- *	1/Error		->	3/Error
- *	2/Warning	->	4/Warning
- *	3/Info		->	5/Notice
- *	4/Debug		->	6/Info
- *	5/Verbose	->	7/Debug
- */
-#ifndef CONFIG_LOG_DEFAULT_LEVEL
-	#define	CONFIG_LOG_DEFAULT_LEVEL	2
-#endif
-
-#ifndef CONFIG_LOG_MAXIMUM_LEVEL
-	#define	CONFIG_LOG_MAXIMUM_LEVEL	4
-#endif
-
-#if (CONFIG_LOG_DEFAULT_LEVEL > 0)	
-	#define	SL_LEV_DEF				(CONFIG_LOG_DEFAULT_LEVEL + 2)
-#else
-	#define	SL_LEV_DEF				(CONFIG_LOG_DEFAULT_LEVEL)
-#endif
-
-#if (CONFIG_LOG_MAXIMUM_LEVEL > 0)
-	#define	SL_LEVEL_MAX			(CONFIG_LOG_MAXIMUM_LEVEL + 2)
-#else
-	#define	SL_LEVEL_MAX			(CONFIG_LOG_MAXIMUM_LEVEL)
-#endif
-
-#if (SL_LEV_DEF < 4) && (configPRODUCTION == 0)
-	#define SL_LEV_CONSOLE			(SL_LEV_DEF+2)
-	#define SL_LEV_HOST				(SL_LEV_DEF+1)
-#elif (SL_LEV_DEF < 5) && (configPRODUCTION == 0)
-	#define SL_LEV_CONSOLE			(SL_LEV_DEF+1)
-	#define SL_LEV_HOST				(SL_LEV_DEF)
-#else
-	#define SL_LEV_CONSOLE			(SL_LEV_DEF)
-	#define SL_LEV_HOST				(SL_LEV_DEF)
-#endif
-
-#define SL_LOG(lvl, fmt, ...) 		do { 													\
-										if ((lvl) <= SL_LEVEL_MAX) {						\
-											vSyslog(lvl,__FUNCTION__,fmt,##__VA_ARGS__);	\
-										}													\
-									} while(0)
+#define SL_LOG(l,f,...) 			do { if ((l) <= SL_LEVEL_MAX) vSyslog(l,__FUNCTION__,f,##__VA_ARGS__); } while(0)
+#define SL_ERROR(e) 				xSyslogError(__FUNCTION__, e)
+#define IF_SL_ERROR(t,e) 			if (t) xSyslogError(__FUNCTION__, e)
 
 #define	SL_EMER(fmt, ...)			SL_LOG(SL_SEV_EMERGENCY, fmt, ##__VA_ARGS__)
 #define	SL_ALRT(fmt, ...)			SL_LOG(SL_SEV_ALERT, fmt, ##__VA_ARGS__)
@@ -116,9 +74,6 @@ extern "C" {
 #define	IF_SL_INFO(tst, fmt, ...)	if (tst) SL_INFO(fmt, ##__VA_ARGS__)
 #define	IF_SL_DBG(tst, fmt, ...)	if (tst) SL_DBG(fmt, ##__VA_ARGS__)
 
-#define SL_ERROR(err) 				xSyslogError(__FUNCTION__, err)
-#define IF_SL_ERROR(tst,err) 		if (tst) xSyslogError(__FUNCTION__, err)
-
 // ###################################### Global variables #########################################
 
 extern SemaphoreHandle_t SL_NetMux, SL_VarMux;			// public to enable semaphore un/lock tracking
@@ -130,6 +85,7 @@ void vSyslogFileCheckSize(void);
 void xvSyslog(int Priority, const char * MsgID, const char * format, va_list args);
 void vSyslog(int Priority, const char * MsgID, const char * format, ...);
 int xSyslogError(const char * pcFN, int eCode);
+
 struct report_t;
 void vSyslogReport(struct report_t * psR);
 
