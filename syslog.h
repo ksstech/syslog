@@ -10,6 +10,10 @@
 extern "C" {
 #endif
 
+// ########################################### macros ##############################################
+
+#define SL_MAX_LEN_MESSAGE			1024
+
 // ############################# Facilities & Severities definitions ###############################
 
 #define		SL_FAC_KERNEL			0			// kernel messages
@@ -52,7 +56,8 @@ extern "C" {
 
 // ############################## Syslog formatting/calling macros #################################
 
-#define SL_LOG(l,f,...) 			do { if ((l) <= SL_LEVEL_MAX) vSyslog(l,__FUNCTION__,f,##__VA_ARGS__); } while(0)
+#define SL_PRI(f,s)					((f << 3) | (s & 0x07))
+#define SL_LOG(l,f,...) 			do { if (((l & 7)) <= SL_LEVEL_MAX) vSyslog(l,__FUNCTION__,f,##__VA_ARGS__); } while(0)
 #define SL_ERROR(e) 				xSyslogError(__FUNCTION__, e)
 #define IF_SL_ERROR(t,e) 			if (t) xSyslogError(__FUNCTION__, e)
 

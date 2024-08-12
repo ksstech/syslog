@@ -83,7 +83,7 @@ UTF-8-STRING = *OCTET ; UTF-8 string as specified ; in RFC 3629
 #include <errno.h>
 
 #ifdef ESP_PLATFORM
-#include "esp_log.h"
+	#include "esp_log.h"
 #endif
 
 // ####################################### Macros ##################################################
@@ -221,7 +221,7 @@ void vSyslogFileSend(void) {
 	IF_myASSERT(debugRESULT, iRV == 0);
 }
 
-static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t *psUTC, int McuID, const char *ProcID, const char *MsgID, 
+static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID, const char *ProcID, const char *MsgID, 
 										  char *pBuf, const char *format, va_list vaList) {
 	const TickType_t tWait = pdMS_TO_TICKS(1000);
 	int iRV;
@@ -233,7 +233,7 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t *psUTC, int McuID, cons
 		};
 		report_t * psR = &sRpt;
 		xRtosSemaphoreTake(&shUARTmux, portMAX_DELAY);
-		wprintfx(psR, formatCONSOLE, xpfSGR(0,0,SyslogColors[PRI],0), psUTC->usecs, McuID, ProcID, MsgID);
+		wprintfx(psR, formatCONSOLE, xpfSGR(0,0,SyslogColors[MsgPRI & 0x07],0), psUTC->usecs, McuID, ProcID, MsgID);
 		wvprintfx(psR, format, vaList);
 		wprintfx(psR, formatTERMINATE, xpfSGR(0,0,attrRESET,0));
 		xRtosSemaphoreGive(&shUARTmux);
@@ -243,7 +243,7 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t *psUTC, int McuID, cons
 			return;
 		if (nameSTA[0] == 0)
 			strcpy(nameSTA, "unknown");					// very early message, WIFI not initialized
-		int xLen = snprintfx(pBuf, SL_SIZEBUF, formatRFC5424, PRI, psUTC, nameSTA, McuID, ProcID, MsgID);
+		int xLen = snprintfx(pBuf, SL_SIZEBUF, formatRFC5424, MsgPRI, psUTC, nameSTA, McuID, ProcID, MsgID);
 		xLen += vsnprintfx(pBuf + xLen, SL_SIZEBUF - xLen - 1, format, vaList); // leave space for LF
 
 		if (xSyslogConnect()) {							// Scheduler running, LxSTA up and connected
@@ -273,11 +273,11 @@ static void IRAM_ATTR xvSyslogSendMessage(int PRI, tsz_t *psUTC, int McuID, cons
 	}
 }
 
-static void IRAM_ATTR xSyslogSendMessage(int PRI, tsz_t *psUTC, int McuID, const char *ProcID,
+static void IRAM_ATTR xSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID, const char *ProcID,
 										 const char *MsgID, char *pBuf, const char *format, ...) {
 	va_list vaList;
 	va_start(vaList, format);
-	xvSyslogSendMessage(PRI, psUTC, McuID, ProcID, MsgID, pBuf, format, vaList);
+	xvSyslogSendMessage(MsgPRI, psUTC, McuID, ProcID, MsgID, pBuf, format, vaList);
 	va_end(vaList);
 }
 
@@ -288,11 +288,9 @@ static void IRAM_ATTR xSyslogSendMessage(int PRI, tsz_t *psUTC, int McuID, const
  * @param[in]	format string and parameters as per normal printf()
  * @return		number of characters sent to server
 */
-void IRAM_ATTR xvSyslog(int Level, const char *MsgID, const char *format, va_list vaList) {
-	u8_t MsgPRI = Level % 8; // ANY message PRI/level > ioSLOGhi value WILL be discarded
-	if (MsgPRI > ioB3GET(ioSLOGhi)) {
+void IRAM_ATTR xvSyslog(int MsgPRI, const char *MsgID, const char *format, va_list vaList) {
+	if ((MsgPRI & 0x07) > ioB3GET(ioSLOGhi))
 		return;
-	}
 	MsgID = (MsgID == NULL) ? "null" : (*MsgID == 0) ? "empty" : MsgID;
 	// Handle state of scheduler and obtain the task name
 	const char *ProcID = (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) ? DRAM_STR("preX") : pcTaskGetName(NULL);
@@ -306,9 +304,9 @@ void IRAM_ATTR xvSyslog(int Level, const char *MsgID, const char *format, va_lis
 	int xLen = crcprintfx(&MsgCRC, DRAM_STR("%s %s "), ProcID, MsgID); // "Task Function "
 	xLen += vcrcprintfx(&MsgCRC, format, vaList);					   // "Task Function message parameters etc"
 
-	if (MsgCRC == RptCRC && MsgPRI == RptPRI) {					  // CRC & PRI same as previous message ?
-		++RptCNT;		  // Yes, increment the repeat counter
-		RptRUN = RunTime; // save timestamps of latest repeat
+	if (MsgCRC == RptCRC && MsgPRI == RptPRI) {	  		// CRC & PRI same as previous message ?
+		++RptCNT;		  								// Yes, increment the repeat counter
+		RptRUN = RunTime;								// save timestamps of latest repeat
 		RptUTC = sTSZ.usecs;
 		RptTask = ProcID;
 		RptFunc = (char *)MsgID;
@@ -329,17 +327,17 @@ void IRAM_ATTR xvSyslog(int Level, const char *MsgID, const char *format, va_lis
 
 		// Handle console message(s)
 		if (TmpCNT > 0) {
-			TmpTSZ.usecs = TmpRUN; // repeated message + count
+			TmpTSZ.usecs = TmpRUN;						// repeated message + count
 			xSyslogSendMessage(TmpPRI, &TmpTSZ, McuID, TmpTask, TmpFunc, NULL, formatREPEATED, TmpCNT);
 		}
-		TmpTSZ.usecs = RunTime; // New message
+		TmpTSZ.usecs = RunTime;							// New message
 		xvSyslogSendMessage(MsgPRI, &TmpTSZ, McuID, ProcID, MsgID, NULL, format, vaList);
 
 		// Handle host message(s)
-		if (MsgPRI <= ioB3GET(ioSLhost)) { // filter based on higher priorities
+		if ((MsgPRI & 7) <= ioB3GET(ioSLhost)) {		// filter based on higher priorities
 			char *pBuf = malloc(SL_SIZEBUF);
 			if (TmpCNT > 0) {
-				TmpTSZ.usecs = TmpUTC; // repeated message + count
+				TmpTSZ.usecs = TmpUTC;					// repeated message + count
 				xSyslogSendMessage(TmpPRI, &TmpTSZ, McuID, TmpTask, TmpFunc, pBuf, formatREPEATED, TmpCNT);
 			}
 			xvSyslogSendMessage(MsgPRI, &sTSZ, McuID, ProcID, MsgID, pBuf, format, vaList);
@@ -357,26 +355,16 @@ void IRAM_ATTR xvSyslog(int Level, const char *MsgID, const char *format, va_lis
  * @param[out]	none
  * @return		number of characters displayed(if only to console) or send(if to server)
 */
-void IRAM_ATTR vSyslog(int Level, const char *MsgID, const char *format, ...) {
+void IRAM_ATTR vSyslog(int MsgPRI, const char *MsgID, const char *format, ...) {
 	va_list vaList;
 	va_start(vaList, format);
-	xvSyslog(Level, MsgID, format, vaList);
+	xvSyslog(MsgPRI, MsgID, format, vaList);
 	va_end(vaList);
 }
 
 int IRAM_ATTR xSyslogError(const char *pcFN, int iRV) {
-#ifdef ESP_PLATFORM
-	#ifdef LWIP_PROVIDE_ERRNO
-	const char * pccMsg = INRANGE(EPERM, iRV, ENOTRECOVERABLE) ? lwip_strerr(iRV) : esp_err_to_name(iRV);
-	#else
-	const char * pccMsg = esp_err_to_name(iRV);
-	#endif
-	vSyslog(SL_SEV_ERROR, pcFN, "iRV=%d (%s)", iRV, pccMsg);
+	vSyslog(SL_SEV_ERROR, pcFN, "iRV=%d (%s)", iRV, pcStrError(iRV));
 	return (iRV > 0) ? -iRV : iRV;
-#else
-	vSyslog(SL_SEV_ERROR, pcFN, "iRV=0x%X (%s)", iRV, strerr(iRV));
-	return iRV;
-#endif
 }
 
 /**
