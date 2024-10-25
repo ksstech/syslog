@@ -58,6 +58,7 @@
 
 #define PAPERTRAIL_HOST     "logs5.papertrailapp.com"
 #define PAPERTRAIL_PORT     28535
+#define UNKNOWNMACAD        "#UnknownMAC#"
 
 // ######################################### Structures ############################################
 // ####################################### Local variables #########################################
@@ -153,6 +154,8 @@ void vSyslogFileSend(void) {
 			while (1) {
 				char *pRV = fgets(pBuf, SL_SIZEBUF, fp);
 				if (pRV != pBuf) break;                 // nothing read or error, exit
+                char * pTmp = strstr(pRV, UNKNOWNMACAD);    // Check if early message, no MAC address
+                if (pTmp != NULL) memcpy(pTmp, idSTA, 12);  // if so, replace with MAC/hostname...
 				int xLen = strlen(pBuf);
 				if (pBuf[xLen - 1] == CHR_LF)
 					pBuf[--xLen] = CHR_NUL;				// remove terminating [CR]LF
@@ -183,10 +186,9 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID, c
 		xRtosSemaphoreGive(&shUARTmux);
 	} else {
 		// If APPSTAGE not yet set, cannot send to Syslog host NOR to LFS file
-		if (nameSTA[0] == 0)
-			strcpy(nameSTA, "unknown");					// very early message, WIFI not initialized
-		int xLen = snprintfx(pBuf, SL_SIZEBUF, formatRFC5424, MsgPRI, psUTC, nameSTA, McuID, ProcID, MsgID);
 		if (allSYSFLAGS(sfAPPSTAGE) == 0) return;
+		if (idSTA[0] == 0) strcpy((char*)idSTA, UNKNOWNMACAD);	// very early message, WIFI not initialized
+		int xLen = snprintfx(pBuf, SL_SIZEBUF, formatRFC5424, MsgPRI, psUTC, idSTA, McuID, ProcID, MsgID);
 		xLen += vsnprintfx(pBuf + xLen, SL_SIZEBUF - xLen - 1, format, vaList); // leave space for LF
 
 		if (xSyslogConnect()) {							// Scheduler running, LxSTA up and connected
