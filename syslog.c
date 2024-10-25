@@ -98,8 +98,7 @@ static int IRAM_ATTR xSyslogConnect(void) {
 		(xRtosWaitStatus(flagLX_STA, pdMS_TO_TICKS(20)) == 0)) {
 		return 0;
 	}
-	if (sCtx.sd > 0)
-		return 1;
+	if (sCtx.sd > 0) return 1;                          // already connected, exit with status OK
     if (ioB2GET(ioHostSLOG) == hostLOG) {
     	sCtx.pHost = PAPERTRAIL_HOST;
 	    sCtx.sa_in.sin_port = htons(PAPERTRAIL_PORT);
