@@ -3,8 +3,8 @@
 /***************************************************************************************************
  * Theory of operation.
  *
- *	#1	ALL messages are sent to the console (if present)
- *	#2	Only messages with SEVerity <= ioSLOGhi will be logged to the syslog server
+ *	#1	Messages with SEVerity <= ioSLOGhi are sent to the console
+ *	#2	Messages with SEVerity <= ioSLhost will be logged to the syslog server
  *
  *	To minimise the impact on application size the SL_xxxx macros must be used to in/exclude levels of info.
  * 		SL_DBG() to control inclusion and display of DEBUG type information
