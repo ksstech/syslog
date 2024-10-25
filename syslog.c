@@ -105,11 +105,7 @@ static int IRAM_ATTR xSyslogConnect(void) {
 	sCtx.flags = SO_REUSEADDR;
 	sCtx.bSyslog = 1;
 	int iRV = xNetOpen(&sCtx);
-	if (iRV >= erSUCCESS) {
-		if (xNetSetRecvTO(&sCtx, flagXNET_NONBLOCK) >= erSUCCESS) {
-			return 1;
-		}
-	}
+	if (iRV >= erSUCCESS && xNetSetRecvTO(&sCtx, flagXNET_NONBLOCK) >= erSUCCESS) return 1;
 	xNetClose(&sCtx);
 	return 0;
 }
@@ -149,8 +145,7 @@ void vSyslogFileSend(void) {
 			char *pBuf = malloc(SL_SIZEBUF);
 			while (1) {
 				char *pRV = fgets(pBuf, SL_SIZEBUF, fp);
-				if (pRV != pBuf)
-					break;
+				if (pRV != pBuf) break;                 // nothing read or error, exit
 				int xLen = strlen(pBuf);
 				if (pBuf[xLen - 1] == CHR_LF)
 					pBuf[--xLen] = CHR_NUL;				// remove terminating [CR]LF
@@ -172,11 +167,7 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID, c
 	const TickType_t tWait = pdMS_TO_TICKS(1000);
 	int iRV;
 	if (pBuf == NULL) {
-		report_t sRpt = {
-			.pcBuf = NULL, 
-			.Size = repSIZE_SET(0,0,0,1,sgrANSI,0,0),
-			.sFM.u32Val = 0,
-		};
+		report_t sRpt = { .Size = repSIZE_SET(0,0,0,1,sgrANSI,0,0) };
 		report_t * psR = &sRpt;
 		xRtosSemaphoreTake(&shUARTmux, portMAX_DELAY);
 		wprintfx(psR, formatCONSOLE, xpfSGR(0,0,SyslogColors[MsgPRI & 0x07],0), psUTC->usecs, McuID, ProcID, MsgID);
@@ -185,11 +176,10 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID, c
 		xRtosSemaphoreGive(&shUARTmux);
 	} else {
 		// If APPSTAGE not yet set, cannot send to Syslog host NOR to LFS file
-		if (allSYSFLAGS(sfAPPSTAGE) == 0)
-			return;
 		if (nameSTA[0] == 0)
 			strcpy(nameSTA, "unknown");					// very early message, WIFI not initialized
 		int xLen = snprintfx(pBuf, SL_SIZEBUF, formatRFC5424, MsgPRI, psUTC, nameSTA, McuID, ProcID, MsgID);
+		if (allSYSFLAGS(sfAPPSTAGE) == 0) return;
 		xLen += vsnprintfx(pBuf + xLen, SL_SIZEBUF - xLen - 1, format, vaList); // leave space for LF
 
 		if (xSyslogConnect()) {							// Scheduler running, LxSTA up and connected
@@ -206,11 +196,11 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID, c
 			}
 		} else {
 		#if (halUSE_LITTLEFS == 1)
-			if (pBuf[xLen-1] != CHR_LF) {
-				pBuf[xLen++] = CHR_LF;					// append LF if required
-				pBuf[xLen] = CHR_NUL;					// and terminate
-			}
 			if (xRtosCheckDevice(devMASK_LFS)) { 		// L2+3 STA down, append to file...
+    			if (pBuf[xLen-1] != CHR_LF) {
+	    			pBuf[xLen++] = CHR_LF;				// append LF if required
+		    		pBuf[xLen] = CHR_NUL;				// and terminate
+			    }
 				halFlashFileWrite("syslog.txt", "a", pBuf);
 				xRtosSetDevice(devMASK_LFS_SL);
 			}
