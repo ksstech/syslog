@@ -56,6 +56,9 @@
 #define formatREPEATED DRAM_STR("Repeated %dx")
 #define formatTERMINATE DRAM_STR("%C\r\n")
 
+#define PAPERTRAIL_HOST     "logs5.papertrailapp.com"
+#define PAPERTRAIL_PORT     28535
+
 // ######################################### Structures ############################################
 // ####################################### Local variables #########################################
 
@@ -97,10 +100,15 @@ static int IRAM_ATTR xSyslogConnect(void) {
 	}
 	if (sCtx.sd > 0)
 		return 1;
-	sCtx.pHost = HostInfo[ioB2GET(ioHostSLOG)].pName;
-	IF_myASSERT(debugTRACK, sCtx.pHost);
+    if (ioB2GET(ioHostSLOG) == hostLOG) {
+    	sCtx.pHost = PAPERTRAIL_HOST;
+	    sCtx.sa_in.sin_port = htons(PAPERTRAIL_PORT);
+    } else {
+    	sCtx.pHost = HostInfo[ioB2GET(ioHostSLOG)].pName;
+	    IF_myASSERT(debugTRACK, sCtx.pHost);
+	    sCtx.sa_in.sin_port = htons(IP_PORT_SYSLOG_UDP);
+    }
 	sCtx.sa_in.sin_family = AF_INET;
-	sCtx.sa_in.sin_port = htons(IP_PORT_SYSLOG_UDP);
 	sCtx.type = SOCK_DGRAM;
 	sCtx.flags = SO_REUSEADDR;
 	sCtx.bSyslog = 1;
