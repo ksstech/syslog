@@ -170,9 +170,9 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID, c
 		report_t sRpt = { .Size = repSIZE_SET(0,0,0,1,sgrANSI,0,0) };
 		report_t * psR = &sRpt;
 		xRtosSemaphoreTake(&shUARTmux, portMAX_DELAY);
-		wprintfx(psR, formatCONSOLE, xpfSGR(0,0,SyslogColors[MsgPRI & 0x07],0), psUTC->usecs, McuID, ProcID, MsgID);
+		wprintfx(psR, formatCONSOLE, xpfCOL(SyslogColors[MsgPRI & 0x07],0), psUTC->usecs, McuID, ProcID, MsgID);
 		wvprintfx(psR, format, vaList);
-		wprintfx(psR, formatTERMINATE, xpfSGR(0,0,attrRESET,0));
+		wprintfx(psR, formatTERMINATE, xpfCOL(attrRESET,0));
 		xRtosSemaphoreGive(&shUARTmux);
 	} else {
 		// If APPSTAGE not yet set, cannot send to Syslog host NOR to LFS file
