@@ -91,6 +91,14 @@ SemaphoreHandle_t SL_NetMux = 0, SL_VarMux = 0;
 // level should be set to NOTICE.
 
 /**
+ * @brief	de-initialise the SysLog module
+*/
+static void IRAM_ATTR vSyslogDisConnect(void) {
+	close(sCtx.sd);
+	sCtx.sd = -1;
+}
+
+/**
  * @brief	establish connection to the selected syslog host
  * @return	1 if successful else 0
 */
@@ -116,14 +124,6 @@ static int IRAM_ATTR xSyslogConnect(void) {
 	if (iRV >= erSUCCESS && xNetSetRecvTO(&sCtx, flagXNET_NONBLOCK) >= erSUCCESS) return 1;
 	xNetClose(&sCtx);
 	return 0;
-}
-
-/**
- * @brief	de-initialise the SysLog module
-*/
-static void IRAM_ATTR vSyslogDisConnect(void) {
-	close(sCtx.sd);
-	sCtx.sd = -1;
 }
 
 /**
