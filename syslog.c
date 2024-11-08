@@ -17,10 +17,11 @@
 
 #include "hal_platform.h"
 #include "certificates.h"
+#include "hal_flash.h"
 #include "hal_network.h"
 #include "hal_options.h"
-#include "hal_flash.h"
 #include "hal_stdio.h"
+#include "hal_timer.h"
 #include "printfx.h"
 #include "socketsX.h"
 #include "syslog.h"
@@ -228,10 +229,9 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *MsgID, const char *format, va_li
 	if ((MsgPRI & 0x07) > ioB3GET(ioSLOGhi)) return;	// discard all messages higher than console log level
 	MsgID = (MsgID == NULL) ? "null" : (*MsgID == 0) ? "empty" : MsgID;
 	// Handle state of scheduler and obtain the task name
-	const char *ProcID = (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) ? DRAM_STR("preX") : pcTaskGetName(NULL);
-	if (RunTime == 0ULL) {
-		RunTime = sTSZ.usecs = (u64_t)esp_log_timestamp() * (u64_t)MICROS_IN_MILLISEC;
-	}
+	const char *ProcID = (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) ? DRAM_STR("preX") : pcTaskGetName(NULL);	
+	u64_t CurRUN = halTIMER_ReadRunTime();
+	if (sTSZ.usecs == 0) sTSZ.usecs = CurRUN;
 	int McuID = esp_cpu_get_core_id();
 
 	xRtosSemaphoreTake(&SL_VarMux, portMAX_DELAY);
@@ -241,7 +241,7 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *MsgID, const char *format, va_li
 
 	if (MsgCRC == RptCRC && MsgPRI == RptPRI) {	  		// CRC & PRI same as previous message ?
 		++RptCNT;		  								// Yes, increment the repeat counter
-		RptRUN = RunTime;								// save timestamps of latest repeat
+		RptRUN = CurRUN;								// save timestamps of latest repeat
 		RptUTC = sTSZ.usecs;
 		RptTask = ProcID;
 		RptFunc = (char *)MsgID;
@@ -265,7 +265,7 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *MsgID, const char *format, va_li
 			TmpTSZ.usecs = TmpRUN;						// repeated message + count
 			xSyslogSendMessage(TmpPRI, &TmpTSZ, McuID, TmpTask, TmpFunc, NULL, formatREPEATED, TmpCNT);
 		}
-		TmpTSZ.usecs = RunTime;							// New message
+		TmpTSZ.usecs = CurRUN;							// New message
 		xvSyslogSendMessage(MsgPRI, &TmpTSZ, McuID, ProcID, MsgID, NULL, format, vaList);
 
 		// Handle host message(s)
