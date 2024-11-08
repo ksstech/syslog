@@ -127,14 +127,13 @@ exit:
 */
 void vSyslogFileCheckSize(void) {
 	ssize_t Size = halFlashFileGetSize("/syslog.txt");
-	if (Size < 0)
-		return;
-	if (Size < 10240) {
+	if (INRANGE(1, Size, 10240)) {
 		xRtosSetDevice(devMASK_LFS_SL); 
 		return;
 	}
-	unlink("/syslog.txt");
+	if (Size > 10240) unlink("/syslog.txt");
 	xRtosClearDevice(devMASK_LFS_SL);
+	return;
 }
 
 void vSyslogFileSend(void) {
