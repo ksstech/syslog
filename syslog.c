@@ -54,7 +54,7 @@
 #define formatRFC5424 DRAM_STR("<%u>1 %.3Z %s %d %s - - %s ")
 #define formatCONSOLE DRAM_STR("%C%!.3R %d %s %s ")
 #define formatREPEATED DRAM_STR("Repeated %dx")
-#define formatTERMINATE DRAM_STR("%C\r\n")
+#define formatTERMINATE DRAM_STR("%C" strNL)
 
 #define UNKNOWNMACAD        "#UnknownMAC#"
 
@@ -137,8 +137,7 @@ void vSyslogFileCheckSize(void) {
 }
 
 void vSyslogFileSend(void) {
-	if (xSyslogConnect() == 0)
-		return;
+	if (xSyslogConnect() == 0) return;
 	int iRV = erSUCCESS;
 	xRtosSemaphoreTake(&LFSmux, portMAX_DELAY);
 	FILE *fp = fopen("syslog.txt", "r");
@@ -192,11 +191,8 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID, c
 			if (xRtosSemaphoreTake(&SL_NetMux, tWait) == pdTRUE) {
 				iRV = xNetSend(&sCtx, (u8_t *)pBuf, xLen);
 				xRtosSemaphoreGive(&SL_NetMux);
-				if (iRV != erFAILURE) {
-					sCtx.maxTx = (iRV > sCtx.maxTx) ? iRV : sCtx.maxTx;
-				} else {
-					vSyslogDisConnect();
-				}
+				if (iRV != erFAILURE)	sCtx.maxTx = (iRV > sCtx.maxTx) ? iRV : sCtx.maxTx;
+				else					vSyslogDisConnect();
 			}
 		} else {
 		#if (halUSE_LITTLEFS == 1)
@@ -229,8 +225,7 @@ static void IRAM_ATTR xSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID, co
  * @return		number of characters sent to server
 */
 void IRAM_ATTR xvSyslog(int MsgPRI, const char *MsgID, const char *format, va_list vaList) {
-	if ((MsgPRI & 0x07) > ioB3GET(ioSLOGhi))
-		return;
+	if ((MsgPRI & 0x07) > ioB3GET(ioSLOGhi)) return;	// discard all messages higher than console log level
 	MsgID = (MsgID == NULL) ? "null" : (*MsgID == 0) ? "empty" : MsgID;
 	// Handle state of scheduler and obtain the task name
 	const char *ProcID = (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) ? DRAM_STR("preX") : pcTaskGetName(NULL);
@@ -313,7 +308,7 @@ int IRAM_ATTR xSyslogError(const char *pcFN, int iRV) {
 void vSyslogReport(report_t *psR) {
 	if (sCtx.sd > 0) {
 		xNetReport(psR, &sCtx, "SLOG", 0, 0, 0);
-		wprintfx(psR, "\tmaxTX=%zu  CurRpt=%lu\r\n", sCtx.maxTx, RptCNT);
+		wprintfx(psR, "\tmaxTX=%zu  CurRpt=%lu" strNL, sCtx.maxTx, RptCNT);
 	}
 }
 
@@ -348,7 +343,7 @@ void vSyslogBenchmark(void) {
 	xSysTimerStop(stSLOG) ;
 	vSysTimerShow(1 << stSLOG) ;
 
-	printfx("CRC #1=%u  #2=%u  #3=%u\r\n", crc1, crc2, crc3) ;
-	printfx("CRC #4=%u  #5=%u  #6=%u\r\n", crc4, crc5, crc6) ;
+	printfx("CRC #1=%u  #2=%u  #3=%u" strNL, crc1, crc2, crc3) ;
+	printfx("CRC #4=%u  #5=%u  #6=%u" strNL, crc4, crc5, crc6) ;
 }
 #endif
