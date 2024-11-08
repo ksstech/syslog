@@ -56,8 +56,6 @@
 #define formatREPEATED DRAM_STR("Repeated %dx")
 #define formatTERMINATE DRAM_STR("%C\r\n")
 
-#define PAPERTRAIL_HOST     "logs5.papertrailapp.com"
-#define PAPERTRAIL_PORT     28535
 #define UNKNOWNMACAD        "#UnknownMAC#"
 
 // ######################################### Structures ############################################
@@ -108,21 +106,19 @@ static int IRAM_ATTR xSyslogConnect(void) {
 		return 0;
 	}
 	if (sCtx.sd > 0) return 1;                          // already connected, exit with status OK
-    if (ioB2GET(ioHostSLOG) == hostLOG) {
-    	sCtx.pHost = PAPERTRAIL_HOST;
-	    sCtx.sa_in.sin_port = htons(PAPERTRAIL_PORT);
-    } else {
-    	sCtx.pHost = HostInfo[ioB2GET(ioHostSLOG)].pName;
-	    IF_myASSERT(debugTRACK, sCtx.pHost);
-	    sCtx.sa_in.sin_port = htons(IP_PORT_SYSLOG_UDP);
-    }
+	int Idx = ioB2GET(ioHostSLOG);
+	sCtx.pHost = HostInfo[Idx].pName;
+	sCtx.sa_in.sin_port = htons(HostInfo[Idx].Port ? HostInfo[Idx].Port : IP_PORT_SYSLOG_UDP);
 	sCtx.sa_in.sin_family = AF_INET;
 	sCtx.type = SOCK_DGRAM;
 	sCtx.flags = SO_REUSEADDR;
 	sCtx.bSyslog = 1;
 	int iRV = xNetOpen(&sCtx);
-	if (iRV >= erSUCCESS && xNetSetRecvTO(&sCtx, flagXNET_NONBLOCK) >= erSUCCESS) return 1;
-	xNetClose(&sCtx);
+	if (iRV < erSUCCESS) goto exit;
+	iRV = xNetSetRecvTO(&sCtx, flagXNET_NONBLOCK);
+	if (iRV >= erSUCCESS) return 1;
+exit:
+	vSyslogDisConnect();
 	return 0;
 }
 
