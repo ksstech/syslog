@@ -45,6 +45,7 @@
 
 // '<7>1 2021/10/21T12:34.567: cc50e38819ec_WROVERv4_5C9 #0 esp_timer halVARS_Report????? - '
 #define SL_SIZEBUF				512
+#define SL_FILESIZE				10204
 
 #ifdef CONFIG_FREERTOS_UNICORE
 #define SL_CORES 1
@@ -128,13 +129,12 @@ exit:
 */
 void vSyslogFileCheckSize(void) {
 	ssize_t Size = halFlashFileGetSize("/syslog.txt");
-	if (INRANGE(1, Size, 10240)) {
+	if (INRANGE(1, Size, SL_FILESIZE)) {
 		xRtosSetDevice(devMASK_LFS_SL); 
-		return;
+	} else {	// file not found, 0 or > "SL_FILESIZE" in size....
+		if (Size > SL_FILESIZE) unlink("/syslog.txt");
+		xRtosClearDevice(devMASK_LFS_SL);
 	}
-	if (Size > 10240) unlink("/syslog.txt");
-	xRtosClearDevice(devMASK_LFS_SL);
-	return;
 }
 
 void vSyslogFileSend(void) {
