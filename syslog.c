@@ -107,7 +107,7 @@ static int IRAM_ATTR xSyslogConnect(void) {
 		(xRtosWaitStatus(flagLX_STA, pdMS_TO_TICKS(20)) == 0)) {
 		return 0;
 	}
-	if (sCtx.sd > 0) return 1;                          // already connected, exit with status OK
+	if (sCtx.sd > 0) return 1;							// already connected, exit with status OK
 	int Idx = ioB2GET(ioHostSLOG);
 	sCtx.pHost = HostInfo[Idx].pName;
 	sCtx.sa_in.sin_port = htons(HostInfo[Idx].Port ? HostInfo[Idx].Port : IP_PORT_SYSLOG_UDP);
@@ -138,7 +138,7 @@ void vSyslogFileCheckSize(void) {
 }
 
 void vSyslogFileSend(void) {
-	if (xSyslogConnect() == 0) return;
+	if (xSyslogConnect() == 0)						return;
 	int iRV = erSUCCESS;
 	xRtosSemaphoreTake(&LFSmux, portMAX_DELAY);
 	FILE *fp = fopen("syslog.txt", "r");
@@ -148,9 +148,9 @@ void vSyslogFileSend(void) {
 			char *pBuf = malloc(SL_SIZEBUF);
 			while (1) {
 				char *pRV = fgets(pBuf, SL_SIZEBUF, fp);
-				if (pRV != pBuf) break;                 // nothing read or error, exit
-                char * pTmp = strstr(pRV, UNKNOWNMACAD);    // Check if early message, no MAC address
-                if (pTmp != NULL) memcpy(pTmp, idSTA, 12);  // if so, replace with MAC/hostname...
+				if (pRV != pBuf)					break;					// nothing read or error, exit
+				char * pTmp = strstr(pRV, UNKNOWNMACAD);	// Check if early message, no MAC address
+				if (pTmp != NULL) memcpy(pTmp, idSTA, 12);	// if so, replace with MAC/hostname...
 				int xLen = strlen(pBuf);
 				if (pBuf[xLen - 1] == CHR_LF)
 					pBuf[--xLen] = CHR_NUL;				// remove terminating [CR]LF
@@ -168,7 +168,7 @@ void vSyslogFileSend(void) {
 }
 
 static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID, const char *ProcID, const char *MsgID, 
-										  char *pBuf, const char *format, va_list vaList) {
+											char *pBuf, const char *format, va_list vaList) {
 	const TickType_t tWait = pdMS_TO_TICKS(1000);
 	int iRV;
 	if (pBuf == NULL) {
@@ -198,11 +198,11 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID, c
 		} else {
 		#if (halUSE_LITTLEFS == 1)
 			if (xRtosCheckDevice(devMASK_LFS)) { 		// L2+3 STA down, append to file...
-    			if (pBuf[xLen-1] != CHR_LF) {
-	    			pBuf[xLen++] = CHR_LF;				// append LF if required
-		    		pBuf[xLen] = CHR_NUL;				// and terminate
-			    }
 				halFlashFileWrite("syslog.txt", "a", pBuf);
+				if (pBuf[xLen-1] != CHR_LF) {
+					pBuf[xLen++] = CHR_LF;				// append LF if required
+					pBuf[xLen] = CHR_NUL;				// and terminate
+				}
 				xRtosSetDevice(devMASK_LFS_SL);
 			}
 		#endif
@@ -236,12 +236,12 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *MsgID, const char *format, va_li
 
 	xRtosSemaphoreTake(&SL_VarMux, portMAX_DELAY);
 	u32_t MsgCRC = 0;
-	int xLen = crcprintfx(&MsgCRC, DRAM_STR("%s %s "), ProcID, MsgID); // "Task Function "
-	xLen += vcrcprintfx(&MsgCRC, format, vaList);					   // "Task Function message parameters etc"
+	int xLen = crcprintfx(&MsgCRC, DRAM_STR("%s %s "), ProcID, MsgID);	// "Task Function "
+	xLen += vcrcprintfx(&MsgCRC, format, vaList);						// "Task Function message parameters etc"
 
-	if (MsgCRC == RptCRC && MsgPRI == RptPRI) {	  		// CRC & PRI same as previous message ?
-		++RptCNT;		  								// Yes, increment the repeat counter
-		RptRUN = CurRUN;								// save timestamps of latest repeat
+	if (MsgCRC == RptCRC && MsgPRI == RptPRI) {				// CRC & PRI same as previous message ?
+		++RptCNT;											// Yes, increment the repeat counter
+		RptRUN = CurRUN;									// save timestamps of latest repeat
 		RptUTC = sTSZ.usecs;
 		RptTask = ProcID;
 		RptFunc = (char *)MsgID;
