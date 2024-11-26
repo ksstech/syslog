@@ -58,7 +58,8 @@
 #define formatREPEATED DRAM_STR("Repeated %dx")
 #define formatTERMINATE DRAM_STR("%C" strNL)
 
-#define UNKNOWNMACAD        "#UnknownMAC#"
+#define slFILENAME			"/syslog.txt"
+#define UNKNOWNMACAD		"#UnknownMAC#"
 
 // ######################################### Structures ############################################
 // ####################################### Local variables #########################################
@@ -128,11 +129,11 @@ exit:
  * 
 */
 void vSyslogFileCheckSize(void) {
-	ssize_t Size = halFlashFileGetSize("/syslog.txt");
+	ssize_t Size = halFlashFileGetSize(slFILENAME);
 	if (INRANGE(1, Size, SL_FILESIZE)) {
 		xRtosSetDevice(devMASK_LFS_SL); 
 	} else {	// file not found, 0 or > "SL_FILESIZE" in size....
-		if (Size > SL_FILESIZE) unlink("/syslog.txt");
+		if (Size > SL_FILESIZE) unlink(slFILENAME);
 		xRtosClearDevice(devMASK_LFS_SL);
 	}
 }
@@ -141,7 +142,7 @@ void vSyslogFileSend(void) {
 	if (xSyslogConnect() == 0)						return;
 	int iRV = erSUCCESS;
 	xRtosSemaphoreTake(&LFSmux, portMAX_DELAY);
-	FILE *fp = fopen("syslog.txt", "r");
+	FILE *fp = fopen(slFILENAME, "r");
 	if (fp) {
 		if (fseek(fp, 0L, SEEK_END) == 0 && ftell(fp) > 0L) {
 			rewind(fp);
@@ -161,7 +162,7 @@ void vSyslogFileSend(void) {
 			xRtosClearDevice(devMASK_LFS_SL);
 		}
 		iRV = fclose(fp);
-		unlink("syslog.txt");
+		unlink(slFILENAME);
 	}
 	xRtosSemaphoreGive(&LFSmux);
 	IF_myASSERT(debugRESULT, iRV == 0);
@@ -175,7 +176,7 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID, c
 		report_t sRpt = { .Size = repSIZE_SET(0,0,0,1,sgrANSI,0,0) };
 		report_t * psR = &sRpt;
 		xRtosSemaphoreTake(&shUARTmux, portMAX_DELAY);
-		wprintfx(psR, formatCONSOLE, xpfCOL(SyslogColors[MsgPRI & 0x07],0), psUTC->usecs, McuID, ProcID, MsgID);
+		wprintfx(psR, formatCONSOLE, xpfCOL(SyslogColors[MsgPRI & 0x07],0), halTIMER_ReadRunTime(), McuID, ProcID, MsgID);
 		wvprintfx(psR, format, vaList);
 		wprintfx(psR, formatTERMINATE, xpfCOL(attrRESET,0));
 		xRtosSemaphoreGive(&shUARTmux);
@@ -198,11 +199,11 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID, c
 		} else {
 		#if (halUSE_LITTLEFS == 1)
 			if (xRtosCheckDevice(devMASK_LFS)) { 		// L2+3 STA down, append to file...
-				halFlashFileWrite("syslog.txt", "a", pBuf);
 				if (pBuf[xLen-1] != CHR_LF) {
 					pBuf[xLen++] = CHR_LF;				// append LF if required
 					pBuf[xLen] = CHR_NUL;				// and terminate
 				}
+				halFlashFileWrite(slFILENAME, "a", pBuf);
 				xRtosSetDevice(devMASK_LFS_SL);
 			}
 		#endif
