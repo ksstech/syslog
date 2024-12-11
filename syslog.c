@@ -236,7 +236,7 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *MsgID, const char *format, va_li
 	if (sTSZ.usecs == 0) sTSZ.usecs = CurRUN;
 	int McuID = esp_cpu_get_core_id();
 
-	xRtosSemaphoreTake(&SL_VarMux, portMAX_DELAY);
+	BaseType_t btSR = xRtosSemaphoreTake(&SL_VarMux, portMAX_DELAY);
 	u32_t MsgCRC = 0;
 	int xLen = crcprintfx(&MsgCRC, DRAM_STR("%s %s "), ProcID, MsgID);	// "Task Function "
 	xLen += vcrcprintfx(&MsgCRC, format, vaList);						// "Task Function message parameters etc"
@@ -247,7 +247,7 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *MsgID, const char *format, va_li
 		RptUTC = sTSZ.usecs;
 		RptTask = ProcID;
 		RptFunc = (char *)MsgID;
-		xRtosSemaphoreGive(&SL_VarMux);
+		if (btSR == pdTRUE) xRtosSemaphoreGive(&SL_VarMux);
 	} else { // Different CRC and/or PRI
 		// save trackers for immediate and future use...
 		RptCRC = MsgCRC;
@@ -259,7 +259,7 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *MsgID, const char *format, va_li
 		u64_t TmpUTC = RptUTC;
 		const char *TmpTask = RptTask;
 		const char *TmpFunc = RptFunc;
-		xRtosSemaphoreGive(&SL_VarMux);
+		if (btSR == pdTRUE) xRtosSemaphoreGive(&SL_VarMux);
 		tsz_t TmpTSZ = {.pTZ = sTSZ.pTZ};
 
 		// Handle console message(s)
