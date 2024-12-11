@@ -105,7 +105,7 @@ static void IRAM_ATTR vSyslogDisConnect(void) {
 */
 static int IRAM_ATTR xSyslogConnect(void) {
 	if ((xTaskGetSchedulerState() != taskSCHEDULER_RUNNING) ||
-		(xRtosWaitStatus(flagLX_STA, pdMS_TO_TICKS(20)) == 0)) {
+		(xRtosWaitStat0(flagLX_STA, pdMS_TO_TICKS(20)) == 0)) {
 		return 0;
 	}
 	if (sCtx.sd > 0) return 1;							// already connected, exit with status OK
@@ -131,10 +131,10 @@ exit:
 void vSyslogFileCheckSize(void) {
 	ssize_t Size = halFlashFileGetSize(slFILENAME);
 	if (INRANGE(1, Size, SL_FILESIZE)) {
-		xRtosSetDevice(devMASK_LFS_SL); 
+		halEventUpdateDevice(devMASK_LFS_SL, 1); 
 	} else {	// file not found, 0 or > "SL_FILESIZE" in size....
 		if (Size > SL_FILESIZE) unlink(slFILENAME);
-		xRtosClearDevice(devMASK_LFS_SL);
+		halEventUpdateDevice(devMASK_LFS_SL, 0);
 	}
 }
 
@@ -159,7 +159,7 @@ void vSyslogFileSend(void) {
 				vTaskDelay(pdMS_TO_TICKS(10));			// ensure WDT gets fed....
 			}
 			free(pBuf);
-			xRtosClearDevice(devMASK_LFS_SL);
+			halEventUpdateDevice(devMASK_LFS_SL, 0);
 		}
 		iRV = fclose(fp);
 		unlink(slFILENAME);
@@ -175,14 +175,15 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID, c
 	if (pBuf == NULL) {
 		report_t sRpt = { .Size = repSIZE_SET(0,0,0,1,sgrANSI,0,0) };
 		report_t * psR = &sRpt;
-		xRtosSemaphoreTake(&shUARTmux, portMAX_DELAY);
+		BaseType_t btSR = sSysFlags.stage0 ? xRtosSemaphoreTake(&shUARTmux, portMAX_DELAY) : pdFALSE;
 		wprintfx(psR, formatCONSOLE, xpfCOL(SyslogColors[MsgPRI & 0x07],0), halTIMER_ReadRunTime(), McuID, ProcID, MsgID);
 		wvprintfx(psR, format, vaList);
 		wprintfx(psR, formatTERMINATE, xpfCOL(attrRESET,0));
-		xRtosSemaphoreGive(&shUARTmux);
+		if (sSysFlags.stage0 && btSR == pdTRUE) xRtosSemaphoreGive(&shUARTmux);
+		
 	} else {
-		// If APPSTAGE not yet set, cannot send to Syslog host NOR to LFS file
-		if (allSYSFLAGS(sfAPPSTAGE) == 0) return;
+		// If not in stage 2 cannot send to Syslog host NOR to LFS file
+		if (sSysFlags.stage2 == 0) return;
 		if (idSTA[0] == 0) strcpy((char*)idSTA, UNKNOWNMACAD);	// very early message, WIFI not initialized
 		int xLen = snprintfx(pBuf, SL_SIZEBUF, formatRFC5424, MsgPRI, psUTC, idSTA, McuID, ProcID, MsgID);
 		xLen += vsnprintfx(pBuf + xLen, SL_SIZEBUF - xLen - 1, format, vaList); // leave space for LF
@@ -204,7 +205,7 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID, c
 					pBuf[xLen] = CHR_NUL;				// and terminate
 				}
 				halFlashFileWrite(slFILENAME, "a", pBuf);
-				xRtosSetDevice(devMASK_LFS_SL);
+				halEventUpdateDevice(devMASK_LFS_SL, 1);
 			}
 		#endif
 		}
