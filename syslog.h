@@ -85,6 +85,7 @@ extern SemaphoreHandle_t SL_NetMux, SL_VarMux;			// public to enable semaphore u
 
 // ###################################### function prototypes ######################################
 
+int xSyslogGetConsoleLevel(void);
 void vSyslogFileSend(void);
 void vSyslogFileCheckSize(void);
 void xvSyslog(int Priority, const char * MsgID, const char * format, va_list args);

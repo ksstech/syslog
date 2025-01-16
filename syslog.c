@@ -91,6 +91,24 @@ SemaphoreHandle_t SL_NetMux = 0, SL_VarMux = 0;
 // seconds the crash can still occur. In order to minimise load on the IP stack the minimum severity
 // level should be set to NOTICE.
 
+int xSyslogGetConsoleLevel(void) {
+#if (appOPTIONS == 1)
+	return ioB3GET(ioSLOGhi); 
+#else
+	#warning "Options support required for proper functioning!!!"
+	return SL_LEV_CONSOLE;
+#endif
+}
+
+int xSyslogGetHostLevel(void) {
+#if (appOPTIONS == 1)
+	return ioB3GET(ioSLhost); 
+#else
+	#warning "Options support required for proper functioning!!!"
+	return SL_LEV_HOST;
+#endif
+}
+
 /**
  * @brief	de-initialise the SysLog module
 */
@@ -109,7 +127,7 @@ static int IRAM_ATTR xSyslogConnect(void) {
 		return 0;
 	}
 	if (sCtx.sd > 0) return 1;							// already connected, exit with status OK
-	int Idx = ioB2GET(ioHostSLOG);
+	int Idx = xSyslogGetHostLevel();
 	sCtx.pHost = HostInfo[Idx].pName;
 	sCtx.sa_in.sin_port = htons(HostInfo[Idx].Port ? HostInfo[Idx].Port : IP_PORT_SYSLOG_UDP);
 	sCtx.sa_in.sin_family = AF_INET;
@@ -228,7 +246,8 @@ static void IRAM_ATTR xSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID, co
  * @return		number of characters sent to server
 */
 void IRAM_ATTR xvSyslog(int MsgPRI, const char *MsgID, const char *format, va_list vaList) {
-	if ((MsgPRI & 0x07) > ioB3GET(ioSLOGhi)) return;	// discard all messages higher than console log level
+	// discard all messages higher than console log level
+	if ((MsgPRI & 0x07) > xSyslogGetConsoleLevel())		return;	
 	MsgID = (MsgID == NULL) ? "null" : (*MsgID == 0) ? "empty" : MsgID;
 	// Handle state of scheduler and obtain the task name
 	const char *ProcID = (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) ? DRAM_STR("preX") : pcTaskGetName(NULL);	
@@ -271,7 +290,7 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *MsgID, const char *format, va_li
 		xvSyslogSendMessage(MsgPRI, &TmpTSZ, McuID, ProcID, MsgID, NULL, format, vaList);
 
 		// Handle host message(s)
-		if ((MsgPRI & 7) <= ioB3GET(ioSLhost)) {		// filter based on higher priorities
+		if ((MsgPRI & 7) <= xSyslogGetHostLevel()) {		// filter based on higher priorities
 			char *pBuf = malloc(SL_SIZEBUF);
 			if (TmpCNT > 0) {
 				TmpTSZ.usecs = TmpUTC;					// repeated message + count
