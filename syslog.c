@@ -1,4 +1,4 @@
-// syslog.c - Copyright (c) 2014-24 Andre M. Maree / KSS Technologies (Pty) Ltd.
+// syslog.c - Copyright (c) 2014-25 Andre M. Maree / KSS Technologies (Pty) Ltd.
 
 /***************************************************************************************************
  * Theory of operation.
