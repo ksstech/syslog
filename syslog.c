@@ -110,14 +110,6 @@ int xSyslogGetHostLevel(void) {
 }
 
 /**
- * @brief	de-initialise the SysLog module
-*/
-static void IRAM_ATTR vSyslogDisConnect(void) {
-	close(sCtx.sd);
-	sCtx.sd = -1;
-}
-
-/**
  * @brief	establish connection to the selected syslog host
  * @return	1 if successful else 0
 */
@@ -139,7 +131,7 @@ static int IRAM_ATTR xSyslogConnect(void) {
 	iRV = xNetSetRecvTO(&sCtx, flagXNET_NONBLOCK);
 	if (iRV >= erSUCCESS) return 1;
 exit:
-	vSyslogDisConnect();
+	xNetClose(&sCtx);
 	return 0;
 }
 
