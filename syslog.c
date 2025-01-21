@@ -123,7 +123,7 @@ static void IRAM_ATTR vSyslogDisConnect(void) {
 */
 static int IRAM_ATTR xSyslogConnect(void) {
 	if ((xTaskGetSchedulerState() != taskSCHEDULER_RUNNING) ||
-		(xRtosWaitStat0(flagLX_STA, pdMS_TO_TICKS(20)) == 0)) {
+		(halEventWaitStatus(flagLX_STA, pdMS_TO_TICKS(20)) == 0)) {
 		return 0;
 	}
 	if (sCtx.sd > 0) return 1;							// already connected, exit with status OK
@@ -217,7 +217,7 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID, c
 			}
 		} else {
 		#if (halUSE_LITTLEFS == 1)
-			if (xRtosCheckDevice(devMASK_LFS)) { 		// L2+3 STA down, append to file...
+			if (halEventCheckDevice(devMASK_LFS)) { 	// L2+3 STA down, append to file...
 				if (pBuf[xLen-1] != CHR_LF) {
 					pBuf[xLen++] = CHR_LF;				// append LF if required
 					pBuf[xLen] = CHR_NUL;				// and terminate
