@@ -117,9 +117,14 @@ static int IRAM_ATTR xSyslogConnect(void) {
 		return 0;
 	}
 	if (sCtx.sd > 0) return 1;							// already connected, exit with status OK
-	int Idx = xSyslogGetHostLevel();
-	sCtx.pHost = HostInfo[Idx].pName;
-	sCtx.sa_in.sin_port = htons(HostInfo[Idx].Port ? HostInfo[Idx].Port : IP_PORT_SYSLOG_UDP);
+	#if (appOPTIONS == 1)
+		int Idx = ioB2GET(ioHostSLOG);
+		sCtx.pHost = HostInfo[Idx].pName;
+		sCtx.sa_in.sin_port = htons(HostInfo[Idx].Port ? HostInfo[Idx].Port : IP_PORT_SYSLOG_UDP);
+	#else
+		sCtx.pHost = "logs5.papertrailapp.com";
+		sCtx.sa_in.sin_port = htons(28535);
+	#endif
 	sCtx.sa_in.sin_family = AF_INET;
 	sCtx.type = SOCK_DGRAM;
 	sCtx.flags = SO_REUSEADDR;
