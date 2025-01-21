@@ -127,8 +127,8 @@ static int IRAM_ATTR xSyslogConnect(void) {
 	#endif
 	sCtx.sa_in.sin_family = AF_INET;
 	sCtx.type = SOCK_DGRAM;
-	sCtx.flags = SO_REUSEADDR;
-	sCtx.bSyslog = 1;
+//	sCtx.flags = SO_REUSEADDR;
+	sCtx.bSyslog = 1;									// mark as syslog port, so as not to recurse
 	int iRV = xNetOpen(&sCtx);
 	if (iRV < erSUCCESS) goto exit;
 	iRV = xNetSetRecvTO(&sCtx, flagXNET_NONBLOCK);
