@@ -212,8 +212,10 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID, c
 			if (xRtosSemaphoreTake(&SL_NetMux, tWait) == pdTRUE) {
 				iRV = xNetSend(&sCtx, (u8_t *)pBuf, xLen);
 				xRtosSemaphoreGive(&SL_NetMux);
-				if (iRV != erFAILURE)	sCtx.maxTx = (iRV > sCtx.maxTx) ? iRV : sCtx.maxTx;
-				else					vSyslogDisConnect();
+				if (iRV != erFAILURE)
+					sCtx.maxTx = (iRV > sCtx.maxTx) ? iRV : sCtx.maxTx;
+				else
+					xNetClose(&sCtx);
 			}
 		} else {
 		#if (halUSE_LITTLEFS == 1)
