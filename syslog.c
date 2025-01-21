@@ -43,14 +43,10 @@
 
 // ###################################### BUILD : CONFIG definitions ##############################
 
-// '<7>1 2021/10/21T12:34.567: cc50e38819ec_WROVERv4_5C9 #0 esp_timer halVARS_Report????? - '
-#define SL_SIZEBUF				512
-#define SL_FILESIZE				10204
-
 #ifdef CONFIG_FREERTOS_UNICORE
-#define SL_CORES 1
+	#define SL_CORES				1
 #else
-#define SL_CORES 2
+	#define SL_CORES				2
 #endif
 
 #define formatRFC5424 DRAM_STR("<%u>1 %.3Z %s %d %s - - %s ")
@@ -58,10 +54,14 @@
 #define formatREPEATED DRAM_STR("Repeated %dx")
 #define formatTERMINATE DRAM_STR("%C" strNL)
 
-#define slFILENAME			"/syslog.txt"
-#define UNKNOWNMACAD		"#UnknownMAC#"
+// '<7>1 2021/10/21T12:34.567: cc50e38819ec_WROVERv4_5C9 #0 esp_timer halVARS_Report????? - '
+#define SL_SIZEBUF					512
+#define SL_FILESIZE					10204				// MAX history (at boot) size before truncation
+#define slFILENAME					"/syslog.txt"		// default file name in root directory
+#define UNKNOWNMACAD				"#UnknownMAC#"		// MAC address marker in pre-wifi messages
 
 // ######################################### Structures ############################################
+
 // ####################################### Local variables #########################################
 
 static netx_t sCtx = {0};
@@ -92,19 +92,19 @@ SemaphoreHandle_t SL_NetMux = 0, SL_VarMux = 0;
 // level should be set to NOTICE.
 
 int xSyslogGetConsoleLevel(void) {
-#if (appOPTIONS == 1)
-	return ioB3GET(ioSLOGhi); 
-#else
-	return SL_LEV_CONSOLE;
-#endif
+	#if (appOPTIONS == 1)
+		return ioB3GET(ioSLOGhi); 
+	#else
+		return SL_LEV_CONSOLE;
+	#endif
 }
 
 int xSyslogGetHostLevel(void) {
-#if (appOPTIONS == 1)
-	return ioB3GET(ioSLhost); 
-#else
-	return SL_LEV_HOST;
-#endif
+	#if (appOPTIONS == 1)
+		return ioB3GET(ioSLhost); 
+	#else
+		return SL_LEV_HOST;
+	#endif
 }
 
 /**
@@ -155,10 +155,10 @@ void vSyslogFileSend(void) {
 	if (xSyslogConnect() == 0)						return;
 	xRtosSemaphoreTake(&LFSmux, portMAX_DELAY);
 	FILE *fp = fopen(slFILENAME, "r");
-	if (fp == NULL)								
-		goto exit0;
-	if (fseek(fp, 0L, SEEK_END) != 0 || ftell(fp) == 0L)
-		goto exit1;
+	if (fp == NULL)										// successfully opened file?			
+		goto exit0;										// no failed
+	if (fseek(fp, 0L, SEEK_END) != 0 || ftell(fp) == 0L)// Seek to end OK & something there?
+		goto exit1;										// nope, something wrong
 	rewind(fp);
 	char * pBuf = malloc(SL_SIZEBUF);
 	while (1) {
@@ -170,7 +170,7 @@ void vSyslogFileSend(void) {
 		int xLen = strlen(pBuf);
 		if (pBuf[xLen - 1] == CHR_LF)
 			pBuf[--xLen] = CHR_NUL;						// remove terminating [CR]LF
-		if (xNetSend(&sCtx, (u8_t *)pBuf, xLen) < 0)		// send message to host
+		if (xNetSend(&sCtx, (u8_t *)pBuf, xLen) < 0)	// send message to host
 			break;										// if error, abort sending
 		vTaskDelay(pdMS_TO_TICKS(10));					// ensure WDT gets fed....
 	}
