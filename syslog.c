@@ -158,30 +158,33 @@ void vSyslogFileCheckSize(void) {
 
 void vSyslogFileSend(void) {
 	if (xSyslogConnect() == 0)						return;
-	int iRV = erSUCCESS;
 	xRtosSemaphoreTake(&LFSmux, portMAX_DELAY);
 	FILE *fp = fopen(slFILENAME, "r");
-	if (fp) {
-		if (fseek(fp, 0L, SEEK_END) == 0 && ftell(fp) > 0L) {
-			rewind(fp);
-			char *pBuf = malloc(SL_SIZEBUF);
-			while (1) {
-				char *pRV = fgets(pBuf, SL_SIZEBUF, fp);
-				if (pRV != pBuf)					break;					// nothing read or error, exit
-				char * pTmp = strstr(pRV, UNKNOWNMACAD);	// Check if early message, no MAC address
-				if (pTmp != NULL) memcpy(pTmp, idSTA, 12);	// if so, replace with MAC/hostname...
-				int xLen = strlen(pBuf);
-				if (pBuf[xLen - 1] == CHR_LF)
-					pBuf[--xLen] = CHR_NUL;				// remove terminating [CR]LF
-				iRV = sendto(sCtx.sd, pBuf, xLen, sCtx.flags, &sCtx.sa, sizeof(sCtx.sa_in));
-				vTaskDelay(pdMS_TO_TICKS(10));			// ensure WDT gets fed....
-			}
-			free(pBuf);
-			halEventUpdateDevice(devMASK_LFS_SL, 0);
-		}
-		iRV = fclose(fp);
-		unlink(slFILENAME);
+	if (fp == NULL)								
+		goto exit0;
+	if (fseek(fp, 0L, SEEK_END) != 0 || ftell(fp) == 0L)
+		goto exit1;
+	rewind(fp);
+	char * pBuf = malloc(SL_SIZEBUF);
+	while (1) {
+		char *pRV = fgets(pBuf, SL_SIZEBUF, fp);		// read string/line from file
+		if (pRV != pBuf)					break;		// nothing read or error, exit
+		char * pTmp = strstr(pRV, UNKNOWNMACAD);		// Check if early message ie no MAC address
+		if (pTmp != NULL)								// if UNKNOWNMACAD marker is present
+			memcpy(pTmp, idSTA, lenMAC_ADDRESS*2);		// replace with actual MAC/hostname
+		int xLen = strlen(pBuf);
+		if (pBuf[xLen - 1] == CHR_LF)
+			pBuf[--xLen] = CHR_NUL;						// remove terminating [CR]LF
+		if (xNetSend(&sCtx, (u8_t *)pBuf, xLen) < 0)		// send message to host
+			break;										// if error, abort sending
+		vTaskDelay(pdMS_TO_TICKS(10));					// ensure WDT gets fed....
 	}
+	free(pBuf);
+	halEventUpdateDevice(devMASK_LFS_SL, 0);
+exit1:
+	fclose(fp);
+	unlink(slFILENAME);
+exit0:
 	xRtosSemaphoreGive(&LFSmux);
 	IF_myASSERT(debugRESULT, iRV == 0);
 }
