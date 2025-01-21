@@ -95,7 +95,6 @@ int xSyslogGetConsoleLevel(void) {
 #if (appOPTIONS == 1)
 	return ioB3GET(ioSLOGhi); 
 #else
-	#warning "Options support required for proper functioning!!!"
 	return SL_LEV_CONSOLE;
 #endif
 }
@@ -104,7 +103,6 @@ int xSyslogGetHostLevel(void) {
 #if (appOPTIONS == 1)
 	return ioB3GET(ioSLhost); 
 #else
-	#warning "Options support required for proper functioning!!!"
 	return SL_LEV_HOST;
 #endif
 }
@@ -178,7 +176,6 @@ exit1:
 	unlink(slFILENAME);
 exit0:
 	xRtosSemaphoreGive(&LFSmux);
-	IF_myASSERT(debugRESULT, iRV == 0);
 }
 
 static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID, const char *ProcID, const char *MsgID, 
