@@ -124,35 +124,6 @@ static int IRAM_ATTR xSyslogConnect(void) {
 	return 0;											// and return status accordingly
 }
 
-// ###################################### Public functions #########################################
-
-// In the case where the log level is set to DEBUG in ESP-IDF the volume of messages being generated
-// could flood the IP stack and cause watchdog timeouts. Even if the timeout is changed from 5 to 10
-// seconds the crash can still occur. In order to minimise load on the IP stack the minimum severity
-// level should be set to NOTICE.
-
-int xSyslogGetConsoleLevel(void) {
-#if (appOPTIONS == 1)
-	return ioB3GET(ioSLOGhi); 
-#else
-	return SL_LEV_CONSOLE;
-#endif
-}
-
-void vSyslogSetConsoleLevel(int Level) {
-#if (appOPTIONS == 1)
-	ioB3SET(ioSLOGhi, Level); 
-#endif
-}
-
-int xSyslogGetHostLevel(void) {
-#if (appOPTIONS == 1)
-	return ioB3GET(ioSLhost); 
-#else
-	return SL_LEV_HOST;
-#endif
-}
-
 /**
  * 
 */
@@ -242,6 +213,35 @@ static void IRAM_ATTR xSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID, co
 	va_start(vaList, format);
 	xvSyslogSendMessage(MsgPRI, psUTC, McuID, ProcID, MsgID, pBuf, format, vaList);
 	va_end(vaList);
+}
+
+// ###################################### Public functions #########################################
+
+// In the case where the log level is set to DEBUG in ESP-IDF the volume of messages being generated
+// could flood the IP stack and cause watchdog timeouts. Even if the timeout is changed from 5 to 10
+// seconds the crash can still occur. In order to minimise load on the IP stack the minimum severity
+// level should be set to NOTICE.
+
+int xSyslogGetConsoleLevel(void) {
+#if (appOPTIONS == 1)
+	return ioB3GET(ioSLOGhi); 
+#else
+	return SL_LEV_CONSOLE;
+#endif
+}
+
+void vSyslogSetConsoleLevel(int Level) {
+#if (appOPTIONS == 1)
+	ioB3SET(ioSLOGhi, Level); 
+#endif
+}
+
+int xSyslogGetHostLevel(void) {
+#if (appOPTIONS == 1)
+	return ioB3GET(ioSLhost); 
+#else
+	return SL_LEV_HOST;
+#endif
 }
 
 /**
