@@ -114,6 +114,14 @@ static int IRAM_ATTR xSyslogConnect(void) {
 	return 0;											// and return status accordingly
 }
 
+static void IRAM_ATTR xSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID, const char *ProcID,
+										 const char *MsgID, char *pBuf, const char *format, ...) {
+	va_list vaList;
+	va_start(vaList, format);
+	xvSyslogSendMessage(MsgPRI, psUTC, McuID, ProcID, MsgID, pBuf, format, vaList);
+	va_end(vaList);
+}
+
 // ###################################### Public functions #########################################
 
 // In the case where the log level is set to DEBUG in ESP-IDF the volume of messages being generated
@@ -234,14 +242,6 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID,
 		#endif
 		}
 	}
-}
-
-static void IRAM_ATTR xSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID, const char *ProcID,
-										 const char *MsgID, char *pBuf, const char *format, ...) {
-	va_list vaList;
-	va_start(vaList, format);
-	xvSyslogSendMessage(MsgPRI, psUTC, McuID, ProcID, MsgID, pBuf, format, vaList);
-	va_end(vaList);
 }
 
 /**
