@@ -79,6 +79,7 @@ static u32_t RptCRC = 0, RptCNT = 0;
 static u64_t RptRUN = 0, RptUTC = 0;
 static u8_t RptPRI = 0;
 static const char *RptTask = NULL, *RptFunc = NULL;
+static report_t sRpt = { .Size = repSIZE_SET(0,0,0,1,sgrANSI,0,0) };
 #if (halUSE_LITTLEFS == 1)
 	static bool FileBuffer = 0;
 #endif
@@ -212,14 +213,12 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID,
 	const TickType_t tWait = pdMS_TO_TICKS(1000);
 	int iRV;
 	if (pBuf == NULL) {
-		report_t sRpt = { .Size = repSIZE_SET(0,0,0,1,sgrANSI,0,0) };
-		report_t * psR = &sRpt;
 		BaseType_t btSR = xRtosSemaphoreTake(&shUARTmux, portMAX_DELAY);
-		wprintfx(psR, formatCONSOLE, xpfCOL(SyslogColors[MsgPRI & 0x07],0), halTIMER_ReadRunTime(), McuID, ProcID, MsgID);
-		wvprintfx(psR, format, vaList);
-		wprintfx(psR, formatTERMINATE, xpfCOL(attrRESET,0));
 		if (btSR == pdTRUE) xRtosSemaphoreGive(&shUARTmux);
 		
+		wprintfx(&sRpt, formatCONSOLE, xpfCOL(SyslogColors[MsgPRI & 0x07],0), halTIMER_ReadRunTime(), McuID, ProcID, MsgID);
+		wvprintfx(&sRpt, format, vaList);
+		wprintfx(&sRpt, formatTERMINATE, xpfCOL(attrRESET,0));
 	} else {
 		// If not in stage 2 cannot send to Syslog host NOR to LFS file
 		if (sSysFlags.stage2 == 0) return;
@@ -347,6 +346,8 @@ int IRAM_ATTR xSyslogError(const char *pcFN, int iRV) {
 */
 void vSyslogReport(report_t * psR) {
 	if (sCtx.sd == -1) return;
+	if (psR == NULL)
+		psR = &sRpt;
 	xNetReport(psR, &sCtx, "SLOG", 0, 0, 0);
 	wprintfx(psR, "\tmaxTX=%zu  CurRpt=%lu" strNL, sCtx.maxTx, RptCNT);
 }
