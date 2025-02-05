@@ -99,6 +99,12 @@ int xSyslogGetConsoleLevel(void) {
 #endif
 }
 
+void vSyslogSetConsoleLevel(int Level) {
+#if (appOPTIONS == 1)
+	ioB3SET(ioSLOGhi, Level); 
+#endif
+}
+
 int xSyslogGetHostLevel(void) {
 #if (appOPTIONS == 1)
 	return ioB3GET(ioSLhost); 
