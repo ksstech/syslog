@@ -89,7 +89,6 @@ int xSyslogGetConsoleLevel(void);
 int xSyslogGetHostLevel(void);
 void vSyslogSetConsoleLevel(int Level);
 
-void vSyslogFileSend(void);
 void vSyslogFileCheckSize(void);
 void xvSyslog(int Priority, const char * MsgID, const char * format, va_list args);
 void vSyslog(int Priority, const char * MsgID, const char * format, ...);

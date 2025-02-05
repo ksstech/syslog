@@ -59,6 +59,7 @@
 #define slFILESIZE					10204				// MAX history (at boot) size before truncation
 #define slFILENAME					"/syslog.txt"		// default file name in root directory
 #define UNKNOWNMACAD				"#UnknownMAC#"		// MAC address marker in pre-wifi messages
+#define slMS_LOCK_WAIT				1000
 
 // ######################################### Structures ############################################
 
@@ -161,31 +162,33 @@ exit0:
 
 static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID,
 	const char *ProcID, const char *MsgID, char *pBuf, const char *format, va_list vaList) {
-	const TickType_t tWait = pdMS_TO_TICKS(1000);
-	int iRV;
+	int iRV, xLen;
 	if (pBuf == NULL) {
 		BaseType_t btSR = xRtosSemaphoreTake(&shUARTmux, portMAX_DELAY);
-		if (btSR == pdTRUE) xRtosSemaphoreGive(&shUARTmux);
-		
 		wprintfx(&sRpt, formatCONSOLE, xpfCOL(SyslogColors[MsgPRI & 0x07],0), halTIMER_ReadRunTime(), McuID, ProcID, MsgID);
 		wvprintfx(&sRpt, format, vaList);
 		wprintfx(&sRpt, formatTERMINATE, xpfCOL(attrRESET,0));
+		if (btSR == pdTRUE)
+			xRtosSemaphoreGive(&shUARTmux);
 	} else {
-		// If not in stage 2 cannot send to Syslog host NOR to LFS file
-		if (sSysFlags.stage2 == 0) return;
-		if (idSTA[0] == 0) strcpy((char*)idSTA, UNKNOWNMACAD);	// very early message, WIFI not initialized
-		int xLen = snprintfx(pBuf, SL_SIZEBUF, formatRFC5424, MsgPRI, psUTC, idSTA, McuID, ProcID, MsgID);
-		xLen += vsnprintfx(pBuf + xLen, SL_SIZEBUF - xLen - 1, format, vaList); // leave space for LF
+		if (idSTA[0] == 0)
+			strcpy((char*)idSTA, UNKNOWNMACAD);			// very early message, WIFI not initialized
+		xLen = snprintfx(pBuf, slSIZEBUF, formatRFC5424, MsgPRI, psUTC, idSTA, McuID, ProcID, MsgID);
+		xLen += vsnprintfx(pBuf + xLen, slSIZEBUF - xLen - 1, format, vaList); // leave space for LF
 
 		if (xSyslogConnect()) {							// Scheduler running, LxSTA up and connected
-			if (xRtosSemaphoreTake(&SL_NetMux, tWait) == pdTRUE) {
+			#if (halUSE_LITTLEFS == 1)
+				if (FileBuffer)
+					vSyslogFileSend();
+			#endif
 			xLen = xSyslogRemoveTerminators(pBuf, xLen);
+			if (xRtosSemaphoreTake(&slNetMux, pdMS_TO_TICKS(slMS_LOCK_WAIT)) == pdTRUE) {
 				iRV = xNetSend(&sCtx, (u8_t *)pBuf, xLen);
-				xRtosSemaphoreGive(&SL_NetMux);
-				if (iRV != erFAILURE)
-					sCtx.maxTx = (iRV > sCtx.maxTx) ? iRV : sCtx.maxTx;
-				else
+				xRtosSemaphoreGive(&slNetMux);
+				if (iRV == erFAILURE)
 					xNetClose(&sCtx);
+				else
+					sCtx.maxTx = (iRV > sCtx.maxTx) ? iRV : sCtx.maxTx;
 			}
 		} else {
 		#if (halUSE_LITTLEFS == 1)
