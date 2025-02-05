@@ -149,12 +149,9 @@ exit:
 */
 void vSyslogFileCheckSize(void) {
 	ssize_t Size = halFlashFileGetSize(slFILENAME);
-	if (INRANGE(1, Size, SL_FILESIZE)) {
-		halEventUpdateDevice(devMASK_LFS_SL, 1); 
-	} else {	// file not found, 0 or > "SL_FILESIZE" in size....
-		if (Size > SL_FILESIZE) unlink(slFILENAME);
-		halEventUpdateDevice(devMASK_LFS_SL, 0);
-	}
+	if (Size > SL_FILESIZE)
+		unlink(slFILENAME);			// file sizer > "SL_FILESIZE" in size....	
+	halEventUpdateDevice(devMASK_LFS_SL, 1);
 }
 
 void vSyslogFileSend(void) {
