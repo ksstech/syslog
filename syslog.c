@@ -92,19 +92,19 @@ SemaphoreHandle_t SL_NetMux = 0, SL_VarMux = 0;
 // level should be set to NOTICE.
 
 int xSyslogGetConsoleLevel(void) {
-	#if (appOPTIONS == 1)
-		return ioB3GET(ioSLOGhi); 
-	#else
-		return SL_LEV_CONSOLE;
-	#endif
+#if (appOPTIONS == 1)
+	return ioB3GET(ioSLOGhi); 
+#else
+	return SL_LEV_CONSOLE;
+#endif
 }
 
 int xSyslogGetHostLevel(void) {
-	#if (appOPTIONS == 1)
-		return ioB3GET(ioSLhost); 
-	#else
-		return SL_LEV_HOST;
-	#endif
+#if (appOPTIONS == 1)
+	return ioB3GET(ioSLhost); 
+#else
+	return SL_LEV_HOST;
+#endif
 }
 
 /**
@@ -183,8 +183,8 @@ exit0:
 	xRtosSemaphoreGive(&LFSmux);
 }
 
-static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID, const char *ProcID, const char *MsgID, 
-											char *pBuf, const char *format, va_list vaList) {
+static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID,
+	const char *ProcID, const char *MsgID, char *pBuf, const char *format, va_list vaList) {
 	const TickType_t tWait = pdMS_TO_TICKS(1000);
 	int iRV;
 	if (pBuf == NULL) {
@@ -246,12 +246,15 @@ static void IRAM_ATTR xSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID, co
 */
 void IRAM_ATTR xvSyslog(int MsgPRI, const char *MsgID, const char *format, va_list vaList) {
 	// discard all messages higher than console log level
-	if ((MsgPRI & 0x07) > xSyslogGetConsoleLevel())		return;	
+	if ((MsgPRI & 0x07) > xSyslogGetConsoleLevel())
+		return;	
 	MsgID = (MsgID == NULL) ? "null" : (*MsgID == 0) ? "empty" : MsgID;
+
 	// Handle state of scheduler and obtain the task name
 	const char *ProcID = (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) ? DRAM_STR("preX") : pcTaskGetName(NULL);	
 	u64_t CurRUN = halTIMER_ReadRunTime();
-	if (sTSZ.usecs == 0) sTSZ.usecs = CurRUN;
+	if (sTSZ.usecs == 0)
+		sTSZ.usecs = CurRUN;
 	int McuID = esp_cpu_get_core_id();
 
 	BaseType_t btSR = xRtosSemaphoreTake(&SL_VarMux, portMAX_DELAY);

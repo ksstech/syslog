@@ -56,8 +56,8 @@ extern "C" {
 
 // ############################## Syslog formatting/calling macros #################################
 
-#define SL_PRI(f,s)					((f << 3) | (s & 0x07))
-#define SL_LOG(l,f,...) 			do { if (((l & 7)) <= SL_LEVEL_MAX) vSyslog(l,__FUNCTION__,f,##__VA_ARGS__); } while(0)
+#define SL_PRI(fac,sev)				((fac << 3) | (sev & 0x07))
+#define SL_LOG(p,f,...) 			do { if (((p & 7)) <= SL_LEVEL_MAX) vSyslog(p,__FUNCTION__,f,##__VA_ARGS__); } while(0)
 #define SL_ERROR(e) 				xSyslogError(__FUNCTION__, e)
 #define IF_SL_ERROR(t,e) 			if (t) xSyslogError(__FUNCTION__, e)
 
@@ -86,6 +86,9 @@ extern SemaphoreHandle_t SL_NetMux, SL_VarMux;			// public to enable semaphore u
 // ###################################### function prototypes ######################################
 
 int xSyslogGetConsoleLevel(void);
+int xSyslogGetHostLevel(void);
+void vSyslogSetConsoleLevel(int Level);
+
 void vSyslogFileSend(void);
 void vSyslogFileCheckSize(void);
 void xvSyslog(int Priority, const char * MsgID, const char * format, va_list args);
