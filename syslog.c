@@ -153,8 +153,12 @@ void vSyslogFileCheckSize(void) {
 	halEventUpdateDevice(devMASK_LFS_SL, 1);
 }
 
+/**
+ * @brief
+ */
 void vSyslogFileSend(void) {
-	if (xSyslogConnect() == 0)						return;
+	if (xSyslogConnect() == 0)
+		return;
 	xRtosSemaphoreTake(&LFSmux, portMAX_DELAY);
 	FILE *fp = fopen(slFILENAME, "r");
 	if (fp == NULL)										// successfully opened file?			
@@ -165,7 +169,8 @@ void vSyslogFileSend(void) {
 	char * pBuf = malloc(SL_SIZEBUF);
 	while (1) {
 		char *pRV = fgets(pBuf, SL_SIZEBUF, fp);		// read string/line from file
-		if (pRV != pBuf)					break;		// nothing read or error, exit
+		if (pRV != pBuf)								// nothing read or error?
+			break;										// exit
 		char * pTmp = strstr(pRV, UNKNOWNMACAD);		// Check if early message ie no MAC address
 		if (pTmp != NULL)								// if UNKNOWNMACAD marker is present
 			memcpy(pTmp, idSTA, lenMAC_ADDRESS*2);		// replace with actual MAC/hostname
@@ -294,7 +299,7 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *MsgID, const char *format, va_li
 		xvSyslogSendMessage(MsgPRI, &TmpTSZ, McuID, ProcID, MsgID, NULL, format, vaList);
 
 		// Handle host message(s)
-		if ((MsgPRI & 7) <= xSyslogGetHostLevel()) {		// filter based on higher priorities
+		if ((MsgPRI & 7) <= xSyslogGetHostLevel()) {	// filter based on higher priorities
 			char *pBuf = malloc(SL_SIZEBUF);
 			if (TmpCNT > 0) {
 				TmpTSZ.usecs = TmpUTC;					// repeated message + count
@@ -330,7 +335,7 @@ int IRAM_ATTR xSyslogError(const char *pcFN, int iRV) {
 /**
  * @brief	report syslog related information
 */
-void vSyslogReport(report_t *psR) {
+void vSyslogReport(report_t * psR) {
 	if (sCtx.sd == -1) return;
 	xNetReport(psR, &sCtx, "SLOG", 0, 0, 0);
 	wprintfx(psR, "\tmaxTX=%zu  CurRpt=%lu" strNL, sCtx.maxTx, RptCNT);
