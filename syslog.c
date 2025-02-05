@@ -164,13 +164,6 @@ int xSyslogGetHostLevel(void) {
 /**
  * 
 */
-void vSyslogFileCheckSize(void) {
-	ssize_t Size = halFlashFileGetSize(slFILENAME);
-	if (Size > SL_FILESIZE)
-		unlink(slFILENAME);			// file sizer > "SL_FILESIZE" in size....	
-	halEventUpdateDevice(devMASK_LFS_SL, 1);
-}
-
 /**
  * @brief
  */
@@ -249,6 +242,18 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID,
 		#endif
 		}
 	}
+}
+
+/**
+ * 
+*/
+void vSyslogFileCheckSize(void) {
+	ssize_t Size = halFlashFileGetSize(slFILENAME);
+	if (Size > slFILESIZE) {
+		unlink(slFILENAME);			// file size > "slFILESIZE" in size....
+		Size = 0;
+	}
+	FileBuffer = (Size > 0) ? 1 : 0;
 }
 
 /**
