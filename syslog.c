@@ -44,9 +44,9 @@
 // ###################################### BUILD : CONFIG definitions ##############################
 
 #ifdef CONFIG_FREERTOS_UNICORE
-	#define SL_CORES				1
+	#define slCORES					1
 #else
-	#define SL_CORES				2
+	#define slCORES					2
 #endif
 
 #define formatRFC5424 DRAM_STR("<%u>1 %.3Z %s %d %s - - %s ")
@@ -55,8 +55,8 @@
 #define formatTERMINATE DRAM_STR("%C" strNL)
 
 // '<7>1 2021/10/21T12:34.567: cc50e38819ec_WROVERv4_5C9 #0 esp_timer halVARS_Report????? - '
-#define SL_SIZEBUF					512
-#define SL_FILESIZE					10204				// MAX history (at boot) size before truncation
+#define slSIZEBUF					512
+#define slFILESIZE					10204				// MAX history (at boot) size before truncation
 #define slFILENAME					"/syslog.txt"		// default file name in root directory
 #define UNKNOWNMACAD				"#UnknownMAC#"		// MAC address marker in pre-wifi messages
 
@@ -82,7 +82,7 @@ static const char *RptTask = NULL, *RptFunc = NULL;
 
 // ###################################### Global variables #########################################
 
-SemaphoreHandle_t SL_NetMux = 0, SL_VarMux = 0;
+SemaphoreHandle_t slNetMux = 0, slVarMux = 0;
 
 // ##################################### Private functions #########################################
 
@@ -174,9 +174,9 @@ void vSyslogFileSend(void) {
 	if (fseek(fp, 0L, SEEK_END) != 0 || ftell(fp) == 0L)// Seek to end OK & something there?
 		goto exit1;										// nope, something wrong
 	rewind(fp);
-	char * pBuf = malloc(SL_SIZEBUF);
+	char * pBuf = malloc(slSIZEBUF);
 	while (1) {
-		char *pRV = fgets(pBuf, SL_SIZEBUF, fp);		// read string/line from file
+		char *pRV = fgets(pBuf, slSIZEBUF, fp);		// read string/line from file
 		if (pRV != pBuf)								// nothing read or error?
 			break;										// exit
 		char * pTmp = strstr(pRV, UNKNOWNMACAD);		// Check if early message ie no MAC address
@@ -264,7 +264,7 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *MsgID, const char *format, va_li
 		sTSZ.usecs = CurRUN;
 	int McuID = esp_cpu_get_core_id();
 
-	BaseType_t btSR = xRtosSemaphoreTake(&SL_VarMux, portMAX_DELAY);
+	BaseType_t btSR = xRtosSemaphoreTake(&slVarMux, portMAX_DELAY);
 	u32_t MsgCRC = 0;
 	int xLen = crcprintfx(&MsgCRC, DRAM_STR("%s %s "), ProcID, MsgID);	// "Task Function "
 	xLen += vcrcprintfx(&MsgCRC, format, vaList);						// "Task Function message parameters etc"
@@ -300,7 +300,7 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *MsgID, const char *format, va_li
 
 		// Handle host message(s)
 		if ((MsgPRI & 7) <= xSyslogGetHostLevel()) {	// filter based on higher priorities
-			char *pBuf = malloc(SL_SIZEBUF);
+			char *pBuf = malloc(slSIZEBUF);
 			if (TmpCNT > 0) {
 				TmpTSZ.usecs = TmpUTC;					// repeated message + count
 				xSyslogSendMessage(TmpPRI, &TmpTSZ, McuID, TmpTask, TmpFunc, pBuf, formatREPEATED, TmpCNT);
