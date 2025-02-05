@@ -64,12 +64,7 @@
 
 // ####################################### Local variables #########################################
 
-static netx_t sCtx = {0};
-static u32_t RptCRC = 0, RptCNT = 0;
-static u64_t RptRUN = 0, RptUTC = 0;
-static u8_t RptPRI = 0;
-static const char *RptTask, *RptFunc;
-static char SyslogColors[8] = {
+static const char SyslogColors[8] = {
 	colourFG_RED,					// Emergency
 	colourFG_RED,					// Alert
 	colourFG_RED,					// Critical
@@ -79,6 +74,11 @@ static char SyslogColors[8] = {
 	colourFG_MAGENTA,				// Info
 	colourFG_CYAN,					// Debug
 };
+static netx_t sCtx = {0};
+static u32_t RptCRC = 0, RptCNT = 0;
+static u64_t RptRUN = 0, RptUTC = 0;
+static u8_t RptPRI = 0;
+static const char *RptTask = NULL, *RptFunc = NULL;
 
 // ###################################### Global variables #########################################
 
