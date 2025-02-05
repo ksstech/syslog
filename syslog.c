@@ -89,6 +89,12 @@ SemaphoreHandle_t slNetMux = 0, slVarMux = 0;
 
 // ##################################### Private functions #########################################
 
+static int xSyslogRemoveTerminators(char * pBuf, int xLen) {
+	while (pBuf[xLen - 1] == CHR_LF || pBuf[xLen - 1] == CHR_CR)
+		pBuf[--xLen] = CHR_NUL;					// remove terminating CR/LF
+	return xLen;
+}
+
 /**
  * @brief	establish connection to the selected syslog host
  * @return	1 if successful else 0
@@ -222,9 +228,8 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID,
 		xLen += vsnprintfx(pBuf + xLen, SL_SIZEBUF - xLen - 1, format, vaList); // leave space for LF
 
 		if (xSyslogConnect()) {							// Scheduler running, LxSTA up and connected
-			while (pBuf[xLen - 1] == CHR_LF || pBuf[xLen - 1] == CHR_CR)
-				pBuf[--xLen] = CHR_NUL;					// remove terminating CR/LF
 			if (xRtosSemaphoreTake(&SL_NetMux, tWait) == pdTRUE) {
+			xLen = xSyslogRemoveTerminators(pBuf, xLen);
 				iRV = xNetSend(&sCtx, (u8_t *)pBuf, xLen);
 				xRtosSemaphoreGive(&SL_NetMux);
 				if (iRV != erFAILURE)
