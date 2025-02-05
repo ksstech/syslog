@@ -118,7 +118,7 @@ static int IRAM_ATTR xSyslogConnect(void) {
 	sCtx.type = SOCK_DGRAM;
 	sCtx.bSyslog = 1;									// mark as syslog port, so as not to recurse
 	// successfully opened && Receive TO set ok?
-	if (xNetOpen(&sCtx) < erSUCCESS && xNetSetRecvTO(&sCtx, flagXNET_NONBLOCK) >= erSUCCESS)
+	if (xNetOpen(&sCtx) > erFAILURE && xNetSetRecvTO(&sCtx, flagXNET_NONBLOCK) > erFAILURE)
 		return 1;										// yes, return all OK
 	xNetClose(&sCtx);									// no, trying closing
 	return 0;											// and return status accordingly
