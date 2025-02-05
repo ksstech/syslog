@@ -231,7 +231,7 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID,
 			}
 		} else {
 		#if (halUSE_LITTLEFS == 1)
-			if (halEventCheckDevice(devMASK_LFS)) { 	// L2+3 STA down, append to file...
+			if (halEventCheckDevice(devMASK_LFS)) { 	// scheduler not (yet) running or LXSTA down, append to file...
 				if (pBuf[xLen-1] != CHR_LF) {
 					pBuf[xLen++] = CHR_LF;				// append LF if required
 					pBuf[xLen] = CHR_NUL;				// and terminate
@@ -275,7 +275,8 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *MsgID, const char *format, va_li
 		RptUTC = sTSZ.usecs;
 		RptTask = ProcID;
 		RptFunc = (char *)MsgID;
-		if (btSR == pdTRUE) xRtosSemaphoreGive(&SL_VarMux);
+		if (btSR == pdTRUE)
+			xRtosSemaphoreGive(&slVarMux);
 	} else { // Different CRC and/or PRI
 		// save trackers for immediate and future use...
 		RptCRC = MsgCRC;
@@ -287,7 +288,8 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *MsgID, const char *format, va_li
 		u64_t TmpUTC = RptUTC;
 		const char *TmpTask = RptTask;
 		const char *TmpFunc = RptFunc;
-		if (btSR == pdTRUE) xRtosSemaphoreGive(&SL_VarMux);
+		if (btSR == pdTRUE)
+			xRtosSemaphoreGive(&slVarMux);
 		tsz_t TmpTSZ = {.pTZ = sTSZ.pTZ};
 
 		// Handle console message(s)
