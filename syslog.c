@@ -79,6 +79,9 @@ static u32_t RptCRC = 0, RptCNT = 0;
 static u64_t RptRUN = 0, RptUTC = 0;
 static u8_t RptPRI = 0;
 static const char *RptTask = NULL, *RptFunc = NULL;
+#if (halUSE_LITTLEFS == 1)
+	static bool FileBuffer = 0;
+#endif
 
 // ###################################### Global variables #########################################
 
@@ -190,7 +193,7 @@ void vSyslogFileSend(void) {
 		vTaskDelay(pdMS_TO_TICKS(10));					// ensure WDT gets fed....
 	}
 	free(pBuf);
-	halEventUpdateDevice(devMASK_LFS_SL, 0);
+	FileBuffer = 0;
 exit1:
 	fclose(fp);
 	unlink(slFILENAME);
@@ -237,7 +240,7 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID,
 					pBuf[xLen] = CHR_NUL;				// and terminate
 				}
 				halFlashFileWrite(slFILENAME, "a", pBuf);
-				halEventUpdateDevice(devMASK_LFS_SL, 1);
+				FileBuffer = 1;
 			}
 		#endif
 		}
