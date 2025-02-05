@@ -130,9 +130,7 @@ static int IRAM_ATTR xSyslogConnect(void) {
 /**
  * @brief
  */
-void vSyslogFileSend(void) {
-	if (xSyslogConnect() == 0)
-		return;
+static void vSyslogFileSend(void) {
 	xRtosSemaphoreTake(&LFSmux, portMAX_DELAY);
 	FILE *fp = fopen(slFILENAME, "r");
 	if (fp == NULL)										// successfully opened file?			
