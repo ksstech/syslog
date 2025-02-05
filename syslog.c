@@ -193,11 +193,11 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID,
 	if (pBuf == NULL) {
 		report_t sRpt = { .Size = repSIZE_SET(0,0,0,1,sgrANSI,0,0) };
 		report_t * psR = &sRpt;
-		BaseType_t btSR = sSysFlags.stage0 ? xRtosSemaphoreTake(&shUARTmux, portMAX_DELAY) : pdFALSE;
+		BaseType_t btSR = xRtosSemaphoreTake(&shUARTmux, portMAX_DELAY);
 		wprintfx(psR, formatCONSOLE, xpfCOL(SyslogColors[MsgPRI & 0x07],0), halTIMER_ReadRunTime(), McuID, ProcID, MsgID);
 		wvprintfx(psR, format, vaList);
 		wprintfx(psR, formatTERMINATE, xpfCOL(attrRESET,0));
-		if (sSysFlags.stage0 && btSR == pdTRUE) xRtosSemaphoreGive(&shUARTmux);
+		if (btSR == pdTRUE) xRtosSemaphoreGive(&shUARTmux);
 		
 	} else {
 		// If not in stage 2 cannot send to Syslog host NOR to LFS file
