@@ -125,9 +125,6 @@ static int IRAM_ATTR xSyslogConnect(void) {
 }
 
 /**
- * 
-*/
-/**
  * @brief
  */
 static void vSyslogFileSend(void) {
