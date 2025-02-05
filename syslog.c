@@ -84,6 +84,36 @@ static const char *RptTask = NULL, *RptFunc = NULL;
 
 SemaphoreHandle_t SL_NetMux = 0, SL_VarMux = 0;
 
+// ##################################### Private functions #########################################
+
+/**
+ * @brief	establish connection to the selected syslog host
+ * @return	1 if successful else 0
+ * @note	can only return 1 if scheduler running & L3 connected, 
+*/
+static int IRAM_ATTR xSyslogConnect(void) {
+	if ((xTaskGetSchedulerState() != taskSCHEDULER_RUNNING) || halEventWaitStatus(flagLX_STA, pdMS_TO_TICKS(20)) == 0)
+		return 0;
+	if (sCtx.sd > 0) 									// already connected ?
+		return 1;										// yes, exit with status OK
+	#if (appOPTIONS == 1)
+		int Idx = ioB2GET(ioHostSLOG);					// if WL connected, NVS vars must be initialized (in stage 2.0/1)
+		sCtx.pHost = HostInfo[Idx].pName;
+		sCtx.sa_in.sin_port = htons(HostInfo[Idx].Port ? HostInfo[Idx].Port : IP_PORT_SYSLOG_UDP);
+	#else
+		sCtx.pHost = "logs5.papertrailapp.com";
+		sCtx.sa_in.sin_port = htons(28535);
+	#endif
+	sCtx.sa_in.sin_family = AF_INET;
+	sCtx.type = SOCK_DGRAM;
+	sCtx.bSyslog = 1;									// mark as syslog port, so as not to recurse
+	// successfully opened && Receive TO set ok?
+	if (xNetOpen(&sCtx) < erSUCCESS && xNetSetRecvTO(&sCtx, flagXNET_NONBLOCK) >= erSUCCESS)
+		return 1;										// yes, return all OK
+	xNetClose(&sCtx);									// no, trying closing
+	return 0;											// and return status accordingly
+}
+
 // ###################################### Public functions #########################################
 
 // In the case where the log level is set to DEBUG in ESP-IDF the volume of messages being generated
@@ -111,37 +141,6 @@ int xSyslogGetHostLevel(void) {
 #else
 	return SL_LEV_HOST;
 #endif
-}
-
-/**
- * @brief	establish connection to the selected syslog host
- * @return	1 if successful else 0
-*/
-static int IRAM_ATTR xSyslogConnect(void) {
-	if ((xTaskGetSchedulerState() != taskSCHEDULER_RUNNING) ||
-		(halEventWaitStatus(flagLX_STA, pdMS_TO_TICKS(20)) == 0)) {
-		return 0;
-	}
-	if (sCtx.sd > 0) return 1;							// already connected, exit with status OK
-	#if (appOPTIONS == 1)
-		int Idx = ioB2GET(ioHostSLOG);
-		sCtx.pHost = HostInfo[Idx].pName;
-		sCtx.sa_in.sin_port = htons(HostInfo[Idx].Port ? HostInfo[Idx].Port : IP_PORT_SYSLOG_UDP);
-	#else
-		sCtx.pHost = "logs5.papertrailapp.com";
-		sCtx.sa_in.sin_port = htons(28535);
-	#endif
-	sCtx.sa_in.sin_family = AF_INET;
-	sCtx.type = SOCK_DGRAM;
-//	sCtx.flags = SO_REUSEADDR;
-	sCtx.bSyslog = 1;									// mark as syslog port, so as not to recurse
-	int iRV = xNetOpen(&sCtx);
-	if (iRV < erSUCCESS) goto exit;
-	iRV = xNetSetRecvTO(&sCtx, flagXNET_NONBLOCK);
-	if (iRV >= erSUCCESS) return 1;
-exit:
-	xNetClose(&sCtx);
-	return 0;
 }
 
 /**
