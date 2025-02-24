@@ -81,7 +81,7 @@ static u64_t RptRUN = 0, RptUTC = 0;
 static u8_t RptPRI = 0;
 static const char *RptTask = NULL, *RptFunc = NULL;
 static report_t sRpt = { .Size = repSIZE_SET(0,0,0,1,sgrANSI,0,0) };
-#if (halUSE_LITTLEFS == 1)
+#if (appLITTLEFS == 1)
 	static bool FileBuffer = 0;
 #endif
 
@@ -180,7 +180,7 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID,
 		xLen += vsnprintfx(pBuf + xLen, slSIZEBUF - xLen - 1, format, vaList); // leave space for LF
 
 		if (xSyslogConnect()) {							// Scheduler running, LxSTA up and connected
-			#if (halUSE_LITTLEFS == 1)
+			#if (appLITTLEFS == 1)
 				if (FileBuffer)
 					vSyslogFileSend();
 			#endif
@@ -194,7 +194,7 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID,
 					sCtx.maxTx = (iRV > sCtx.maxTx) ? iRV : sCtx.maxTx;
 			}
 		} else {
-		#if (halUSE_LITTLEFS == 1)
+		#if (appLITTLEFS > 0)
 			if (halEventCheckDevice(devMASK_LFS)) { 	// scheduler not (yet) running or LXSTA down, append to file...
 				if (pBuf[xLen-1] != CHR_LF) {
 					pBuf[xLen++] = CHR_LF;				// append LF if required
