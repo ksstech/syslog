@@ -116,8 +116,8 @@ static int IRAM_ATTR xSyslogConnect(void) {
 		sCtx.pHost = HostInfo[Idx].pName;
 		sCtx.sa_in.sin_port = htons(HostInfo[Idx].Port ? HostInfo[Idx].Port : IP_PORT_SYSLOG_UDP);
 	#else
-		sCtx.pHost = "logs5.papertrailapp.com";
-		sCtx.sa_in.sin_port = htons(28535);
+		sCtx.pHost = appDEFAULT_SL_HOST;				// options not part of application ?
+		sCtx.sa_in.sin_port = htons(appDEFAULT_SL_PORT);// get from app_config...
 	#endif
 	// successfully opened && Receive TO set ok?
 	if ((xNetOpen(&sCtx) > erFAILURE) && 				// successfully opened ?
