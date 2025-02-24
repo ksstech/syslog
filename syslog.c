@@ -107,11 +107,11 @@ static int IRAM_ATTR xSyslogConnect(void) {
 		return 0;
 	if (sCtx.sd > 0) 									// already connected ?
 		return 1;										// yes, exit with status OK
-	#if (appOPTIONS == 1)
 	sCtx.type = SOCK_DGRAM;
 	sCtx.flags = SO_REUSEADDR;
 	sCtx.sa_in.sin_family = AF_INET;
 	sCtx.bSyslog = 1;									// mark as syslog port, so as not to recurse in xNet??????
+	#if (appOPTIONS > 0)
 		int Idx = ioB2GET(ioHostSLOG);					// if WL connected, NVS vars must be initialized (in stage 2.0/1)
 		sCtx.pHost = HostInfo[Idx].pName;
 		sCtx.sa_in.sin_port = htons(HostInfo[Idx].Port ? HostInfo[Idx].Port : IP_PORT_SYSLOG_UDP);
@@ -120,8 +120,10 @@ static int IRAM_ATTR xSyslogConnect(void) {
 		sCtx.sa_in.sin_port = htons(28535);
 	#endif
 	// successfully opened && Receive TO set ok?
-	if (xNetOpen(&sCtx) > erFAILURE && xNetSetRecvTO(&sCtx, flagXNET_NONBLOCK) > erFAILURE)
+	if ((xNetOpen(&sCtx) > erFAILURE) && 				// successfully opened ?
+		(xNetSetRecvTO(&sCtx, flagXNET_NONBLOCK) > erFAILURE)) {	// and RX timeout set ?
 		return 1;										// yes, return all OK
+	}
 	xNetClose(&sCtx);									// no, trying closing
 	return 0;											// and return status accordingly
 }
@@ -349,7 +351,8 @@ int IRAM_ATTR xSyslogError(const char *pcFN, int iRV) {
  * @brief	report syslog related information
 */
 void vSyslogReport(report_t * psR) {
-	if (sCtx.sd == -1) return;
+	if (sCtx.sd <= 0)
+		return;
 	if (psR == NULL)
 		psR = &sRpt;
 	xNetReport(psR, &sCtx, "SLOG", 0, 0, 0);
