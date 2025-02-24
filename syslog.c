@@ -108,6 +108,10 @@ static int IRAM_ATTR xSyslogConnect(void) {
 	if (sCtx.sd > 0) 									// already connected ?
 		return 1;										// yes, exit with status OK
 	#if (appOPTIONS == 1)
+	sCtx.type = SOCK_DGRAM;
+	sCtx.flags = SO_REUSEADDR;
+	sCtx.sa_in.sin_family = AF_INET;
+	sCtx.bSyslog = 1;									// mark as syslog port, so as not to recurse in xNet??????
 		int Idx = ioB2GET(ioHostSLOG);					// if WL connected, NVS vars must be initialized (in stage 2.0/1)
 		sCtx.pHost = HostInfo[Idx].pName;
 		sCtx.sa_in.sin_port = htons(HostInfo[Idx].Port ? HostInfo[Idx].Port : IP_PORT_SYSLOG_UDP);
@@ -115,9 +119,6 @@ static int IRAM_ATTR xSyslogConnect(void) {
 		sCtx.pHost = "logs5.papertrailapp.com";
 		sCtx.sa_in.sin_port = htons(28535);
 	#endif
-	sCtx.sa_in.sin_family = AF_INET;
-	sCtx.type = SOCK_DGRAM;
-	sCtx.bSyslog = 1;									// mark as syslog port, so as not to recurse
 	// successfully opened && Receive TO set ok?
 	if (xNetOpen(&sCtx) > erFAILURE && xNetSetRecvTO(&sCtx, flagXNET_NONBLOCK) > erFAILURE)
 		return 1;										// yes, return all OK
