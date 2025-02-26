@@ -56,11 +56,6 @@ extern "C" {
 
 // ############################## Syslog formatting/calling macros #################################
 
-#define SL_PRI(fac,sev)				((fac << 3) | (sev & 0x07))
-#define SL_LOG(p,f,...) 			do { if (((p & 7)) <= SL_LEVEL_MAX) vSyslog(p,__FUNCTION__,f,##__VA_ARGS__); } while(0)
-#define SL_ERROR(e) 				xSyslogError(__FUNCTION__, e)
-#define IF_SL_ERROR(t,e) 			if (t) xSyslogError(__FUNCTION__, e)
-
 #define	SL_EMER(fmt, ...)			SL_LOG(SL_SEV_EMERGENCY, fmt, ##__VA_ARGS__)
 #define	SL_ALRT(fmt, ...)			SL_LOG(SL_SEV_ALERT, fmt, ##__VA_ARGS__)
 #define	SL_CRIT(fmt, ...)			SL_LOG(SL_SEV_CRITICAL, fmt, ##__VA_ARGS__)
@@ -78,6 +73,17 @@ extern "C" {
 #define	IF_SL_NOT(tst, fmt, ...)	if (tst) SL_NOT(fmt, ##__VA_ARGS__)
 #define	IF_SL_INFO(tst, fmt, ...)	if (tst) SL_INFO(fmt, ##__VA_ARGS__)
 #define	IF_SL_DBG(tst, fmt, ...)	if (tst) SL_DBG(fmt, ##__VA_ARGS__)
+
+#define SL_LOG(pri, f, ...) 		do { 													\
+										if (((pri)&7) <= SL_LEVEL_MAX) {					\
+											 vSyslog(pri,__FUNCTION__,f,##__VA_ARGS__);		\
+										} 													\
+									} while(0)
+
+#define SL_PRI(fac,sev)				(((fac)<<3) | ((sev)&7))
+
+#define SL_ERROR(err) 				xSyslogError(__FUNCTION__, err)
+#define IF_SL_ERROR(tst, err) 		if (tst) SL_ERROR(err)
 
 // ###################################### Global variables #########################################
 
