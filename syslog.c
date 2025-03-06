@@ -117,7 +117,7 @@ static bool IRAM_ATTR xSyslogConnect(void) {
 	sCtx.sa_in.sin_family = AF_INET;
 	sCtx.bSyslog = 1;									// mark as syslog port, so as not to recurse in xNet??????
 	#if (appOPTIONS > 0)
-		int Idx = ioB2GET(ioHostSLOG);					// if WL connected, NVS vars must be initialized (in stage 2.0/1)
+		int Idx = xOptionGet(ioHostSLOG);				// if WL connected, NVS vars must be initialized (in stage 2.0/1)
 		sCtx.pHost = HostInfo[Idx].pName;
 		sCtx.sa_in.sin_port = htons(HostInfo[Idx].Port ? HostInfo[Idx].Port : IP_PORT_SYSLOG_UDP);
 	#else
