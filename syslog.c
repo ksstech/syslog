@@ -77,7 +77,6 @@ static u32_t RptCRC = 0, RptCNT = 0;
 static u64_t RptRUN = 0, RptUTC = 0;
 static u8_t RptPRI = 0, RptCore = 0;
 static const char *RptTask = NULL, *RptFunc = NULL;
-static report_t sRpt = { .Size = repSIZE_SET(0,0,0,1,sgrANSI,0,0) };
 #if (appLITTLEFS == 1)
 	static bool FileBuffer = 0;
 #endif
@@ -368,10 +367,7 @@ int IRAM_ATTR xSyslogError(const char *FuncID, int iRV) {
 void vSyslogReport(report_t * psR) {
 	if (sCtx.sd <= 0)
 		return;
-	if (psR == NULL) {
-		psR = &sRpt;
-		fmSET(aNL, 0);
-	}
+	fmSET(aNL, 0);
 	xNetReport(psR, &sCtx, "SLOG", 0, 0, 0);
 	wprintfx(psR, "\tmaxTX=%zu  CurRpt=%lu" strNL, sCtx.maxTx, RptCNT);
 }
