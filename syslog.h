@@ -103,6 +103,7 @@ int xSyslogGetHostLevel(void);
  * @param[in]
  */
 void vSyslogSetConsoleLevel(int Level);
+void vSyslogSetHostLevel(int Level);
 
 /**
  * @brief	Check size of slFILENAME, if bigger than slFILESIZE will unlink/delete the file to make space

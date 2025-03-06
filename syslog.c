@@ -85,6 +85,11 @@ static report_t sRpt = { .Size = repSIZE_SET(0,0,0,1,sgrANSI,0,0) };
 	static bool FileBuffer = 0;
 #endif
 
+#if (appOPTIONS == 0)
+	static u8_t hostLevel = SL_LEV_HOST;
+	static u8_t consoleLevel = SL_LEV_CONSOLE;
+#endif
+
 // ###################################### Global variables #########################################
 
 SemaphoreHandle_t slNetMux = 0, slVarMux = 0;
@@ -225,29 +230,42 @@ static void IRAM_ATTR xSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID, co
 
 int xSyslogGetConsoleLevel(void) {
 #if (appOPTIONS == 1)
-	return ioB3GET(ioSLOGhi); 
+	int iRV = xOptionGet(ioSLOGhi);
+	return iRV ? iRV : SL_LEV_CONSOLE;
 #else
-	return SL_LEV_CONSOLE;
-#endif
-}
-
-void vSyslogSetConsoleLevel(int Level) {
-#if (appOPTIONS == 1)
-	ioB3SET(ioSLOGhi, Level); 
+	return consoleLevel;
 #endif
 }
 
 int xSyslogGetHostLevel(void) {
 #if (appOPTIONS == 1)
-	return ioB3GET(ioSLhost); 
+	int iRV = xOptionGet(ioSLhost);
+	return iRV ? iRV : SL_LEV_HOST;
 #else
-	return SL_LEV_HOST;
+	return hostLevel;
 #endif
 }
 
-/**
- * 
-*/
+void vSyslogSetConsoleLevel(int Level) {
+	if (Level <= SL_LEVEL_MAX) {
+		#if (appOPTIONS == 1)
+		vOptionSet(ioSLOGhi, Level);
+		#else
+		consoleLevel = Level;
+		#endif
+	}
+}
+
+void vSyslogSetHostLevel(int Level) {
+	if (Level <= SL_LEVEL_MAX) {
+	#if (appOPTIONS == 1)
+		vOptionSet(ioSLhost, Level);
+	#else
+		hostLevel = Level;
+	#endif
+	}
+}
+
 void vSyslogFileCheckSize(void) {
 	ssize_t Size = halFlashFileGetSize(slFILENAME);
 	if (Size > slFILESIZE) {
