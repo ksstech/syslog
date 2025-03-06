@@ -75,7 +75,7 @@ static const char SyslogColors[8] = {
 static netx_t sCtx = { 0 };
 static u32_t RptCRC = 0, RptCNT = 0;
 static u64_t RptRUN = 0, RptUTC = 0;
-static u8_t RptPRI = 0;
+static u8_t RptPRI = 0, RptCore = 0;
 static const char *RptTask = NULL, *RptFunc = NULL;
 static report_t sRpt = { .Size = repSIZE_SET(0,0,0,1,sgrANSI,0,0) };
 #if (appLITTLEFS == 1)
@@ -312,6 +312,7 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_l
 		RptUTC = sTSZ.usecs;
 		RptTask = TaskID;
 		RptFunc = (char *)FuncID;
+		RptCore = CoreID;
 		if (btSR == pdTRUE)
 			xRtosSemaphoreGive(&slVarMux);
 	} else { // Different CRC and/or PRI
@@ -319,6 +320,8 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_l
 		RptCRC = MsgCRC;
 		u8_t TmpPRI = RptPRI;
 		RptPRI = MsgPRI;
+		u8_t TmpCore = RptCore;
+		RptCore = CoreID;
 		u32_t TmpCNT = RptCNT;
 		RptCNT = 0;
 		u64_t TmpRUN = RptRUN;
