@@ -297,8 +297,8 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_l
 
 	BaseType_t btSR = xRtosSemaphoreTake(&slVarMux, portMAX_DELAY);
 	u32_t MsgCRC = 0;
-	xLen += vcrcprintfx(&MsgCRC, format, vaList);						// "Task Function message parameters etc"
 	int xLen = crcprintfx(&MsgCRC, DRAM_STR("%s %d %s "), TaskID, CoreID, FuncID);	// "Task Core Function "
+	xLen += vcrcprintfx(&MsgCRC, format, vaList);									//  add message parameters etc"
 
 	if (MsgCRC == RptCRC && MsgPRI == RptPRI) {				// CRC & PRI same as previous message ?
 		++RptCNT;											// Yes, increment the repeat counter
