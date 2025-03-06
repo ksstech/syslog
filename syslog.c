@@ -332,6 +332,13 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_l
 			xRtosSemaphoreGive(&slVarMux);
 		tsz_t TmpTSZ = {.pTZ = sTSZ.pTZ};
 
+		#if (appLITTLEFS == 1)
+		xRtosSemaphoreTake(&LFSmux, portMAX_DELAY);
+		if (FileBuffer && xSyslogConnect())
+			vSyslogFileSend();
+		xRtosSemaphoreGive(&LFSmux);
+		#endif
+	
 		// Handle console message(s)
 		if (TmpCNT > 0) {
 			TmpTSZ.usecs = TmpRUN;						// repeated message + count
