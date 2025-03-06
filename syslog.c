@@ -272,12 +272,14 @@ void vSyslogSetHostLevel(int Level) {
 }
 
 void vSyslogFileCheckSize(void) {
+	xRtosSemaphoreTake(&LFSmux, portMAX_DELAY);
 	ssize_t Size = halFlashFileGetSize(slFILENAME);
 	if (Size > slFILESIZE) {
 		unlink(slFILENAME);			// file size > "slFILESIZE" in size....
 		Size = 0;
 	}
 	FileBuffer = (Size > 0) ? 1 : 0;
+	xRtosSemaphoreGive(&LFSmux);
 }
 
 void IRAM_ATTR xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_list vaList) {
