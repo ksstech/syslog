@@ -49,10 +49,7 @@
 	#define slCORES					2
 #endif
 
-#define formatRFC5424 DRAM_STR("<%u>1 %.3Z %s %d %s - - %s ")
-#define formatCONSOLE DRAM_STR("%C%!.3R %d %s %s ")
 #define formatREPEATED DRAM_STR("Repeated %dx")
-#define formatTERMINATE DRAM_STR("%C" strNL)
 
 // '<7>1 2021/10/21T12:34.567: cc50e38819ec_WROVERv4_5C9 #0 esp_timer halVARS_Report????? - '
 #define slSIZEBUF					512
@@ -75,7 +72,7 @@ static const char SyslogColors[8] = {
 	colourFG_MAGENTA,				// Info
 	colourFG_CYAN,					// Debug
 };
-static netx_t sCtx = {0};
+static netx_t sCtx = { 0 };
 static u32_t RptCRC = 0, RptCNT = 0;
 static u64_t RptRUN = 0, RptUTC = 0;
 static u8_t RptPRI = 0;
@@ -115,7 +112,7 @@ static bool IRAM_ATTR xSyslogConnect(void) {
 	sCtx.type = SOCK_DGRAM;
 	sCtx.flags = SO_REUSEADDR;
 	sCtx.sa_in.sin_family = AF_INET;
-	sCtx.bSyslog = 1;									// mark as syslog port, so as not to recurse in xNet??????
+	sCtx.bSyslog = 1;									// mark as syslog port, so as not to recurse in xNetReport
 	#if (appOPTIONS > 0)
 		int Idx = xOptionGet(ioHostSLOG);				// if WL connected, NVS vars must be initialized (in stage 2.0/1)
 		sCtx.pHost = HostInfo[Idx].pName;
@@ -129,7 +126,7 @@ static bool IRAM_ATTR xSyslogConnect(void) {
 		(xNetSetRecvTO(&sCtx, flagXNET_NONBLOCK) > erFAILURE)) {	// and RX timeout set ?
 		return 1;										// yes, return all OK
 	}
-	xNetClose(&sCtx);									// no, trying closing
+	xNetClose(&sCtx);									// no, try closing
 	return 0;											// and return status accordingly
 }
 
@@ -159,8 +156,8 @@ static void vSyslogFileSend(void) {
 			break;										// if error, abort sending
 		vTaskDelay(pdMS_TO_TICKS(10));					// ensure WDT gets fed....
 	}
-	free(pBuf);
 	FileBuffer = 0;
+	free(pBuf);											// always free buffer
 exit1:
 	fclose(fp);
 	unlink(slFILENAME);
