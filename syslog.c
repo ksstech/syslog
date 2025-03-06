@@ -107,7 +107,7 @@ static int xSyslogRemoveTerminators(char * pBuf, int xLen) {
  * @return	1 if successful else 0
  * @note	can only return 1 if scheduler running & L3 connected, 
 */
-static int IRAM_ATTR xSyslogConnect(void) {
+static bool IRAM_ATTR xSyslogConnect(void) {
 	if ((xTaskGetSchedulerState() != taskSCHEDULER_RUNNING) || halEventCheckStatus(flagLX_STA) == 0)
 		return 0;
 	if (sCtx.sd > 0) 									// already connected ?
