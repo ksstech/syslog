@@ -121,10 +121,15 @@ static bool IRAM_ATTR xSyslogConnect(void) {
 		sCtx.sa_in.sin_port = htons(appDEFAULT_SL_PORT);// get from app_config...
 	#endif
 	// successfully opened && Receive TO set ok?
+#if 1
+	if (xNetOpen(&sCtx) > erFAILURE) 					// successfully opened ?
+		return 1;										// yes, return all OK
+#else
 	if ((xNetOpen(&sCtx) > erFAILURE) && 				// successfully opened ?
 		(xNetSetRecvTO(&sCtx, flagXNET_NONBLOCK) > erFAILURE)) {	// and RX timeout set ?
 		return 1;										// yes, return all OK
 	}
+#endif
 	xNetClose(&sCtx);									// no, try closing
 	return 0;											// and return status accordingly
 }
