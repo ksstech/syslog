@@ -281,13 +281,6 @@ void vSyslogFileCheckSize(void) {
 	FileBuffer = (Size > 0) ? 1 : 0;
 }
 
-/**
- * @brief		writes an RFC formatted message to syslog host
- * @brief		write to stdout & syslog host (if up and running)
- * @param[in]	Priority and MsgID as defined by RFC
- * @param[in]	format string and parameters as per normal printf()
- * @return		number of characters sent to server
-*/
 void IRAM_ATTR xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_list vaList) {
 	// discard all messages higher than console log level
 	if ((MsgPRI & 0x07) > xSyslogGetConsoleLevel())
@@ -360,15 +353,6 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_l
 	}
 }
 
-/**
- * Writes an RFC formatted message to syslog host
- * @brief		if syslog not up and running, write to stdout
- * @brief		avoid using malloc() or similar since also called from error/crash handlers
- * @param[in]	Priority, ProcID and MsgID as defined by RFC
- * @param[in]	format string and parameters as per normal printf()
- * @param[out]	none
- * @return		number of characters displayed(if only to console) or send(if to server)
-*/
 void IRAM_ATTR vSyslog(int MsgPRI, const char *FuncID, const char *format, ...) {
 	va_list vaList;
 	va_start(vaList, format);
@@ -381,9 +365,6 @@ int IRAM_ATTR xSyslogError(const char *FuncID, int iRV) {
 	return (iRV > 0) ? -iRV : iRV;
 }
 
-/**
- * @brief	report syslog related information
-*/
 void vSyslogReport(report_t * psR) {
 	if (sCtx.sd <= 0)
 		return;
