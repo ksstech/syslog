@@ -165,8 +165,6 @@ exit0:
 	xRtosSemaphoreGive(&LFSmux);
 }
 
-static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID,
-	const char *ProcID, const char *MsgID, char *pBuf, const char *format, va_list vaList) {
 static void vSyslogFilesAppend(char * pBuf, int xLen) {
 	if (halEventCheckDevice(devMASK_LFS)) { 	// LFS available & initialised ?
 		if (pBuf[xLen-1] != CHR_LF) {			// yes, if last character not a LF
@@ -180,10 +178,12 @@ static void vSyslogFilesAppend(char * pBuf, int xLen) {
 	}
 }
 
+static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int CoreID,
+	const char *TaskID, const char *FuncID, char *pBuf, const char *format, va_list vaList) {
 	int iRV, xLen;
 	if (pBuf == NULL) {
 		BaseType_t btSR = xRtosSemaphoreTake(&shUARTmux, portMAX_DELAY);
-		wprintfx(&sRpt, formatCONSOLE, xpfCOL(SyslogColors[MsgPRI & 0x07],0), halTIMER_ReadRunTime(), McuID, ProcID, MsgID);
+		wprintfx(&sRpt, formatCONSOLE, xpfCOL(SyslogColors[MsgPRI & 0x07],0), halTIMER_ReadRunTime(), CoreID, TaskID, FuncID);
 		wvprintfx(&sRpt, format, vaList);
 		wprintfx(&sRpt, formatTERMINATE, xpfCOL(attrRESET,0));
 		if (btSR == pdTRUE)
@@ -219,11 +219,11 @@ static void vSyslogFilesAppend(char * pBuf, int xLen) {
 	}
 }
 
-static void IRAM_ATTR xSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID, const char *ProcID,
-										 const char *MsgID, char *pBuf, const char *format, ...) {
+static void IRAM_ATTR xSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int CoreID, const char *TaskID,
+										 const char *FuncID, char *pBuf, const char *format, ...) {
 	va_list vaList;
 	va_start(vaList, format);
-	xvSyslogSendMessage(MsgPRI, psUTC, McuID, ProcID, MsgID, pBuf, format, vaList);
+	xvSyslogSendMessage(MsgPRI, psUTC, CoreID, TaskID, FuncID, pBuf, format, vaList);
 	va_end(vaList);
 }
 
@@ -288,30 +288,30 @@ void vSyslogFileCheckSize(void) {
  * @param[in]	format string and parameters as per normal printf()
  * @return		number of characters sent to server
 */
-void IRAM_ATTR xvSyslog(int MsgPRI, const char *MsgID, const char *format, va_list vaList) {
+void IRAM_ATTR xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_list vaList) {
 	// discard all messages higher than console log level
 	if ((MsgPRI & 0x07) > xSyslogGetConsoleLevel())
 		return;	
-	MsgID = (MsgID == NULL) ? "null" : (*MsgID == 0) ? "empty" : MsgID;
+	FuncID = (FuncID == NULL) ? "null" : (*FuncID == 0) ? "empty" : FuncID;
 
 	// Handle state of scheduler and obtain the task name
-	const char *ProcID = (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) ? DRAM_STR("preX") : pcTaskGetName(NULL);	
+	const char *TaskID = (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) ? DRAM_STR("preX") : pcTaskGetName(NULL);	
 	u64_t CurRUN = halTIMER_ReadRunTime();
 	if (sTSZ.usecs == 0)
 		sTSZ.usecs = CurRUN;
-	int McuID = esp_cpu_get_core_id();
+	int CoreID = esp_cpu_get_core_id();
 
 	BaseType_t btSR = xRtosSemaphoreTake(&slVarMux, portMAX_DELAY);
 	u32_t MsgCRC = 0;
-	int xLen = crcprintfx(&MsgCRC, DRAM_STR("%s %s "), ProcID, MsgID);	// "Task Function "
 	xLen += vcrcprintfx(&MsgCRC, format, vaList);						// "Task Function message parameters etc"
+	int xLen = crcprintfx(&MsgCRC, DRAM_STR("%s %d %s "), TaskID, CoreID, FuncID);	// "Task Core Function "
 
 	if (MsgCRC == RptCRC && MsgPRI == RptPRI) {				// CRC & PRI same as previous message ?
 		++RptCNT;											// Yes, increment the repeat counter
 		RptRUN = CurRUN;									// save timestamps of latest repeat
 		RptUTC = sTSZ.usecs;
-		RptTask = ProcID;
-		RptFunc = (char *)MsgID;
+		RptTask = TaskID;
+		RptFunc = (char *)FuncID;
 		if (btSR == pdTRUE)
 			xRtosSemaphoreGive(&slVarMux);
 	} else { // Different CRC and/or PRI
@@ -332,19 +332,19 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *MsgID, const char *format, va_li
 		// Handle console message(s)
 		if (TmpCNT > 0) {
 			TmpTSZ.usecs = TmpRUN;						// repeated message + count
-			xSyslogSendMessage(TmpPRI, &TmpTSZ, McuID, TmpTask, TmpFunc, NULL, formatREPEATED, TmpCNT);
+			xSyslogSendMessage(TmpPRI, &TmpTSZ, TmpCore, TmpTask, TmpFunc, NULL, formatREPEATED, TmpCNT);
 		}
 		TmpTSZ.usecs = CurRUN;							// New message
-		xvSyslogSendMessage(MsgPRI, &TmpTSZ, McuID, ProcID, MsgID, NULL, format, vaList);
+		xvSyslogSendMessage(MsgPRI, &TmpTSZ, CoreID, TaskID, FuncID, NULL, format, vaList);
 
 		// Handle host message(s)
 		if ((MsgPRI & 7) <= xSyslogGetHostLevel()) {	// filter based on higher priorities
 			char *pBuf = malloc(slSIZEBUF);
 			if (TmpCNT > 0) {
 				TmpTSZ.usecs = TmpUTC;					// repeated message + count
-				xSyslogSendMessage(TmpPRI, &TmpTSZ, McuID, TmpTask, TmpFunc, pBuf, formatREPEATED, TmpCNT);
+				xSyslogSendMessage(TmpPRI, &TmpTSZ, TmpCore, TmpTask, TmpFunc, pBuf, formatREPEATED, TmpCNT);
 			}
-			xvSyslogSendMessage(MsgPRI, &sTSZ, McuID, ProcID, MsgID, pBuf, format, vaList);
+			xvSyslogSendMessage(MsgPRI, &sTSZ, CoreID, TaskID, FuncID, pBuf, format, vaList);
 			free(pBuf);
 		}
 	}
@@ -359,15 +359,15 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *MsgID, const char *format, va_li
  * @param[out]	none
  * @return		number of characters displayed(if only to console) or send(if to server)
 */
-void IRAM_ATTR vSyslog(int MsgPRI, const char *MsgID, const char *format, ...) {
+void IRAM_ATTR vSyslog(int MsgPRI, const char *FuncID, const char *format, ...) {
 	va_list vaList;
 	va_start(vaList, format);
-	xvSyslog(MsgPRI, MsgID, format, vaList);
+	xvSyslog(MsgPRI, FuncID, format, vaList);
 	va_end(vaList);
 }
 
-int IRAM_ATTR xSyslogError(const char *pcFN, int iRV) {
-	vSyslog(SL_SEV_ERROR, pcFN, "iRV=%d (%s)", iRV, pcStrError(iRV));
+int IRAM_ATTR xSyslogError(const char *FuncID, int iRV) {
+	vSyslog(SL_SEV_ERROR, FuncID, "iRV=%d (%s)", iRV, pcStrError(iRV));
 	return (iRV > 0) ? -iRV : iRV;
 }
 
