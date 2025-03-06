@@ -188,32 +188,48 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int CoreID,
 	const char *TaskID, const char *FuncID, char *pBuf, const char *format, va_list vaList) {
 	int iRV, xLen;
 	if (pBuf == NULL) {
-		BaseType_t btSR = xRtosSemaphoreTake(&shUARTmux, portMAX_DELAY);
+		static report_t sRpt = { .Size = repSIZE_SET(0,0,0,1,sgrANSI,0,0) };
+		BaseType_t btSR = halUartLock(portMAX_DELAY);
+
+		#define formatCONSOLE DRAM_STR("%C%!.3R %d %s %s ")
 		wprintfx(&sRpt, formatCONSOLE, xpfCOL(SyslogColors[MsgPRI & 0x07],0), halTIMER_ReadRunTime(), CoreID, TaskID, FuncID);
 		wvprintfx(&sRpt, format, vaList);
+		
+		#define formatTERMINATE DRAM_STR("%C" strNL)
 		wprintfx(&sRpt, formatTERMINATE, xpfCOL(attrRESET,0));
 		if (btSR == pdTRUE)
-			xRtosSemaphoreGive(&shUARTmux);
+			halUartUnLock();
 	} else {
 		if (idSTA[0] == 0)
 			strcpy((char*)idSTA, UNKNOWNMACAD);			// very early message, WIFI not initialized
-		xLen = snprintfx(pBuf, slSIZEBUF, formatRFC5424, MsgPRI, psUTC, idSTA, McuID, ProcID, MsgID);
+#if 1
+		#define formatRFC5424 DRAM_STR("<%u>1 %.3Z %s %s/%d %s - - ")		/* "main/0/Devices" */
+		xLen = snprintfx(pBuf, slSIZEBUF, formatRFC5424, MsgPRI, psUTC, idSTA, TaskID, CoreID, FuncID);
+#elif 0
+		#define formatRFC5424 DRAM_STR("<%d>1 %.3Z %s %s %d %s - ")			/* "main" */
+		xLen = snprintfx(pBuf, slSIZEBUF, formatRFC5424, MsgPRI, psUTC, idSTA, TaskID, CoreID, FuncID);		
+#elif 0
+		#define formatRFC5424 DRAM_STR("<%u>1 %.3Z %s %d %s %s - ")			/* "0/main" */
+		xLen = snprintfx(pBuf, slSIZEBUF, formatRFC5424, MsgPRI, psUTC, idSTA, CoreID, TaskID, FuncID);
+#elif 0
+		#define formatRFC5424 DRAM_STR("<%u>1 %.3Z %s %d/%s %s - - ")		/* "0/main/Devices" */
+		xLen = snprintfx(pBuf, slSIZEBUF, formatRFC5424, MsgPRI, psUTC, idSTA, CoreID, TaskID, FuncID);
+#elif 0
+		#define formatRFC5424 DRAM_STR("<%u>1 %.3Z %s %s %d %s - ")			/* "main" */
+		xLen = snprintfx(pBuf, slSIZEBUF, formatRFC5424, MsgPRI, psUTC, idSTA, TaskID, CoreID, FuncID);
+#endif
 		xLen += vsnprintfx(pBuf + xLen, slSIZEBUF - xLen - 1, format, vaList); // leave space for LF
-
 		if (xSyslogConnect()) {							// Scheduler running, LxSTA up and connected
-			#if (appLITTLEFS == 1)
-				if (FileBuffer)
-					vSyslogFileSend();
-			#endif
 			xLen = xSyslogRemoveTerminators(pBuf, xLen);
 			if (xRtosSemaphoreTake(&slNetMux, pdMS_TO_TICKS(slMS_LOCK_WAIT)) == pdTRUE) {
 				iRV = xNetSend(&sCtx, (u8_t *)pBuf, xLen);
-				xRtosSemaphoreGive(&slNetMux);
-				if (iRV == erFAILURE)
+				if (iRV < erSUCCESS) {
 					xNetClose(&sCtx);
-				else
+					#if (appLITTLEFS > 0)
+						vSyslogFilesAppend(pBuf, xLen);
+					#endif
+				} else {
 					sCtx.maxTx = (iRV > sCtx.maxTx) ? iRV : sCtx.maxTx;
-			}
 				}
 				xRtosSemaphoreGive(&slNetMux);
 			}
