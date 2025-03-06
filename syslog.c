@@ -97,8 +97,8 @@ SemaphoreHandle_t slNetMux = 0, slVarMux = 0;
 // ##################################### Private functions #########################################
 
 static int xSyslogRemoveTerminators(char * pBuf, int xLen) {
-	while (pBuf[xLen - 1] == CHR_LF || pBuf[xLen - 1] == CHR_CR)
-		pBuf[--xLen] = CHR_NUL;					// remove terminating CR/LF
+	while  (isspace((int) pBuf[xLen - 1]) != 0)
+		pBuf[--xLen] = CHR_NUL;							// remove terminating white space character(s)
 	return xLen;
 }
 
