@@ -167,6 +167,19 @@ exit0:
 
 static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID,
 	const char *ProcID, const char *MsgID, char *pBuf, const char *format, va_list vaList) {
+static void vSyslogFilesAppend(char * pBuf, int xLen) {
+	if (halEventCheckDevice(devMASK_LFS)) { 	// LFS available & initialised ?
+		if (pBuf[xLen-1] != CHR_LF) {			// yes, if last character not a LF
+			pBuf[xLen++] = CHR_LF;				// append LF for later fgets()
+			pBuf[xLen] = CHR_NUL;				// and terminate
+		}
+		xRtosSemaphoreTake(&LFSmux, portMAX_DELAY);
+		halFlashFileWrite(slFILENAME, "a", pBuf);
+		FileBuffer = 1;
+		xRtosSemaphoreGive(&LFSmux);
+	}
+}
+
 	int iRV, xLen;
 	if (pBuf == NULL) {
 		BaseType_t btSR = xRtosSemaphoreTake(&shUARTmux, portMAX_DELAY);
@@ -195,17 +208,13 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int McuID,
 				else
 					sCtx.maxTx = (iRV > sCtx.maxTx) ? iRV : sCtx.maxTx;
 			}
-		} else {
-		#if (appLITTLEFS > 0)
-			if (halEventCheckDevice(devMASK_LFS)) { 	// scheduler not (yet) running or LXSTA down, append to file...
-				if (pBuf[xLen-1] != CHR_LF) {
-					pBuf[xLen++] = CHR_LF;				// append LF if required
-					pBuf[xLen] = CHR_NUL;				// and terminate
 				}
-				halFlashFileWrite(slFILENAME, "a", pBuf);
-				FileBuffer = 1;
+				xRtosSemaphoreGive(&slNetMux);
 			}
-		#endif
+		} else {										// scheduler not (yet) running or LXSTA down
+			#if (appLITTLEFS > 0)
+				vSyslogFilesAppend(pBuf, xLen);
+			#endif
 		}
 	}
 }
