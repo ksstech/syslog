@@ -91,15 +91,54 @@ extern SemaphoreHandle_t SL_NetMux, SL_VarMux;			// public to enable semaphore u
 
 // ###################################### function prototypes ######################################
 
+/**
+ * @brief
+ * @return
+ */
 int xSyslogGetConsoleLevel(void);
 int xSyslogGetHostLevel(void);
+
+/**
+ * @brief
+ * @param[in]
+ */
 void vSyslogSetConsoleLevel(int Level);
 
+/**
+ * @brief	Check size of slFILENAME, if bigger than slFILESIZE will unlink/delete the file to make space
+*/
 void vSyslogFileCheckSize(void);
-void xvSyslog(int Priority, const char * MsgID, const char * format, va_list args);
-void vSyslog(int Priority, const char * MsgID, const char * format, ...);
-int xSyslogError(const char * pcFN, int eCode);
 
+/**
+ * @brief		writes an RFC formatted message to stdout & syslog host (if up and running)
+ * @param[in]	MsgPRI PRIority (combined FACility & SEVerity)
+ * @param[in]	FuncID originating function name
+ * @param[in]	format string and parameters as per normal printf()
+ * @return		number of characters displayed(if only to console) or send(if to server)
+*/
+void xvSyslog(int MsgPRI, const char * FuncID, const char * format, va_list args);
+
+/**
+ * @brief		writes an RFC formatted message to stdout & syslog host (if up and running)
+ * @param[in]	MsgPRI PRIority (combined FACility & SEVerity)
+ * @param[in]	FuncID originating function name
+ * @param[in]	format string and parameters as per normal printf()
+ * @return		number of characters displayed(if only to console) or send(if to server)
+*/
+void vSyslog(int MsgPRI, const char * FuncID, const char * format, ...);
+
+/**
+ * @brief
+ * @param[in]	pcFN function where error occurred, invoking this handler
+ * @param[in]	eCode error code to be mapped to a syslog message with pri ERROR
+ * @return
+ */
+int xSyslogError(const char * FuncID, int eCode);
+
+/**
+ * @brief	report syslog related information
+ * @param[in]	psR pointer to report structure
+*/
 struct report_t;
 void vSyslogReport(struct report_t * psR);
 
