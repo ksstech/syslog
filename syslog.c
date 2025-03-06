@@ -138,35 +138,37 @@ static bool IRAM_ATTR xSyslogConnect(void) {
  * @brief
  */
 static void vSyslogFileSend(void) {
-	xRtosSemaphoreTake(&LFSmux, portMAX_DELAY);
 	FILE *fp = fopen(slFILENAME, "r");
 	if (fp == NULL)										// successfully opened file?			
-		goto exit0;										// no failed
-	if (fseek(fp, 0L, SEEK_END) != 0 || ftell(fp) == 0L)// Seek to end OK & something there?
+		return;											// no failed
+	int iRV = erSUCCESS;								// default to force file deletion at exit
+	int xLen = -1;
+	char * pTmp = NULL;
+	if (fseek(fp, 0L, SEEK_END) || ftell(fp) == 0L)		// Seek error or empty file?
 		goto exit1;										// nope, something wrong
 	rewind(fp);
 	char * pBuf = malloc(slSIZEBUF);
-	while (1) {
-		char *pRV = fgets(pBuf, slSIZEBUF, fp);		// read string/line from file
-		if (pRV != pBuf)								// nothing read or error?
-			break;										// exit
-		char * pTmp = strstr(pRV, UNKNOWNMACAD);		// Check if early message ie no MAC address
+	while (fgets(pBuf, slSIZEBUF, fp) != NULL) {
+		pTmp = strstr(pBuf, UNKNOWNMACAD);				// Check if early message ie no MAC address
 		if (pTmp != NULL)								// if UNKNOWNMACAD marker is present
 			memcpy(pTmp, idSTA, lenMAC_ADDRESS*2);		// replace with actual MAC/hostname
-		int xLen = strlen(pBuf);
-		if (pBuf[xLen - 1] == CHR_LF)
-			pBuf[--xLen] = CHR_NUL;						// remove terminating [CR]LF
-		if (xNetSend(&sCtx, (u8_t *)pBuf, xLen) < 0)	// send message to host
-			break;										// if error, abort sending
+		xLen = strlen(pBuf);
+		xLen = xSyslogRemoveTerminators(pBuf, xLen);	// remove terminating [CR]LF
+		iRV = xNetSend(&sCtx, (u8_t *)pBuf, xLen);		// send
+//		RPT("%s [iRV=%d  xLen=%d]" strNL, pBuf, iRV, xLen);
+		if (iRV <= 0) {									// message send failed?
+			xNetClose(&sCtx);							// yes, close connection
+			break;										// and abort sending
+		}
 		vTaskDelay(pdMS_TO_TICKS(10));					// ensure WDT gets fed....
 	}
-	FileBuffer = 0;
 	free(pBuf);											// always free buffer
 exit1:
-	fclose(fp);
-	unlink(slFILENAME);
-exit0:
-	xRtosSemaphoreGive(&LFSmux);
+	fclose(fp);											// always close the file
+	if (iRV > erFAILURE) {								// if last send was successful
+		FileBuffer = 0;									// clear flag used to check for sending
+		unlink(slFILENAME);								// delete the file
+	}
 }
 
 static void vSyslogFilesAppend(char * pBuf, int xLen) {
