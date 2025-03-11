@@ -353,10 +353,10 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_l
 		u64_t TmpUTC = RptUTC;
 		const char *TmpTask = RptTask;
 		const char *TmpFunc = RptFunc;
-		tsz_t TmpTSZ = {.pTZ = sTSZ.pTZ};
 		xRtosSemaphoreGive(&slVarMux);						// variable changes done, unlock
 
 		// Handle console message(s)
+		tsz_t TmpTSZ;
 		if (TmpCNT > 0) {
 			TmpTSZ.usecs = TmpRUN;						// repeated message + count
 			xSyslogSendMessage(TmpPRI, &TmpTSZ, TmpCore, TmpTask, TmpFunc, NULL, formatREPEATED, TmpCNT);
