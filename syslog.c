@@ -190,7 +190,7 @@ static void vSyslogFilesAppend(char * pBuf, int xLen) {
 	}
 }
 
-static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int CoreID,
+static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psTS, int CoreID,
 	const char *TaskID, const char *FuncID, char *pBuf, const char *format, va_list vaList) {
 	int iRV, xLen;
 	if (pBuf == NULL) {
@@ -198,7 +198,7 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int CoreID,
 		BaseType_t btSR = halUartLock(portMAX_DELAY);
 
 		#define formatCONSOLE DRAM_STR("%C%!.3R %d %s %s ")
-		wprintfx(&sRpt, formatCONSOLE, xpfCOL(SyslogColors[MsgPRI & 0x07],0), halTIMER_ReadRunTime(), CoreID, TaskID, FuncID);
+		wprintfx(&sRpt, formatCONSOLE, xpfCOL(SyslogColors[MsgPRI & 0x07],0), psTS->usecs, CoreID, TaskID, FuncID);
 		wvprintfx(&sRpt, format, vaList);
 		
 		#define formatTERMINATE DRAM_STR("%C" strNL)
