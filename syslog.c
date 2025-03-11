@@ -111,7 +111,7 @@ static bool IRAM_ATTR xSyslogConnect(void) {
 	sCtx.type = SOCK_DGRAM;
 	sCtx.flags = SO_REUSEADDR;
 	sCtx.sa_in.sin_family = AF_INET;
-	sCtx.bSyslog = 1;									// mark as syslog port, so as not to recurse in xNetReport
+	sCtx.bSyslog = 1;									// mark as syslog port, so as not to recurse in xNetSyslog
 	#if (appOPTIONS > 0)
 		int Idx = xOptionGet(ioHostSLOG);				// if WL connected, NVS vars must be initialized (in stage 2.0/1)
 		sCtx.pHost = HostInfo[Idx].pName;
@@ -178,7 +178,7 @@ static void vSyslogFilesAppend(char * pBuf, int xLen) {
 			pBuf[xLen] = CHR_NUL;				// and terminate
 		}
 		xRtosSemaphoreTake(&LFSmux, portMAX_DELAY);
-		halFlashFileWrite(slFILENAME, "a", pBuf);
+		halFlashFileWrite(slFILENAME, "a", pBuf);	// AMM check protection
 		FileBuffer = 1;
 		xRtosSemaphoreGive(&LFSmux);
 	}
@@ -219,10 +219,10 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int CoreID,
 			xLen = xSyslogRemoveTerminators(pBuf, xLen);
 			if (xRtosSemaphoreTake(&slNetMux, pdMS_TO_TICKS(slMS_LOCK_WAIT)) == pdTRUE) {
 				iRV = xNetSend(&sCtx, (u8_t *)pBuf, xLen);
-				if (iRV < erSUCCESS) {
-					xNetClose(&sCtx);
-					#if (appLITTLEFS > 0)
-						vSyslogFilesAppend(pBuf, xLen);
+				if (iRV < erSUCCESS) {					/* error sending message? */
+					xNetClose(&sCtx);					/* yes, close the conenction */
+					#if (appLITTLEFS > 0)				/* and if LFS is available */
+						vSyslogFilesAppend(pBuf, xLen);	/* append message to the file */
 					#endif
 				} else {
 					sCtx.maxTx = (iRV > sCtx.maxTx) ? iRV : sCtx.maxTx;
@@ -301,7 +301,7 @@ void vSyslogSetHostLevel(int Level) {
 
 void vSyslogFileCheckSize(void) {
 	xRtosSemaphoreTake(&LFSmux, portMAX_DELAY);
-	ssize_t Size = halFlashFileGetSize(slFILENAME);
+	ssize_t Size = halFlashFileGetSize(slFILENAME);	// AMM check protection !!!
 	if (Size > slFILESIZE) {
 		unlink(slFILENAME);			// file size > "slFILESIZE" in size....
 		Size = 0;
