@@ -158,14 +158,16 @@ static void vSyslogFileSend(void) {
 			memcpy(pTmp, idSTA, lenMAC_ADDRESS*2);		// replace with actual MAC/hostname
 		xLen = strlen(pBuf);
 		xLen = xSyslogRemoveTerminators(pBuf, xLen);	// remove terminating [CR]LF
-		iRV = xNetSend(&sCtx, (u8_t *)pBuf, xLen);		// send
-//		RPT("%s [iRV=%d  xLen=%d]" strNL, pBuf, iRV, xLen);
+		if (xLen == 0)									// if nothing left to send (was just terminators...)
+			break;
+		iRV = xNetSend(&sCtx, (u8_t *)pBuf, xLen);		// send contents of buffer
 		if (iRV <= 0) {									// message send failed?
 			xNetClose(&sCtx);							// yes, close connection
 			break;										// and abort sending
 		}
 		vTaskDelay(pdMS_TO_TICKS(10));					// ensure WDT gets fed....
 	}
+	xRtosSemaphoreGive(&slNetMux);
 exit0:
 	free(pBuf);											// always free buffer
 exit1:
