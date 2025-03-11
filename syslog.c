@@ -241,11 +241,11 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int CoreID,
 	}
 }
 
-static void IRAM_ATTR xSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int CoreID, const char *TaskID,
+static void IRAM_ATTR xSyslogSendMessage(int MsgPRI, tsz_t *psTS, int CoreID, const char *TaskID,
 										 const char *FuncID, char *pBuf, const char *format, ...) {
 	va_list vaList;
 	va_start(vaList, format);
-	xvSyslogSendMessage(MsgPRI, psUTC, CoreID, TaskID, FuncID, pBuf, format, vaList);
+	xvSyslogSendMessage(MsgPRI, psTS, CoreID, TaskID, FuncID, pBuf, format, vaList);
 	va_end(vaList);
 }
 
