@@ -202,22 +202,13 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int CoreID,
 	} else {
 		if (idSTA[0] == 0)
 			strcpy((char*)idSTA, UNKNOWNMACAD);			// very early message, WIFI not initialized
-#if 1
-		#define formatRFC5424 DRAM_STR("<%u>1 %.3Z %s %s/%d %s - - ")		/* "main/0/Devices" */
-		xLen = snprintfx(pBuf, slSIZEBUF, formatRFC5424, MsgPRI, psUTC, idSTA, TaskID, CoreID, FuncID);
-#elif 0
-		#define formatRFC5424 DRAM_STR("<%d>1 %.3Z %s %s %d %s - ")			/* "main" */
-		xLen = snprintfx(pBuf, slSIZEBUF, formatRFC5424, MsgPRI, psUTC, idSTA, TaskID, CoreID, FuncID);		
-#elif 0
-		#define formatRFC5424 DRAM_STR("<%u>1 %.3Z %s %d %s %s - ")			/* "0/main" */
-		xLen = snprintfx(pBuf, slSIZEBUF, formatRFC5424, MsgPRI, psUTC, idSTA, CoreID, TaskID, FuncID);
-#elif 0
-		#define formatRFC5424 DRAM_STR("<%u>1 %.3Z %s %d/%s %s - - ")		/* "0/main/Devices" */
-		xLen = snprintfx(pBuf, slSIZEBUF, formatRFC5424, MsgPRI, psUTC, idSTA, CoreID, TaskID, FuncID);
-#elif 0
-		#define formatRFC5424 DRAM_STR("<%u>1 %.3Z %s %s %d %s - ")			/* "main" */
-		xLen = snprintfx(pBuf, slSIZEBUF, formatRFC5424, MsgPRI, psUTC, idSTA, TaskID, CoreID, FuncID);
-#endif
+		#if 1
+			#define formatRFC5424 DRAM_STR("<%u>1 %.3Z %s %s/%d %s - - ")		/* "main/0/Devices" */
+			xLen = snprintfx(pBuf, slSIZEBUF, formatRFC5424, MsgPRI, psTS, idSTA, TaskID, CoreID, FuncID);
+		#else
+			#define formatRFC5424 DRAM_STR("<%d>1 %.3Z %s %s %d %s - ")			/* "main" */
+			xLen = snprintfx(pBuf, slSIZEBUF, formatRFC5424, MsgPRI, psTS, idSTA, TaskID, CoreID, FuncID);		
+		#endif
 		xLen += vsnprintfx(pBuf + xLen, slSIZEBUF - xLen - 1, format, vaList); // leave space for LF
 		if (xSyslogConnect()) {							// Scheduler running, LxSTA up and connected
 			xLen = xSyslogRemoveTerminators(pBuf, xLen);
