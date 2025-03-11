@@ -211,6 +211,11 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int CoreID,
 		#endif
 		xLen += vsnprintfx(pBuf + xLen, slSIZEBUF - xLen - 1, format, vaList); // leave space for LF
 		if (xSyslogConnect()) {							// Scheduler running, LxSTA up and connected
+			#if (appLITTLEFS == 1)
+			if (FileBuffer)
+				vSyslogFileSend();
+			#endif
+		
 			xLen = xSyslogRemoveTerminators(pBuf, xLen);
 			if (xRtosSemaphoreTake(&slNetMux, pdMS_TO_TICKS(slMS_LOCK_WAIT)) == pdTRUE) {
 				iRV = xNetSend(&sCtx, (u8_t *)pBuf, xLen);
@@ -349,13 +354,6 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_l
 			xRtosSemaphoreGive(&slVarMux);
 		tsz_t TmpTSZ = {.pTZ = sTSZ.pTZ};
 
-		#if (appLITTLEFS == 1)
-		xRtosSemaphoreTake(&LFSmux, portMAX_DELAY);
-		if (FileBuffer && xSyslogConnect())
-			vSyslogFileSend();
-		xRtosSemaphoreGive(&LFSmux);
-		#endif
-	
 		// Handle console message(s)
 		if (TmpCNT > 0) {
 			TmpTSZ.usecs = TmpRUN;						// repeated message + count
