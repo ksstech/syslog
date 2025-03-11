@@ -150,6 +150,8 @@ static void vSyslogFileSend(void) {
 		goto exit1;										// nope, something wrong
 	rewind(fp);
 	char * pBuf = malloc(slSIZEBUF);
+	if (xRtosSemaphoreTake(&slNetMux, slMS_LOCK_WAIT) != pdTRUE)
+		goto exit0;
 	while (fgets(pBuf, slSIZEBUF, fp) != NULL) {
 		pTmp = strstr(pBuf, UNKNOWNMACAD);				// Check if early message ie no MAC address
 		if (pTmp != NULL)								// if UNKNOWNMACAD marker is present
@@ -164,8 +166,10 @@ static void vSyslogFileSend(void) {
 		}
 		vTaskDelay(pdMS_TO_TICKS(10));					// ensure WDT gets fed....
 	}
+exit0:
 	free(pBuf);											// always free buffer
 exit1:
+	// add EOF and error checks, use to determine whether to delete the file
 	fclose(fp);											// always close the file
 	if (iRV > erFAILURE) {								// if last send was successful
 		FileBuffer = 0;									// clear flag used to check for sending
