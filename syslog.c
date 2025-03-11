@@ -327,7 +327,7 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_l
 		sTSZ.usecs = CurRUN;
 	int CoreID = esp_cpu_get_core_id();
 
-	BaseType_t btSR = xRtosSemaphoreTake(&slVarMux, portMAX_DELAY);
+	xRtosSemaphoreTake(&slVarMux, portMAX_DELAY);			// ensure changing of variable list is protected..
 	u32_t MsgCRC = 0;
 	int xLen = crcprintfx(&MsgCRC, DRAM_STR("%s %d %s "), TaskID, CoreID, FuncID);	// "Task Core Function "
 	xLen += vcrcprintfx(&MsgCRC, format, vaList);									//  add message parameters etc"
@@ -339,8 +339,7 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_l
 		RptTask = TaskID;
 		RptFunc = (char *)FuncID;
 		RptCore = CoreID;
-		if (btSR == pdTRUE)
-			xRtosSemaphoreGive(&slVarMux);
+		xRtosSemaphoreGive(&slVarMux);						// variable chnages done, unlock
 	} else { // Different CRC and/or PRI
 		// save trackers for immediate and future use...
 		RptCRC = MsgCRC;
@@ -354,9 +353,8 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_l
 		u64_t TmpUTC = RptUTC;
 		const char *TmpTask = RptTask;
 		const char *TmpFunc = RptFunc;
-		if (btSR == pdTRUE)
-			xRtosSemaphoreGive(&slVarMux);
 		tsz_t TmpTSZ = {.pTZ = sTSZ.pTZ};
+		xRtosSemaphoreGive(&slVarMux);						// variable changes done, unlock
 
 		// Handle console message(s)
 		if (TmpCNT > 0) {
