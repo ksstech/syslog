@@ -185,10 +185,8 @@ static void vSyslogFilesAppend(char * pBuf, int xLen) {
 			pBuf[xLen++] = CHR_LF;				// append LF for later fgets()
 			pBuf[xLen] = CHR_NUL;				// and terminate
 		}
-		xRtosSemaphoreTake(&LFSmux, portMAX_DELAY);
 		halFlashFileWrite(slFILENAME, "a", pBuf);	// AMM check protection
 		FileBuffer = 1;
-		xRtosSemaphoreGive(&LFSmux);
 	}
 }
 
@@ -308,14 +306,12 @@ void vSyslogSetHostLevel(int Level) {
 }
 
 void vSyslogFileCheckSize(void) {
-	xRtosSemaphoreTake(&LFSmux, portMAX_DELAY);
 	ssize_t Size = halFlashFileGetSize(slFILENAME);	// AMM check protection !!!
 	if (Size > slFILESIZE) {
 		unlink(slFILENAME);			// file size > "slFILESIZE" in size....
 		Size = 0;
 	}
 	FileBuffer = (Size > 0) ? 1 : 0;
-	xRtosSemaphoreGive(&LFSmux);
 }
 
 void IRAM_ATTR xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_list vaList) {
