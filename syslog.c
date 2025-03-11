@@ -255,6 +255,14 @@ static void IRAM_ATTR xSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int CoreID, c
 // could flood the IP stack and cause watchdog timeouts. Even if the timeout is changed from 5 to 10
 // seconds the crash can still occur. In order to minimise load on the IP stack the minimum severity
 // level should be set to NOTICE.
+int xSyslogCheckDuplicates(int sock, struct sockaddr_in * addr) {
+	// Check for same port but sockets not same as current context
+	if ((htons(addr->sin_port) == sCtx.sa_in.sin_port) && (sock != sCtx.sd)) {
+		close(sock);
+		return 1;
+	}
+	return 0;
+}
 
 int xSyslogGetConsoleLevel(void) {
 #if (appOPTIONS == 1)

@@ -92,6 +92,15 @@ extern SemaphoreHandle_t SL_NetMux, SL_VarMux;			// public to enable semaphore u
 // ###################################### function prototypes ######################################
 
 /**
+ * @brief	Check if port# matches syslog context, close the socket if different from conext socket
+ * @param[in]	sock open socket number being investigated
+ * @param[in]	addr IP address of open socket being investigated
+ * @return	0 if not matching/closed, 1 if port match but different socket hence closed
+ */
+struct sockaddr_in;
+int xSyslogCheckDuplicates(int sock, struct sockaddr_in * addr);
+
+/**
  * @brief
  * @return
  */
