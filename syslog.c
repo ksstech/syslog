@@ -194,8 +194,8 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psTS, int CoreID,
 	const char *TaskID, const char *FuncID, char *pBuf, const char *format, va_list vaList) {
 	int iRV, xLen;
 	if (pBuf == NULL) {
-		static report_t sRpt = { .Size = repSIZE_SET(0,0,0,1,sgrANSI,0,0) };
 		BaseType_t btSR = halUartLock(portMAX_DELAY);
+		static report_t sRpt = { .Size = repSIZE_SET(0,0,0,1,sgrANSI,0,0) };
 
 		#define formatCONSOLE DRAM_STR("%C%!.3R %d %s %s ")
 		wprintfx(&sRpt, formatCONSOLE, xpfCOL(SyslogColors[MsgPRI & 0x07],0), psTS->usecs, CoreID, TaskID, FuncID);
