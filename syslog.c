@@ -251,10 +251,6 @@ static void IRAM_ATTR xSyslogSendMessage(int MsgPRI, tsz_t *psUTC, int CoreID, c
 
 // ###################################### Public functions #########################################
 
-// In the case where the log level is set to DEBUG in ESP-IDF the volume of messages being generated
-// could flood the IP stack and cause watchdog timeouts. Even if the timeout is changed from 5 to 10
-// seconds the crash can still occur. In order to minimise load on the IP stack the minimum severity
-// level should be set to NOTICE.
 int xSyslogCheckDuplicates(int sock, struct sockaddr_in * addr) {
 	// Check for same port but sockets not same as current context
 	if ((htons(addr->sin_port) == sCtx.sa_in.sin_port) && (sock != sCtx.sd)) {
@@ -291,6 +287,11 @@ void vSyslogSetConsoleLevel(int Level) {
 		#endif
 	}
 }
+
+// In the case where the log level is set to DEBUG in ESP-IDF the volume of messages being generated
+// could flood the IP stack and cause watchdog timeouts. Even if the timeout is changed from 5 to 10
+// seconds the crash can still occur. In order to minimise load on the IP stack the minimum severity
+// level should be set to NOTICE.
 
 void vSyslogSetHostLevel(int Level) {
 	if (Level <= SL_LEVEL_MAX) {
