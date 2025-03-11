@@ -108,8 +108,11 @@ static bool IRAM_ATTR xSyslogConnect(void) {
 		(halEventCheckStatus(flagLX_STA) == 0) ||
 		(xRtosSemaphoreTake(&slNetMux, slMS_LOCK_WAIT) != pdTRUE)) {
 		return 0;
-	if (sCtx.sd > 0) 									// already connected ?
-		return 1;										// yes, exit with status OK
+	}
+	int iRV = 1;
+	if (sCtx.sd > 0) { 									// already connected ?
+		goto done;										// yes, finish with status OK
+	}
 	sCtx.type = SOCK_DGRAM;
 	sCtx.flags = SO_REUSEADDR;
 	sCtx.sa_in.sin_family = AF_INET;
@@ -122,18 +125,15 @@ static bool IRAM_ATTR xSyslogConnect(void) {
 		sCtx.pHost = appDEFAULT_SL_HOST;				// options not part of application ?
 		sCtx.sa_in.sin_port = htons(appDEFAULT_SL_PORT);// get from app_config...
 	#endif
-	// successfully opened && Receive TO set ok?
-#if 1
-	if (xNetOpen(&sCtx) > erFAILURE) 					// successfully opened ?
-		return 1;										// yes, return all OK
-#else
-	if ((xNetOpen(&sCtx) > erFAILURE) && 				// successfully opened ?
-		(xNetSetRecvTO(&sCtx, flagXNET_NONBLOCK) > erFAILURE)) {	// and RX timeout set ?
-		return 1;										// yes, return all OK
+	// open socket connection... AMM check if blocking really required!!!
+	if ((xNetOpen(&sCtx) < erSUCCESS) || 				// open failed ?
+		(xNetSetRecvTO(&sCtx, flagXNET_NONBLOCK) < erSUCCESS)) {	// RX timeout failed ?
+		xNetClose(&sCtx);								// try closing
+		iRV = 0;										// return failure...
 	}
-#endif
-	xNetClose(&sCtx);									// no, try closing
-	return 0;											// and return status accordingly
+done:
+	xRtosSemaphoreGive(&slNetMux);
+	return iRV;											// and return status accordingly
 }
 
 /**
