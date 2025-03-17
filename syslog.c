@@ -171,17 +171,6 @@ exit1:
 	}
 }
 
-static void vSyslogFilesAppend(char * pBuf, int xLen) {
-	if (halEventCheckDevice(devMASK_LFS)) { 	// LFS available & initialised ?
-		if (pBuf[xLen-1] != CHR_LF) {			// yes, if last character not a LF
-			pBuf[xLen++] = CHR_LF;				// append LF for later fgets()
-			pBuf[xLen] = CHR_NUL;				// and terminate
-		}
-		halFlashFileWrite(slFILENAME, "a", pBuf);	// AMM check protection
-		FileBuffer = 1;
-	}
-}
-
 static void IRAM_ATTR xvSyslogSendMessage(sl_vars_t * psV, char *pBuf, const char *format, va_list vaList) {
 	if (pBuf == NULL) {				/* CONSOLE destined message ***********************************/
 		#define formatCONSOLE	DRAM_STR("%C%!.3R %d %s %s ")
@@ -203,24 +192,35 @@ static void IRAM_ATTR xvSyslogSendMessage(sl_vars_t * psV, char *pBuf, const cha
 		int xLen = snprintfx(pBuf, slSIZEBUF, formatRFC5424, psV->pri, psV->utc, idSTA, psV->task, psV->core, psV->func);		
 #endif
 		xLen += vsnprintfx(pBuf + xLen, slSIZEBUF - xLen - 1, format, vaList); // leave space for LF
+
+		// If check scheduler and LxSTA, take semaphore and if all ok, send the message
+		if (xSyslogConnect() && xRtosSemaphoreTake(&shSLsock, pdMS_TO_TICKS(slMS_LOCK_WAIT)) == pdTRUE) {
 			xLen = xSyslogRemoveTerminators(pBuf, xLen);
-			if (xRtosSemaphoreTake(&slNetMux, pdMS_TO_TICKS(slMS_LOCK_WAIT)) == pdTRUE) {
-				iRV = xNetSend(&sCtx, (u8_t *)pBuf, xLen);
-				if (iRV < erSUCCESS) {					/* error sending message? */
-					xNetClose(&sCtx);					/* yes, close the conenction */
-					#if (appLITTLEFS > 0)				/* and if LFS is available */
-						vSyslogFilesAppend(pBuf, xLen);	/* append message to the file */
-					#endif
-				} else {
-					sCtx.maxTx = (iRV > sCtx.maxTx) ? iRV : sCtx.maxTx;
-				}
-				xRtosSemaphoreGive(&slNetMux);
+			iRV = xNetSend(&sCtx, (u8_t *)pBuf, xLen);
+			if (iRV >= erSUCCESS) {						/* message successfully sent? */
+				sCtx.maxTx = (iRV > sCtx.maxTx) ? iRV : sCtx.maxTx;	/* yes, update running stats */
+			} else {									/* no, close the connection */
+				xNetClose(&sCtx);						/* iRV already set for persisting */
 			}
-		} else {										// scheduler not (yet) running or LXSTA down
-			#if (appLITTLEFS > 0)
-				vSyslogFilesAppend(pBuf, xLen);
-			#endif
+			xRtosSemaphoreGive(&shSLsock);
 		}
+		#if (appLITTLEFS > 0)		/* HOST not accessible try send to LFS if available ***********/
+		if (iRV < erSUCCESS && halEventCheckDevice(devMASK_LFS)) {
+			if (pBuf[xLen-1] != CHR_LF) {					// yes, if last character not a LF
+				pBuf[xLen++] = CHR_LF;						// append LF for later fgets()
+				pBuf[xLen] = CHR_NUL;						// and terminate
+			}
+# if 1
+			halFlashFileWrite(slFILENAME, "ax", pBuf);		// open append exclusive
+			FileBuffer = 1;
+#else
+			xRtosSemaphoreTake(&shLFSmux, portMAX_DELAY);
+			halFlashFileWrite(slFILENAME, "a", pBuf);		// open append
+			FileBuffer = 1;
+			xRtosSemaphoreGive(&shLFSmux);
+#endif
+		}
+		#endif
 	}
 }
 
