@@ -140,44 +140,65 @@ exit:
 /**
  * @brief
  */
-static void vSyslogFileSend(void) {
+void vSyslogFileSend(void) {
+	// step 1: check if scheduler running, LxSTA up and connected
+	if (xSyslogConnect() == 0)
+		return;
+
+	// step 2: protect the whole operation
+	if (xRtosSemaphoreTake(&shSLsock, slMS_LOCK_WAIT) == pdFALSE)	/* semaphore taken? */
+		return;														/* no, return for now */
+
+	// step 3: try to lock file for read [and delete/unlink]
+	if (xRtosSemaphoreTake(&shLFSmux, slMS_LOCK_WAIT) == pdFALSE)
+		goto exit0;
+
+	// step 4: try to open the file for read
 	FILE *fp = fopen(slFILENAME, "r");
-	if (fp == NULL)										// successfully opened file?			
-		return;											// no failed
+	if (fp == NULL)										/* successfully opened file? */
+		goto exit1;										/* no, release both semaphores and return */
+
+	// step 5: determine file size
 	int iRV = erSUCCESS;								// default to force file deletion at exit
-	int xLen = -1;
 	char * pTmp = NULL;
 	if (fseek(fp, 0L, SEEK_END) || ftell(fp) == 0L)		// Seek error or empty file?
-		goto exit1;										// nope, something wrong
+		goto exit2;										// nope, something wrong
+
+	// step 6: rewind and start sending
 	rewind(fp);
 	char * pBuf = malloc(slSIZEBUF);
-	if (xRtosSemaphoreTake(&slNetMux, slMS_LOCK_WAIT) != pdTRUE)
-		goto exit0;
 	while (fgets(pBuf, slSIZEBUF, fp) != NULL) {
+		// step 6a: fix placeholder MAC if required
 		pTmp = strstr(pBuf, UNKNOWNMACAD);				// Check if early message ie no MAC address
 		if (pTmp != NULL)								// if UNKNOWNMACAD marker is present
 			memcpy(pTmp, idSTA, lenMAC_ADDRESS*2);		// replace with actual MAC/hostname
-		xLen = strlen(pBuf);
+
+		// step 6b: trim extra terminators from the end
+		int xLen = strlen(pBuf);
 		xLen = xSyslogRemoveTerminators(pBuf, xLen);	// remove terminating [CR]LF
 		if (xLen == 0)									// if nothing left to send (was just terminators...)
 			break;
+
+		// step 6c: send whatever remains of message (if any)
 		iRV = xNetSend(&sCtx, (u8_t *)pBuf, xLen);		// send contents of buffer
 		if (iRV <= 0) {									// message send failed?
 			xNetClose(&sCtx);							// yes, close connection
 			break;										// and abort sending
 		}
-		vTaskDelay(pdMS_TO_TICKS(10));					// ensure WDT gets fed....
+		vTaskDelay(pdMS_TO_TICKS(slMS_FILESEND_DLY));	// ensure WDT gets fed....
 	}
-	xRtosSemaphoreGive(&slNetMux);
-exit0:
 	free(pBuf);											// always free buffer
-exit1:
-	// add EOF and error checks, use to determine whether to delete the file
+exit2:
+	// step 6: close the file and delete if successfully sent (add EOF and error checks to make sure?)
 	fclose(fp);											// always close the file
-	if (iRV > erFAILURE) {								// if last send was successful
+	if (iRV >= erSUCCESS) {								// if last send was successful
 		FileBuffer = 0;									// clear flag used to check for sending
 		unlink(slFILENAME);								// delete the file
 	}
+exit1:
+	xRtosSemaphoreGive(&shLFSmux);
+exit0:
+	xRtosSemaphoreGive(&shSLsock);
 }
 
 static void IRAM_ATTR xvSyslogSendMessage(sl_vars_t * psV, char *pBuf, const char *format, va_list vaList) {
