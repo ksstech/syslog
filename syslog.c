@@ -96,19 +96,20 @@ static int xSyslogRemoveTerminators(char * pBuf, int xLen) {
  * @note	can only return 1 if scheduler running & L3 connected, 
 */
 static bool IRAM_ATTR xSyslogConnect(void) {
-	if ((xTaskGetSchedulerState() != taskSCHEDULER_RUNNING) ||
-		(halEventCheckStatus(flagLX_STA) == 0) ||
-		(xRtosSemaphoreTake(&slNetMux, slMS_LOCK_WAIT) != pdTRUE)) {
+	// step 1: If scheduler not running or L2+3 not ready, fail
+	if ((xTaskGetSchedulerState() != taskSCHEDULER_RUNNING) || halEventCheckStatus(flagLX_STA) == 0)
 		return 0;
-	}
+
+	// step 2: If unable to take the semaphore, fail
+	if (xRtosSemaphoreTake(&shSLsock, slMS_LOCK_WAIT) == pdFALSE)
+		return 0;
+
+	// step 3: If already connected, return success
 	int iRV = 1;
-	if (sCtx.sd > 0) { 									// already connected ?
-		goto done;										// yes, finish with status OK
-	}
-	sCtx.type = SOCK_DGRAM;
-	sCtx.flags = SO_REUSEADDR;
-	sCtx.sa_in.sin_family = AF_INET;
-	sCtx.bSyslog = 1;									// mark as syslog port, so as not to recurse in xNetSyslog
+	if (sCtx.sd > 0)
+		goto exit;
+
+	// step 4: setup basic parameters for syslog connection
 	#if (appOPTIONS > 0)
 		int Idx = xOptionGet(ioHostSLOG);				// if WL connected, NVS vars must be initialized (in stage 2.0/1)
 		sCtx.pHost = HostInfo[Idx].pName;
@@ -117,14 +118,22 @@ static bool IRAM_ATTR xSyslogConnect(void) {
 		sCtx.pHost = appDEFAULT_SL_HOST;				// options not part of application ?
 		sCtx.sa_in.sin_port = htons(appDEFAULT_SL_PORT);// get from app_config...
 	#endif
-	// open socket connection... AMM check if blocking really required!!!
+	sCtx.type = SOCK_DGRAM;
+	sCtx.flags = SO_REUSEADDR;
+	sCtx.sa_in.sin_family = AF_INET;
+	sCtx.bSyslog = 1;									// mark as syslog port, so as not to recurse in xNetSyslog
+
+	// step 5: before openng, close any zombie sockets
+	xNetCloseDuplicates(sCtx.sa_in.sin_port);
+
+	// step 6: open socket connection... AMM check if blocking really required!!!
 	if ((xNetOpen(&sCtx) < erSUCCESS) || 				// open failed ?
 		(xNetSetRecvTO(&sCtx, flagXNET_NONBLOCK) < erSUCCESS)) {	// RX timeout failed ?
 		xNetClose(&sCtx);								// try closing
 		iRV = 0;										// return failure...
 	}
-done:
-	xRtosSemaphoreGive(&slNetMux);
+exit:
+	xRtosSemaphoreGive(&shSLsock);
 	return iRV;											// and return status accordingly
 }
 
