@@ -368,7 +368,7 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_l
 	xvSyslogSendMessage(&sMsg, NULL, format, vaList);
 
 	// step 6: handle host message(s)
-	if ((sMsg.pri & 7) > xSyslogGetHostLevel())			// filter based on higher priorities
+	if ((MsgPRI & 7) > xSyslogGetHostLevel())			// filter based on higher priorities
 		return;
 	char *pBuf = malloc(slSIZEBUF);
 	if (sPrv.count)
