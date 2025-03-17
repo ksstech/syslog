@@ -47,6 +47,14 @@
 
 // ######################################### Structures ############################################
 
+typedef struct {
+	u8_t pri, core;
+	u16_t count;
+	u32_t crc;
+	u64_t run, utc;
+	const char *task, *func;
+} sl_vars_t;
+
 // ####################################### Local variables #########################################
 
 static const char SyslogColors[8] = {
@@ -60,10 +68,7 @@ static const char SyslogColors[8] = {
 	colourFG_CYAN,					// Debug
 };
 static netx_t sCtx = { 0 };
-static u32_t RptCRC = 0, RptCNT = 0;
-static u64_t RptRUN = 0, RptUTC = 0;
-static u8_t RptPRI = 0, RptCore = 0;
-static const char *RptTask = NULL, *RptFunc = NULL;
+static sl_vars_t sRpt = { 0 };
 #if (appLITTLEFS == 1)
 	static bool FileBuffer = 0;
 #endif
@@ -177,31 +182,26 @@ static void vSyslogFilesAppend(char * pBuf, int xLen) {
 	}
 }
 
-static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psTS, int CoreID,
-	const char *TaskID, const char *FuncID, char *pBuf, const char *format, va_list vaList) {
-	int iRV, xLen;
-	if (pBuf == NULL) {
-		BaseType_t btSR = halUartLock(portMAX_DELAY);
+static void IRAM_ATTR xvSyslogSendMessage(sl_vars_t * psV, char *pBuf, const char *format, va_list vaList) {
+	if (pBuf == NULL) {				/* CONSOLE destined message ***********************************/
+		#define formatCONSOLE	DRAM_STR("%C%!.3R %d %s %s ")
 		static report_t sRpt = { .Size = repSIZE_SET(0,0,0,1,sgrANSI,0,0) };
-
-		#define formatCONSOLE DRAM_STR("%C%!.3R %d %s %s ")
-		wprintfx(&sRpt, formatCONSOLE, xpfCOL(SyslogColors[MsgPRI & 0x07],0), psTS->usecs, CoreID, TaskID, FuncID);
+		halUartLock(portMAX_DELAY);
+		wprintfx(&sRpt, formatCONSOLE, xpfCOL(SyslogColors[psV->pri & 0x07],0), psV->run, psV->core, psV->task, psV->func);
 		wvprintfx(&sRpt, format, vaList);
-		
-		#define formatTERMINATE DRAM_STR("%C" strNL)
-		wprintfx(&sRpt, formatTERMINATE, xpfCOL(attrRESET,0));
-		if (btSR == pdTRUE)
-			halUartUnLock();
-	} else {
-		if (idSTA[0] == 0)
-			strcpy((char*)idSTA, UNKNOWNMACAD);			// very early message, WIFI not initialized
-		#if 1
-			#define formatRFC5424 DRAM_STR("<%u>1 %.3Z %s %s/%d %s - - ")		/* "main/0/Devices" */
-			xLen = snprintfx(pBuf, slSIZEBUF, formatRFC5424, MsgPRI, psTS, idSTA, TaskID, CoreID, FuncID);
-		#else
-			#define formatRFC5424 DRAM_STR("<%d>1 %.3Z %s %s %d %s - ")			/* "main" */
-			xLen = snprintfx(pBuf, slSIZEBUF, formatRFC5424, MsgPRI, psTS, idSTA, TaskID, CoreID, FuncID);		
-		#endif
+		wprintfx(&sRpt, DRAM_STR("%C" strNL), xpfCOL(attrRESET,0));
+		halUartUnLock();
+	} else {						/* SYSLOG HOST destined message *******************************/
+		int iRV = erFAILURE;
+		if (idSTA[0] == 0)								/* very early message, not WIFI yet */
+			strcpy((char*)idSTA, UNKNOWNMACAD);			/* insert MAC address placemaker */
+#if 1
+		#define formatRFC5424 DRAM_STR("<%u>1 %.3R %s %s/%d %s - - ")		/* "main/0/Devices" */
+		int xLen = snprintfx(pBuf, slSIZEBUF, formatRFC5424, psV->pri, psV->utc, idSTA, psV->task, psV->core, psV->func);
+#else
+		#define formatRFC5424 DRAM_STR("<%d>1 %.3Z %s %s %d %s - ")			/* "main" */
+		int xLen = snprintfx(pBuf, slSIZEBUF, formatRFC5424, psV->pri, psV->utc, idSTA, psV->task, psV->core, psV->func);		
+#endif
 		xLen += vsnprintfx(pBuf + xLen, slSIZEBUF - xLen - 1, format, vaList); // leave space for LF
 		if (xSyslogConnect()) {							// Scheduler running, LxSTA up and connected
 			#if (appLITTLEFS == 1)
@@ -230,11 +230,10 @@ static void IRAM_ATTR xvSyslogSendMessage(int MsgPRI, tsz_t *psTS, int CoreID,
 	}
 }
 
-static void IRAM_ATTR xSyslogSendMessage(int MsgPRI, tsz_t *psTS, int CoreID, const char *TaskID,
-										 const char *FuncID, char *pBuf, const char *format, ...) {
+static void IRAM_ATTR xSyslogSendMessage(sl_vars_t * psV, char *pBuf, const char *format, ...) {
 	va_list vaList;
 	va_start(vaList, format);
-	xvSyslogSendMessage(MsgPRI, psTS, CoreID, TaskID, FuncID, pBuf, format, vaList);
+	xvSyslogSendMessage(psV, pBuf, format, vaList);
 	va_end(vaList);
 }
 
@@ -302,66 +301,55 @@ void vSyslogFileCheckSize(void) {
 }
 
 void IRAM_ATTR xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_list vaList) {
-	// discard all messages higher than console log level
-	if ((MsgPRI & 0x07) > xSyslogGetConsoleLevel())
-		return;	
-	FuncID = (FuncID == NULL) ? "null" : (*FuncID == 0) ? "empty" : FuncID;
+	// step 0: check if anything in file that needs sending, do so ASAP
+//	#if (appLITTLEFS == 1)
+//	if (FileBuffer) vSyslogFileSend();
+//	#endif
 
-	// Handle state of scheduler and obtain the task name
-	const char *TaskID = (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) ? DRAM_STR("preX") : pcTaskGetName(NULL);	
-	u64_t CurRUN = halTIMER_ReadRunTime();
-	if (sTSZ.usecs == 0)
-		sTSZ.usecs = CurRUN;
-	int CoreID = esp_cpu_get_core_id();
+	// step 1: check if message priority outside console threshold
+	if ((MsgPRI & 7) > xSyslogGetConsoleLevel())
+		return;
 
-	xRtosSemaphoreTake(&slVarMux, portMAX_DELAY);			// ensure changing of variable list is protected..
-	u32_t MsgCRC = 0;
-	int xLen = crcprintfx(&MsgCRC, DRAM_STR("%s %d %s "), TaskID, CoreID, FuncID);	// "Task Core Function "
-	xLen += vcrcprintfx(&MsgCRC, format, vaList);									//  add message parameters etc"
+	// step 2: handle state of scheduler and obtain the task name
+	sl_vars_t sMsg;
+	sMsg.pri = MsgPRI;
+	sMsg.func = (FuncID == NULL) ? "null" : (*FuncID == 0) ? "empty" : FuncID;
+	sMsg.count = 0;
+	sMsg.core = esp_cpu_get_core_id();
+	sMsg.run = sTSZ.usecs = halTIMER_ReadRunTime();
+	sMsg.utc = sTSZ.usecs ? sTSZ.usecs : sMsg.run;		// if very early stages us runtime as UTC 
+	sMsg.task = (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) ? DRAM_STR("preX") : pcTaskGetName(NULL);	
 
-	if (MsgCRC == RptCRC && MsgPRI == RptPRI) {				// CRC & PRI same as previous message ?
-		++RptCNT;											// Yes, increment the repeat counter
-		RptRUN = CurRUN;									// save timestamps of latest repeat
-		RptUTC = sTSZ.usecs;
-		RptTask = TaskID;
-		RptFunc = (char *)FuncID;
-		RptCore = CoreID;
-		xRtosSemaphoreGive(&slVarMux);						// variable chnages done, unlock
-	} else { // Different CRC and/or PRI
-		// save trackers for immediate and future use...
-		RptCRC = MsgCRC;
-		u8_t TmpPRI = RptPRI;
-		RptPRI = MsgPRI;
-		u8_t TmpCore = RptCore;
-		RptCore = CoreID;
-		u32_t TmpCNT = RptCNT;
-		RptCNT = 0;
-		u64_t TmpRUN = RptRUN;
-		u64_t TmpUTC = RptUTC;
-		const char *TmpTask = RptTask;
-		const char *TmpFunc = RptFunc;
-		xRtosSemaphoreGive(&slVarMux);						// variable changes done, unlock
+	// step 3: semaphore protect all local variables, then calculate CRC for current message 
+	xRtosSemaphoreTake(&shSLvars, portMAX_DELAY);
+	crcprintfx(&sMsg.crc, DRAM_STR("%s %s "), sMsg.task, sMsg.func);	// "Task Core Function "
+	vcrcprintfx(&sMsg.crc, format, vaList);				//  add message parameters etc"
 
-		// Handle console message(s)
-		tsz_t TmpTSZ;
-		if (TmpCNT > 0) {
-			TmpTSZ.usecs = TmpRUN;						// repeated message + count
-			xSyslogSendMessage(TmpPRI, &TmpTSZ, TmpCore, TmpTask, TmpFunc, NULL, formatREPEATED, TmpCNT);
-		}
-		TmpTSZ.usecs = CurRUN;							// New message
-		xvSyslogSendMessage(MsgPRI, &TmpTSZ, CoreID, TaskID, FuncID, NULL, format, vaList);
-
-		// Handle host message(s)
-		if ((MsgPRI & 7) <= xSyslogGetHostLevel()) {	// filter based on higher priorities
-			char *pBuf = malloc(slSIZEBUF);
-			if (TmpCNT > 0) {
-				TmpTSZ.usecs = TmpUTC;					// repeated message + count
-				xSyslogSendMessage(TmpPRI, &TmpTSZ, TmpCore, TmpTask, TmpFunc, pBuf, formatREPEATED, TmpCNT);
-			}
-			xvSyslogSendMessage(MsgPRI, &sTSZ, CoreID, TaskID, FuncID, pBuf, format, vaList);
-			free(pBuf);
-		}
+	if (sRpt.crc == sMsg.crc && sRpt.pri == sMsg.pri) {	// CRC & PRI same as previous message ?
+		u16_t Count = ++sRpt.count;						// Yes, increment the repeat counter
+		sRpt = sMsg;									// current message info now basis of next repeat
+		sRpt.count = Count;								// and update with incremented count
+		xRtosSemaphoreGive(&shSLvars);					// variable changes done, unlock and return
+		return;
 	}
+	// Different CRC and/or PRI
+	sl_vars_t sPrv = sRpt;								// save previous repeat values for message creation
+	sRpt = sMsg;										// save as repeat test for next message
+	xRtosSemaphoreGive(&shSLvars);						// variable changes done, unlock and continue
+
+	// step 5: handle console message(s)
+	if (sPrv.count)										// repeated message
+		xSyslogSendMessage(&sPrv, NULL, formatREPEATED, sPrv.count);
+	xvSyslogSendMessage(&sMsg, NULL, format, vaList);
+
+	// step 6: handle host message(s)
+	if ((sMsg.pri & 7) > xSyslogGetHostLevel())			// filter based on higher priorities
+		return;
+	char *pBuf = malloc(slSIZEBUF);
+	if (sPrv.count)
+		xSyslogSendMessage(&sPrv, pBuf, formatREPEATED, sPrv.count);
+	xvSyslogSendMessage(&sMsg, pBuf, format, vaList);
+	free(pBuf);
 }
 
 void IRAM_ATTR vSyslog(int MsgPRI, const char *FuncID, const char *format, ...) {
@@ -381,7 +369,7 @@ void vSyslogReport(report_t * psR) {
 		return;
 	fmSET(aNL, 0);
 	xNetReport(psR, &sCtx, "SLOG", 0, 0, 0);
-	wprintfx(psR, "\tmaxTX=%zu  CurRpt=%lu" strNL, sCtx.maxTx, RptCNT);
+	wprintfx(psR, "\tmaxTX=%zu  CurRpt=%lu" strNL, sCtx.maxTx, sRpt.count);
 }
 
 // #################################### Test and benchmark routines ################################
