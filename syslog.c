@@ -203,12 +203,6 @@ static void IRAM_ATTR xvSyslogSendMessage(sl_vars_t * psV, char *pBuf, const cha
 		int xLen = snprintfx(pBuf, slSIZEBUF, formatRFC5424, psV->pri, psV->utc, idSTA, psV->task, psV->core, psV->func);		
 #endif
 		xLen += vsnprintfx(pBuf + xLen, slSIZEBUF - xLen - 1, format, vaList); // leave space for LF
-		if (xSyslogConnect()) {							// Scheduler running, LxSTA up and connected
-			#if (appLITTLEFS == 1)
-			if (FileBuffer)
-				vSyslogFileSend();
-			#endif
-		
 			xLen = xSyslogRemoveTerminators(pBuf, xLen);
 			if (xRtosSemaphoreTake(&slNetMux, pdMS_TO_TICKS(slMS_LOCK_WAIT)) == pdTRUE) {
 				iRV = xNetSend(&sCtx, (u8_t *)pBuf, xLen);
