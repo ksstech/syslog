@@ -43,20 +43,7 @@
 
 // ###################################### BUILD : CONFIG definitions ##############################
 
-#ifdef CONFIG_FREERTOS_UNICORE
-	#define slCORES					1
-#else
-	#define slCORES					2
-#endif
-
 #define formatREPEATED DRAM_STR("Repeated %dx")
-
-// '<7>1 2021/10/21T12:34.567: cc50e38819ec_WROVERv4_5C9 #0 esp_timer halVARS_Report????? - '
-#define slSIZEBUF					512
-#define slFILESIZE					10204				// MAX history (at boot) size before truncation
-#define slFILENAME					"/syslog.txt"		// default file name in root directory
-#define UNKNOWNMACAD				"#UnknownMAC#"		// MAC address marker in pre-wifi messages
-#define slMS_LOCK_WAIT				1000
 
 // ######################################### Structures ############################################
 
