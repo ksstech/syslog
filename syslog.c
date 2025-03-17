@@ -340,8 +340,8 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_l
 	sMsg.func = (FuncID == NULL) ? "null" : (*FuncID == 0) ? "empty" : FuncID;
 	sMsg.count = 0;
 	sMsg.core = esp_cpu_get_core_id();
-	sMsg.run = sTSZ.usecs = halTIMER_ReadRunTime();
-	sMsg.utc = sTSZ.usecs ? sTSZ.usecs : sMsg.run;		// if very early stages us runtime as UTC 
+	sMsg.run = halTIMER_ReadRunTime();
+	sMsg.utc = sTSZ.usecs;
 	sMsg.task = (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) ? DRAM_STR("preX") : pcTaskGetName(NULL);	
 
 	// step 3: semaphore protect all local variables, then calculate CRC for current message 
