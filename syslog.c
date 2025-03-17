@@ -75,7 +75,7 @@ static const char *RptTask = NULL, *RptFunc = NULL;
 
 // ###################################### Global variables #########################################
 
-SemaphoreHandle_t slNetMux = 0, slVarMux = 0;
+SemaphoreHandle_t shSLsock = 0, shSLvars = 0;
 
 // ##################################### Private functions #########################################
 
