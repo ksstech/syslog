@@ -344,11 +344,12 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_l
 	sMsg.utc = sTSZ.usecs;
 	sMsg.task = (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) ? DRAM_STR("preX") : pcTaskGetName(NULL);	
 
-	// step 3: semaphore protect all local variables, then calculate CRC for current message 
-	xRtosSemaphoreTake(&shSLvars, portMAX_DELAY);
-	crcprintfx(&sMsg.crc, DRAM_STR("%s %s "), sMsg.task, sMsg.func);	// "Task Core Function "
+	// step 3: calculate CRC for current message 
+	crcprintfx(&sMsg.crc, DRAM_STR("%s %s "), sMsg.task, sMsg.func);	// "Task Function "
 	vcrcprintfx(&sMsg.crc, format, vaList);				//  add message parameters etc"
 
+	// step 4: semaphore protect all local variables
+	xRtosSemaphoreTake(&shSLvars, portMAX_DELAY);
 	if (sRpt.crc == sMsg.crc && sRpt.pri == sMsg.pri) {	// CRC & PRI same as previous message ?
 		u16_t Count = ++sRpt.count;						// Yes, increment the repeat counter
 		sRpt = sMsg;									// current message info now basis of next repeat
