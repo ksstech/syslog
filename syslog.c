@@ -118,10 +118,10 @@ static bool IRAM_ATTR xSyslogConnect(void) {
 		sCtx.pHost = appDEFAULT_SL_HOST;				// options not part of application ?
 		sCtx.sa_in.sin_port = htons(appDEFAULT_SL_PORT);// get from app_config...
 	#endif
-	sCtx.type = SOCK_DGRAM;
 	sCtx.flags = SO_REUSEADDR;
 	sCtx.sa_in.sin_family = AF_INET;
-	sCtx.bSyslog = 1;									// mark as syslog port, so as not to recurse in xNetSyslog
+	sCtx.c.type = SOCK_DGRAM;
+	sCtx.c.NoSyslog = 1;								// mark as syslog port, so as not to recurse in xNetSyslog
 
 	// step 5: before openng, close any zombie sockets
 	xNetCloseDuplicates(sCtx.sa_in.sin_port);
