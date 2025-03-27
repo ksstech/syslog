@@ -206,9 +206,9 @@ static void IRAM_ATTR xvSyslogSendMessage(sl_vars_t * psV, char *pBuf, const cha
 		#define formatCONSOLE	DRAM_STR("%C%!.3R %d %s %s ")
 		static report_t sRpt = { .Size = repSIZE_SET(0,0,0,1,sgrANSI,0,0) };
 		halUartLock(portMAX_DELAY);
-		wprintfx(&sRpt, formatCONSOLE, xpfCOL(SyslogColors[psV->pri & 0x07],0), psV->run, psV->core, psV->task, psV->func);
-		wvprintfx(&sRpt, format, vaList);
-		wprintfx(&sRpt, DRAM_STR("%C" strNL), xpfCOL(attrRESET,0));
+		report(&sRpt, formatCONSOLE, xpfCOL(SyslogColors[psV->pri & 0x07],0), psV->run, psV->core, psV->task, psV->func);
+		vreport(&sRpt, format, vaList);
+		report(&sRpt, DRAM_STR("%C" strNL), xpfCOL(attrRESET,0));
 		halUartUnLock();
 	} else {						/* SYSLOG HOST destined message *******************************/
 		int iRV = erFAILURE;
@@ -394,7 +394,7 @@ void vSyslogReport(report_t * psR) {
 		return;
 	fmSET(aNL, 0);
 	xNetReport(psR, &sCtx, "SLOG", 0, 0, 0);
-	wprintfx(psR, "\tmaxTX=%zu  CurRpt=%lu" strNL, sCtx.maxTx, sRpt.count);
+	report(psR, "\tmaxTX=%zu  CurRpt=%lu" strNL, sCtx.maxTx, sRpt.count);
 }
 
 // #################################### Test and benchmark routines ################################
