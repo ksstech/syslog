@@ -22,7 +22,7 @@
 #include "hal_options.h"
 #include "hal_stdio.h"
 #include "hal_timer.h"
-#include "printfx.h"
+#include "report.h"
 #include "socketsX.h"
 #include "syslog.h"
 #include "errors_events.h"
