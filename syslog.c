@@ -214,13 +214,9 @@ static void IRAM_ATTR xvSyslogSendMessage(sl_vars_t * psV, char *pBuf, const cha
 		int iRV = erFAILURE;
 		if (idSTA[0] == 0)								/* very early message, not WIFI yet */
 			strcpy((char*)idSTA, UNKNOWNMACAD);			/* insert MAC address placemaker */
-#if 1
-		#define formatRFC5424 DRAM_STR("<%u>1 %.3R %s %s/%d %s - - ")		/* "main/0/Devices" */
+		#define formatRFC5424 DRAM_STR("<%u>1 %.3R %s %s/%d %s - - ")		/* papertrailapp.com "main/0/Devices" */
+//		#define formatRFC5424 DRAM_STR("<%d>1 %.3Z %s %s %d %s - ")			/* RFC compliant "main 0 Devices" */
 		int xLen = snprintfx(pBuf, slSIZEBUF, formatRFC5424, psV->pri, psV->utc, idSTA, psV->task, psV->core, psV->func);
-#else
-		#define formatRFC5424 DRAM_STR("<%d>1 %.3Z %s %s %d %s - ")			/* "main" */
-		int xLen = snprintfx(pBuf, slSIZEBUF, formatRFC5424, psV->pri, psV->utc, idSTA, psV->task, psV->core, psV->func);		
-#endif
 		xLen += vsnprintfx(pBuf + xLen, slSIZEBUF - xLen - 1, format, vaList); // leave space for LF
 
 		// If check scheduler and LxSTA, take semaphore and if all ok, send the message
