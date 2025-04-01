@@ -143,6 +143,7 @@ void xvSyslog(int MsgPRI, const char * FuncID, const char * format, va_list args
  * @param[in]	MsgPRI PRIority (combined FACility & SEVerity)
  * @param[in]	FuncID originating function name
  * @param[in]	format string and parameters as per normal printf()
+ * @param[in]	varargs variable number of arguments
  * @return		number of characters displayed(if only to console) or send(if to server)
 */
 void vSyslog(int MsgPRI, const char * FuncID, const char * format, ...);
