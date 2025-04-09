@@ -17,6 +17,7 @@
 
 #include "hal_platform.h"
 #include "certificates.h"
+#include "filesys.h"
 #include "hal_flash.h"
 #include "hal_network.h"
 #include "hal_options.h"
@@ -237,11 +238,11 @@ static void IRAM_ATTR xvSyslogSendMessage(sl_vars_t * psV, char *pBuf, const cha
 				pBuf[xLen] = CHR_NUL;						// and terminate
 			}
 # if 1
-			halFlashFileWrite(slFILENAME, "ax", pBuf);		// open append exclusive
+			xFileSysFileWrite(slFILENAME, "ax", pBuf);		// open append exclusive
 			FileBuffer = 1;
 #else
 			xRtosSemaphoreTake(&shLFSmux, portMAX_DELAY);
-			halFlashFileWrite(slFILENAME, "a", pBuf);		// open append
+			xFileSysFileWrite(slFILENAME, "a", pBuf);		// open append
 			FileBuffer = 1;
 			xRtosSemaphoreGive(&shLFSmux);
 #endif
@@ -312,7 +313,7 @@ void vSyslogSetHostLevel(int Level) {
 }
 
 void vSyslogFileCheckSize(void) {
-	ssize_t Size = halFlashFileGetSize(slFILENAME);	// AMM check protection !!!
+	ssize_t Size = xFileSysGetFileSize(slFILENAME);	// AMM check protection !!!
 	if (Size > slFILESIZE) {
 		unlink(slFILENAME);			// file size > "slFILESIZE" in size....
 		Size = 0;
