@@ -2,9 +2,12 @@
 
 #pragma once
 
-#include <stdarg.h>
 #include "sdkconfig.h"
+#include "report.h"
+
 #include "FreeRTOS_Support.h"
+
+#include <stdarg.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -160,8 +163,7 @@ int xSyslogError(const char * FuncID, int eCode);
  * @brief	report syslog related information
  * @param[in]	psR pointer to report structure
 */
-struct report_t;
-void vSyslogReport(struct report_t * psR);
+void vSyslogReport(report_t * psR);
 
 #ifdef __cplusplus
 }

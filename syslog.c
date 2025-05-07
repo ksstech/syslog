@@ -16,16 +16,14 @@
 */
 
 #include "hal_platform.h"
+#include "syslog.h"
 #include "certificates.h"
 #include "filesys.h"
-#include "hal_flash.h"
 #include "hal_network.h"
 #include "hal_options.h"
-#include "hal_stdio.h"
 #include "hal_timer.h"
-#include "report.h"
+#include "hal_usart.h"
 #include "socketsX.h"
-#include "syslog.h"
 #include "errors_events.h"
 
 #include <errno.h>
@@ -42,15 +40,15 @@
 #define debugPARAM				(debugFLAG_GLOBAL & debugFLAG & 0x4000)
 #define debugRESULT				(debugFLAG_GLOBAL & debugFLAG & 0x8000)
 
-// ###################################### BUILD : CONFIG definitions ##############################
-
-#define formatREPEATED DRAM_STR("Repeated %dx")
-
 // ######################################### Structures ############################################
 
 typedef struct {
-	u8_t pri, core;
-	u16_t count;
+	struct __attribute__((packed)) {
+		u16_t count:16;
+		u8_t pri:8;
+		u8_t core:4;
+		u8_t spare:4;
+	};
 	u32_t crc;
 	u64_t run, utc;
 	const char *task, *func;
@@ -79,17 +77,13 @@ static sl_vars_t sRpt = { 0 };
 	static u8_t consoleLevel = SL_LEV_CONSOLE;
 #endif
 
+char SLbuffer[2][slSIZEBUF] = { 0 };
+
 // ###################################### Global variables #########################################
 
 SemaphoreHandle_t shSLsock = 0, shSLvars = 0;
 
 // ##################################### Private functions #########################################
-
-static int xSyslogRemoveTerminators(char * pBuf, int xLen) {
-	while  (isspace((int) pBuf[xLen - 1]) != 0)
-		pBuf[--xLen] = CHR_NUL;							// remove terminating white space character(s)
-	return xLen;
-}
 
 /**
  * @brief	establish connection to the selected syslog host
@@ -138,124 +132,57 @@ exit:
 	return iRV;											// and return status accordingly
 }
 
-/**
- * @brief
- */
-void vSyslogFileSend(void) {
-	// step 1: check if scheduler running, LxSTA up and connected
-	if (xSyslogConnect() == 0)
-		return;
+#define formatREPEATED		DRAM_STR("Repeated %dx")
+#define formatCONSOLE1		DRAM_STR("%C%!.3R %d %s %s ")
+#define formatCONSOLE2		DRAM_STR("%C" strNL)
+#define formatPAPERTRAIL	DRAM_STR("<%u>1 %.3R %s %s/%d %s - - ")		/* papertrailapp.com "main/0/Devices" */
+#define formatRFC5424		DRAM_STR("<%d>1 %.3Z %s %s %d %s - ")		/* RFC compliant "main 0 Devices" */
 
-	// step 2: protect the whole operation
-	if (xRtosSemaphoreTake(&shSLsock, slMS_LOCK_WAIT) == pdFALSE)	/* semaphore taken? */
-		return;														/* no, return for now */
-
-	// step 3: try to lock file for read [and delete/unlink]
-	if (xRtosSemaphoreTake(&shLFSmux, slMS_LOCK_WAIT) == pdFALSE)
-		goto exit0;
-
-	// step 4: try to open the file for read
-	FILE *fp = fopen(slFILENAME, "r");
-	if (fp == NULL)										/* successfully opened file? */
-		goto exit1;										/* no, release both semaphores and return */
-
-	// step 5: determine file size
-	int iRV = erSUCCESS;								// default to force file deletion at exit
-	char * pTmp = NULL;
-	if (fseek(fp, 0L, SEEK_END) || ftell(fp) == 0L)		// Seek error or empty file?
-		goto exit2;										// nope, something wrong
-
-	// step 6: rewind and start sending
-	rewind(fp);
-	char * pBuf = malloc(slSIZEBUF);
-	while (fgets(pBuf, slSIZEBUF, fp) != NULL) {
-		// step 6a: fix placeholder MAC if required
-		pTmp = strstr(pBuf, UNKNOWNMACAD);				// Check if early message ie no MAC address
-		if (pTmp != NULL)								// if UNKNOWNMACAD marker is present
-			memcpy(pTmp, idSTA, lenMAC_ADDRESS*2);		// replace with actual MAC/hostname
-
-		// step 6b: trim extra terminators from the end
-		int xLen = strlen(pBuf);
-		xLen = xSyslogRemoveTerminators(pBuf, xLen);	// remove terminating [CR]LF
-		if (xLen == 0)									// if nothing left to send (was just terminators...)
-			break;
-
-		// step 6c: send whatever remains of message (if any)
-		iRV = xNetSend(&sCtx, (u8_t *)pBuf, xLen);		// send contents of buffer
-		if (iRV <= 0) {									// message send failed?
-			xNetClose(&sCtx);							// yes, close connection
-			break;										// and abort sending
-		}
-		vTaskDelay(pdMS_TO_TICKS(slMS_FILESEND_DLY));	// ensure WDT gets fed....
-	}
-	free(pBuf);											// always free buffer
-exit2:
-	// step 6: close the file and delete if successfully sent (add EOF and error checks to make sure?)
-	fclose(fp);											// always close the file
-	if (iRV >= erSUCCESS) {								// if last send was successful
-		FileBuffer = 0;									// clear flag used to check for sending
-		unlink(slFILENAME);								// delete the file
-	}
-exit1:
-	xRtosSemaphoreGive(&shLFSmux);
-exit0:
-	xRtosSemaphoreGive(&shSLsock);
+static int IRAM_ATTR xSyslogRemoveTerminators(char * pBuf, int xLen) {
+	while  (isspace((int) pBuf[xLen - 1]) != 0)
+		pBuf[--xLen] = CHR_NUL;							// remove terminating white space character(s)
+	return xLen;
 }
 
-static void IRAM_ATTR xvSyslogSendMessage(sl_vars_t * psV, char *pBuf, const char *format, va_list vaList) {
-	if (pBuf == NULL) {				/* CONSOLE destined message ***********************************/
-		#define formatCONSOLE	DRAM_STR("%C%!.3R %d %s %s ")
-		static report_t sRpt = { .Size = repSIZE_SET(0,0,0,1,sgrANSI,0,0) };
-		halUartLock(portMAX_DELAY);
-		report(&sRpt, formatCONSOLE, xpfCOL(SyslogColors[psV->pri & 0x07],0), psV->run, psV->core, psV->task, psV->func);
-		vreport(&sRpt, format, vaList);
-		report(&sRpt, DRAM_STR("%C" strNL), xpfCOL(attrRESET,0));
-		halUartUnLock();
-	} else {						/* SYSLOG HOST destined message *******************************/
-		int iRV = erFAILURE;
-		if (idSTA[0] == 0)								/* very early message, not WIFI yet */
-			strcpy((char*)idSTA, UNKNOWNMACAD);			/* insert MAC address placemaker */
-		#define formatRFC5424 DRAM_STR("<%u>1 %.3R %s %s/%d %s - - ")		/* papertrailapp.com "main/0/Devices" */
-//		#define formatRFC5424 DRAM_STR("<%d>1 %.3Z %s %s %d %s - ")			/* RFC compliant "main 0 Devices" */
-		int xLen = snprintfx(pBuf, slSIZEBUF, formatRFC5424, psV->pri, psV->utc, idSTA, psV->task, psV->core, psV->func);
-		xLen += vsnprintfx(pBuf + xLen, slSIZEBUF - xLen - 1, format, vaList); // leave space for LF
-
-		// If check scheduler and LxSTA, take semaphore and if all ok, send the message
-		if (xSyslogConnect() && xRtosSemaphoreTake(&shSLsock, pdMS_TO_TICKS(slMS_LOCK_WAIT)) == pdTRUE) {
-			xLen = xSyslogRemoveTerminators(pBuf, xLen);
-			iRV = xNetSend(&sCtx, (u8_t *)pBuf, xLen);
-			if (iRV >= erSUCCESS) {						/* message successfully sent? */
-				sCtx.maxTx = (iRV > sCtx.maxTx) ? iRV : sCtx.maxTx;	/* yes, update running stats */
-			} else {									/* no, close the connection */
-				xNetClose(&sCtx);						/* iRV already set for persisting */
-			}
-			xRtosSemaphoreGive(&shSLsock);
-		}
-		#if (appLITTLEFS > 0)		/* HOST not accessible try send to LFS if available ***********/
-		if (iRV < erSUCCESS && halEventCheckDevice(devMASK_LFS)) {
-			if (pBuf[xLen-1] != CHR_LF) {					// yes, if last character not a LF
-				pBuf[xLen++] = CHR_LF;						// append LF for later fgets()
-				pBuf[xLen] = CHR_NUL;						// and terminate
-			}
-# if 1
-			xFileSysFileWrite(slFILENAME, "ax", pBuf);		// open append exclusive
-			FileBuffer = 1;
-#else
-			xRtosSemaphoreTake(&shLFSmux, portMAX_DELAY);
-			xFileSysFileWrite(slFILENAME, "a", pBuf);		// open append
-			FileBuffer = 1;
-			xRtosSemaphoreGive(&shLFSmux);
-#endif
-		}
-		#endif
-	}
+static void IRAM_ATTR xvSyslogConsole(report_t * psR, sl_vars_t * psV, const char * format, va_list vaList) {
+	int xLen;
+	xLen = xReport(psR, formatCONSOLE1, xpfCOL(SyslogColors[psV->pri&7],0), psV->run, psV->core, psV->task, psV->func);
+	if (format)	xLen += xvReport(psR, format, vaList);
+	else		xLen += xReport(psR, formatREPEATED, psV->count);
+	xLen += xReport(psR, formatCONSOLE2, xpfCOL(attrRESET,0));
+	write(STDOUT_FILENO, psR->pcAlloc, xLen);	
 }
 
-static void IRAM_ATTR xSyslogSendMessage(sl_vars_t * psV, char *pBuf, const char *format, ...) {
-	va_list vaList;
-	va_start(vaList, format);
-	xvSyslogSendMessage(psV, pBuf, format, vaList);
-	va_end(vaList);
+static void IRAM_ATTR xvSyslogHost(report_t * psR, sl_vars_t * psV, const char * format, va_list vaList) {
+	int xLen;
+	if (idSTA[0] == 0)								/* very early message, not WIFI yet */
+		strcpy((char*)idSTA, UNKNOWNMACAD);			/* insert MAC address placemaker */
+	xLen = xReport(psR, formatPAPERTRAIL, psV->pri, psV->utc, idSTA, psV->task, psV->core, psV->func);
+	if (format)	xLen += xvReport(psR, format, vaList);
+	else		xLen += xReport(psR, formatREPEATED, psV->count);
+
+	// If check scheduler and LxSTA, take semaphore and if all ok, send the message
+	int iRV = erFAILURE;
+	if (xSyslogConnect() && xRtosSemaphoreTake(&shSLsock, pdMS_TO_TICKS(slMS_LOCK_WAIT)) == pdTRUE) {
+		xLen = xSyslogRemoveTerminators(psR->pcAlloc, xLen);
+		iRV = xNetSend(&sCtx, (u8_t *)psR->pcAlloc, xLen);
+		if (iRV >= erSUCCESS) {						/* message successfully sent? */
+			sCtx.maxTx = (iRV > sCtx.maxTx) ? iRV : sCtx.maxTx;	/* yes, update running stats */
+		} else {									/* no, close the connection */
+			xNetClose(&sCtx);						/* iRV already set for persisting */
+		}
+		xRtosSemaphoreGive(&shSLsock);
+	}
+	#if (appLITTLEFS > 0)		/* HOST not accessible try send to LFS if available ***********/
+	if (iRV < erSUCCESS && halEventCheckDevice(devMASK_LFS)) {
+		if (psR->pcAlloc[xLen-1] != CHR_LF) {		// yes, if last character not a LF
+			psR->pcAlloc[xLen++] = CHR_LF;			// append LF for later fgets()
+			psR->pcAlloc[xLen] = CHR_NUL;			// and terminate
+		}
+		xFileSysFileWrite(slFILENAME, "ax", psR->pcAlloc);	// open append exclusive
+		FileBuffer = 1;
+	}
+	#endif
 }
 
 // ###################################### Public functions #########################################
@@ -312,20 +239,81 @@ void vSyslogSetHostLevel(int Level) {
 	}
 }
 
-void vSyslogFileCheckSize(void) {
-	ssize_t Size = xFileSysGetFileSize(slFILENAME);	// AMM check protection !!!
-	if (Size > slFILESIZE) {
-		unlink(slFILENAME);			// file size > "slFILESIZE" in size....
-		Size = 0;
+#if (appLITTLEFS == 1)
+/**
+ * @brief	Send contents (if any) of syslog offline buffer file to host
+ */
+void vSyslogFileSend(void) {
+	// step 1: check if scheduler running, LxSTA up and connected
+	if (xSyslogConnect() == 0)
+		return;
+	// step 2: check if anything there to send
+	if (xFileSysGetFileSize(slFILENAME) <= 0)
+		return;
+	// step 3: protect the whole operation
+	if (xRtosSemaphoreTake(&shSLsock, slMS_LOCK_WAIT) == pdFALSE)	/* semaphore taken? */
+		return;														/* no, return for now */
+	// step 4: try to lock file for read [and delete/unlink]
+	if (xRtosSemaphoreTake(&shLFSmux, slMS_LOCK_WAIT) == pdFALSE)
+		goto exit0;
+	// step 5: try to open the file for read
+	FILE *fp = fopen(slFILENAME, "r");
+	if (fp == NULL)										/* successfully opened file? */
+		goto exit1;										/* no, release both semaphores and return */
+
+	// step 6: rewind and start sending
+	int iRV = erSUCCESS;								// default to force file deletion at exit
+	char * pBuf = malloc(slSIZEBUF);
+	while (fgets(pBuf, slSIZEBUF, fp) != NULL) {
+		// step 6a: fix placeholder MAC if required
+		char * pTmp = strstr(pBuf, UNKNOWNMACAD);		// Check if early message ie no MAC address
+		if (pTmp)										// if UNKNOWNMACAD marker is present
+			memcpy(pTmp, idSTA, lenMAC_ADDRESS*2);		// replace with actual MAC/hostname
+
+		// step 6b: trim extra terminators from the end
+		int xLen = strlen(pBuf);
+		xLen = xSyslogRemoveTerminators(pBuf, xLen);	// remove terminating [CR]LF
+		if (xLen == 0)									// if nothing left to send (was just terminators...)
+			break;
+
+		// step 6c: send whatever remains of message (if any)
+		iRV = xNetSend(&sCtx, (u8_t *)pBuf, xLen);		// send contents of buffer
+		if (iRV <= 0) {									// message send failed?
+			xNetClose(&sCtx);							// yes, close connection
+			break;										// and abort sending
+		}
+		vTaskDelay(pdMS_TO_TICKS(slMS_FILESEND_DLY));	// ensure WDT gets fed....
 	}
-	FileBuffer = (Size > 0) ? 1 : 0;
+	free(pBuf);											// always free buffer
+
+	// step 7: close the file and delete if successfully sent (add EOF and error checks to make sure?)
+	fclose(fp);											// always close the file
+	if (iRV >= erSUCCESS) {								// if last send was successful
+		FileBuffer = 0;									// clear flag used to check for sending
+		unlink(slFILENAME);								// delete the file
+	}
+exit1:
+	xRtosSemaphoreGive(&shLFSmux);
+exit0:
+	xRtosSemaphoreGive(&shSLsock);
+}
+#endif
+
+void vSyslogFileCheckSize(void) {
+	ssize_t Size = xFileSysGetFileSize(slFILENAME);
+	if (Size > slFILESIZE) {							// if file size > slFILESIZE
+		unlink(slFILENAME);								// remove file
+		Size = 0;										// discard content
+	}
+	FileBuffer = (Size > 0) ? 1 : 0;					// set flag if anything in file
 }
 
 void IRAM_ATTR xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_list vaList) {
 	// step 0: check if anything in file that needs sending, do so ASAP
-//	#if (appLITTLEFS == 1)
-//	if (FileBuffer) vSyslogFileSend();
-//	#endif
+	#if (appLITTLEFS == 1)
+	if (FileBuffer)
+		vSyslogFileSend();
+	#endif
 
 	// step 1: check if message priority outside console threshold
 	if ((MsgPRI & 7) > xSyslogGetConsoleLevel())
@@ -359,19 +347,25 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_l
 	sRpt = sMsg;										// save as repeat test for next message
 	xRtosSemaphoreGive(&shSLvars);						// variable changes done, unlock and continue
 
-	// step 5: handle console message(s)
+	// Step 5: prepare variable structure(s)
+	va_fake_t vaFake = { .pa = NULL };
+	report_t sRpt = {
+		.pcAlloc = &SLbuffer[sMsg.core][0],
+		.pcBuf = &SLbuffer[sMsg.core][0],
+		.Size = repSIZE_SET(sNONE,sgrANSI,0,slSIZEBUF)
+	 };
+
+	// step 6: handle console message(s)
 	if (sPrv.count)										// repeated message
-		xSyslogSendMessage(&sPrv, NULL, formatREPEATED, sPrv.count);
-	xvSyslogSendMessage(&sMsg, NULL, format, vaList);
+		xvSyslogConsole(&sRpt, &sPrv, NULL, vaFake.va);
+	xvSyslogConsole(&sRpt, &sMsg, format, vaList);
 
 	// step 6: handle host message(s)
 	if ((MsgPRI & 7) > xSyslogGetHostLevel())			// filter based on higher priorities
 		return;
-	char *pBuf = malloc(slSIZEBUF);
 	if (sPrv.count)
-		xSyslogSendMessage(&sPrv, pBuf, formatREPEATED, sPrv.count);
-	xvSyslogSendMessage(&sMsg, pBuf, format, vaList);
-	free(pBuf);
+		xvSyslogHost(&sRpt, &sPrv, NULL, vaFake.va);
+	xvSyslogHost(&sRpt, &sMsg, format, vaList);
 }
 
 void IRAM_ATTR vSyslog(int MsgPRI, const char *FuncID, const char *format, ...) {
@@ -391,7 +385,7 @@ void vSyslogReport(report_t * psR) {
 		return;
 	fmSET(aNL, 0);
 	xNetReport(psR, &sCtx, "SLOG", 0, 0, 0);
-	report(psR, "\tmaxTX=%zu  CurRpt=%lu" strNL, sCtx.maxTx, sRpt.count);
+	xReport(psR, "\tmaxTX=%zu  CurRpt=%lu" strNL, sCtx.maxTx, sRpt.count);
 }
 
 // #################################### Test and benchmark routines ################################
