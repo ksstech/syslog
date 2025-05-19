@@ -3,7 +3,7 @@
 set( srcs "syslog.c" )
 set( include_dirs "." )
 set( priv_include_dirs )
-set( requires "confidential hal_esp32 socketsX" )
+set( requires "confidential filesys hal_esp32 socketsX" )
 set( priv_requires "printfx" )
 
 idf_component_register(
