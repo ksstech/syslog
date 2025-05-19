@@ -1,1 +1,0 @@
-# pseudo component makefile.
