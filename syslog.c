@@ -215,13 +215,13 @@ int xSyslogGetHostLevel(void) {
 }
 
 void vSyslogSetConsoleLevel(int Level) {
-	if (Level <= SL_LEVEL_MAX) {
-		#if (appOPTIONS == 1)
-		vOptionSet(ioSLOGhi, Level);
-		#else
-		consoleLevel = Level;
-		#endif
-	}
+	if (Level > SL_LEVEL_MAX)
+		Level = SL_LEVEL_MAX;
+#if (appOPTIONS == 1)
+	vOptionSet(ioSLOGhi, Level);
+#else
+	consoleLevel = Level;
+#endif
 }
 
 // In the case where the log level is set to DEBUG in ESP-IDF the volume of messages being generated
@@ -230,13 +230,13 @@ void vSyslogSetConsoleLevel(int Level) {
 // level should be set to NOTICE.
 
 void vSyslogSetHostLevel(int Level) {
-	if (Level <= SL_LEVEL_MAX) {
-	#if (appOPTIONS == 1)
-		vOptionSet(ioSLhost, Level);
-	#else
-		hostLevel = Level;
-	#endif
-	}
+	if (Level > SL_LEVEL_MAX)
+		Level = SL_LEVEL_MAX;
+#if (appOPTIONS == 1)
+	vOptionSet(ioSLhost, Level);
+#else
+	hostLevel = Level;
+#endif
 }
 
 #if (appLITTLEFS == 1)
