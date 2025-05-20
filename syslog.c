@@ -20,7 +20,6 @@
 #include "certificates.h"
 #include "filesys.h"
 #include "hal_network.h"
-#include "hal_options.h"
 #include "hal_timer.h"
 #include "hal_usart.h"
 #include "socketsX.h"
@@ -383,7 +382,6 @@ int IRAM_ATTR xSyslogError(const char *FuncID, int iRV) {
 void vSyslogReport(report_t * psR) {
 	if (sCtx.sd <= 0)
 		return;
-	fmSET(aNL, 0);
 	xNetReport(psR, &sCtx, "SLOG", 0, 0, 0);
 	xReport(psR, "\tmaxTX=%zu  CurRpt=%lu" strNL, sCtx.maxTx, sRpt.count);
 }
