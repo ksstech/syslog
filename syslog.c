@@ -214,8 +214,8 @@ int xSyslogGetHostLevel(void) {
 }
 
 void vSyslogSetConsoleLevel(int Level) {
-	if (Level > SL_LEVEL_MAX)
-		Level = SL_LEVEL_MAX;
+	if (Level > SL_LEV_MAX)
+		Level = SL_LEV_MAX;
 #if (appOPTIONS == 1)
 	vOptionSet(ioSLOGhi, Level);
 #else
@@ -229,8 +229,8 @@ void vSyslogSetConsoleLevel(int Level) {
 // level should be set to NOTICE.
 
 void vSyslogSetHostLevel(int Level) {
-	if (Level > SL_LEVEL_MAX)
-		Level = SL_LEVEL_MAX;
+	if (Level > SL_LEV_MAX)
+		Level = SL_LEV_MAX;
 #if (appOPTIONS == 1)
 	vOptionSet(ioSLhost, Level);
 #else

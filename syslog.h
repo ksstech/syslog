@@ -53,10 +53,6 @@ extern "C" {
 #define		SL_SEV_INFO				6			// Informational: informational messages
 #define		SL_SEV_DEBUG			7			// Debug: debug-level messages
 
-#ifndef SL_LEVEL_MAX
-	#define SL_LEVEL_MAX			7
-#endif
-
 // '<7>1 2021/10/21T12:34.567: cc50e38819ec_WROVERv4_5C9 #0 esp_timer halVARS_Report????? - '
 #define slSIZEBUF					512
 #define slFILESIZE					10204				// MAX history (at boot) size before truncation
@@ -87,10 +83,10 @@ extern "C" {
 #define	IF_SL_INFO(tst, fmt, ...)	if (tst) SL_INFO(fmt, ##__VA_ARGS__)
 #define	IF_SL_DBG(tst, fmt, ...)	if (tst) SL_DBG(fmt, ##__VA_ARGS__)
 
-#define SL_LOG(pri, f, ...) 		do { 													\
-										if (((pri)&7) <= SL_LEVEL_MAX) {					\
-											 vSyslog(pri,__FUNCTION__,f,##__VA_ARGS__);		\
-										} 													\
+#define SL_LOG(pri, f, ...) 		do { 												\
+										if (((pri)&7) <= SL_LEV_MAX) {					\
+											 vSyslog(pri,__FUNCTION__,f,##__VA_ARGS__);	\
+										} 												\
 									} while(0)
 
 #define SL_PRI(fac,sev)				(((fac)<<3) | ((sev)&7))
