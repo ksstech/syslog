@@ -62,9 +62,16 @@ extern "C" {
 #define slMS_LOCK_WAIT				200					/* was 1000 */
 #define slMS_FILESEND_DLY			5
 
-
 // ############################## Syslog formatting/calling macros #################################
 
+#define SL_PRI(fac,sev)				(((fac)<<3) | ((sev)&7))
+#define SL_LOG(pri, f, ...) 		do { 												\
+										if (((pri)&7) <= SL_LEV_MAX) {					\
+											 vSyslog(pri,__FUNCTION__,f,##__VA_ARGS__);	\
+										} 												\
+									} while(0)
+
+#define SL_ERROR(err) 				xSyslogError(__FUNCTION__, err)
 #define	SL_EMER(fmt, ...)			SL_LOG(SL_SEV_EMERGENCY, fmt, ##__VA_ARGS__)
 #define	SL_ALRT(fmt, ...)			SL_LOG(SL_SEV_ALERT, fmt, ##__VA_ARGS__)
 #define	SL_CRIT(fmt, ...)			SL_LOG(SL_SEV_CRITICAL, fmt, ##__VA_ARGS__)
@@ -74,6 +81,7 @@ extern "C" {
 #define	SL_INFO(fmt, ...)			SL_LOG(SL_SEV_INFO, fmt, ##__VA_ARGS__)
 #define	SL_DBG(fmt, ...)			SL_LOG(SL_SEV_DEBUG, fmt, ##__VA_ARGS__)
 
+#define IF_SL_ERROR(tst, err) 		if (tst) SL_ERROR(err)
 #define	IF_SL_EMER(tst, fmt, ...)	if (tst) SL_EMER(fmt, ##__VA_ARGS__)
 #define	IF_SL_ALRT(tst, fmt, ...)	if (tst) SL_ALRT(fmt, ##__VA_ARGS__)
 #define	IF_SL_CRIT(tst, fmt, ...)	if (tst) SL_CRIT(fmt, ##__VA_ARGS__)
@@ -82,17 +90,6 @@ extern "C" {
 #define	IF_SL_NOT(tst, fmt, ...)	if (tst) SL_NOT(fmt, ##__VA_ARGS__)
 #define	IF_SL_INFO(tst, fmt, ...)	if (tst) SL_INFO(fmt, ##__VA_ARGS__)
 #define	IF_SL_DBG(tst, fmt, ...)	if (tst) SL_DBG(fmt, ##__VA_ARGS__)
-
-#define SL_LOG(pri, f, ...) 		do { 												\
-										if (((pri)&7) <= SL_LEV_MAX) {					\
-											 vSyslog(pri,__FUNCTION__,f,##__VA_ARGS__);	\
-										} 												\
-									} while(0)
-
-#define SL_PRI(fac,sev)				(((fac)<<3) | ((sev)&7))
-
-#define SL_ERROR(err) 				xSyslogError(__FUNCTION__, err)
-#define IF_SL_ERROR(tst, err) 		if (tst) SL_ERROR(err)
 
 // ###################################### Global variables #########################################
 
