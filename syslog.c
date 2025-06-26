@@ -135,7 +135,7 @@ exit:
 #define formatCONSOLE1		DRAM_STR("%C%!.3R %d %s %s ")
 #define formatCONSOLE2		DRAM_STR("%C" strNL)
 #define formatPAPERTRAIL	DRAM_STR("<%u>1 %.3R %s %s/%d %s - - ")		/* papertrailapp.com "main/0/Devices" */
-#define formatRFC5424		DRAM_STR("<%d>1 %.3Z %s %s %d %s - ")		/* RFC compliant "main 0 Devices" */
+#define formatRFC5424		DRAM_STR("<%d>1 %.3R %s %s %d %s - ")		/* RFC compliant "main 0 Devices" */
 
 static int IRAM_ATTR xSyslogRemoveTerminators(char * pBuf, int xLen) {
 	while  (isspace((int) pBuf[xLen - 1]) != 0)
@@ -143,28 +143,36 @@ static int IRAM_ATTR xSyslogRemoveTerminators(char * pBuf, int xLen) {
 	return xLen;
 }
 
-static void IRAM_ATTR xvSyslogConsole(report_t * psR, sl_vars_t * psV, const char * format, va_list vaList) {
-	int xLen;
-	xLen = xReport(psR, formatCONSOLE1, xpfCOL(SyslogColors[psV->pri&7],0), psV->run, psV->core, psV->task, psV->func);
-	if (format)	xLen += xvReport(psR, format, vaList);
-	else		xLen += xReport(psR, formatREPEATED, psV->count);
-	xLen += xReport(psR, formatCONSOLE2, xpfCOL(attrRESET,0));
-	write(STDOUT_FILENO, psR->pcAlloc, xLen);	
+static void IRAM_ATTR xvSyslogConsole(sl_vars_t * psV, const char * format, va_list vaList) {
+	report_t sRpt = {
+		.pcAlloc = &SLbuffer[psV->core][0],
+		.pcBuf = &SLbuffer[psV->core][0],
+		.Size = repSIZE_SET(sBUFFER,sgrANSI,0,0,slSIZEBUF)
+	 };
+	int xLen = xReport(&sRpt, formatCONSOLE1, xpfCOL(SyslogColors[psV->pri&7],0), psV->run, psV->core, psV->task, psV->func);
+	if (format)	xLen += xvReport(&sRpt, format, vaList);
+	else		xLen += xReport(&sRpt, formatREPEATED, psV->count);
+	xLen += xReport(&sRpt, formatCONSOLE2, xpfCOL(attrRESET,0));
+	fputs(sRpt.pcAlloc, stdout);		// write to stdout
 }
 
-static void IRAM_ATTR xvSyslogHost(report_t * psR, sl_vars_t * psV, const char * format, va_list vaList) {
-	int xLen;
+static void IRAM_ATTR xvSyslogHost(sl_vars_t * psV, const char * format, va_list vaList) {
+	report_t sRpt = {
+		.pcAlloc = &SLbuffer[psV->core][0],
+		.pcBuf = &SLbuffer[psV->core][0],
+		.Size = repSIZE_SET(sBUFFER,sgrNONE,0,0,slSIZEBUF)
+	 };
 	if (idSTA[0] == 0)								/* very early message, not WIFI yet */
 		strcpy((char*)idSTA, UNKNOWNMACAD);			/* insert MAC address placemaker */
-	xLen = xReport(psR, formatPAPERTRAIL, psV->pri, psV->utc, idSTA, psV->task, psV->core, psV->func);
-	if (format)	xLen += xvReport(psR, format, vaList);
-	else		xLen += xReport(psR, formatREPEATED, psV->count);
+	int xLen = xReport(&sRpt, formatPAPERTRAIL, psV->pri, psV->utc, idSTA, psV->task, psV->core, psV->func);
+	if (format)	xLen += xvReport(&sRpt, format, vaList);
+	else		xLen += xReport(&sRpt, formatREPEATED, psV->count);
 
 	// If check scheduler and LxSTA, take semaphore and if all ok, send the message
 	int iRV = erFAILURE;
 	if (xSyslogConnect() && xRtosSemaphoreTake(&shSLsock, pdMS_TO_TICKS(slMS_LOCK_WAIT)) == pdTRUE) {
-		xLen = xSyslogRemoveTerminators(psR->pcAlloc, xLen);
-		iRV = xNetSend(&sCtx, (u8_t *)psR->pcAlloc, xLen);
+		xLen = xSyslogRemoveTerminators(sRpt.pcAlloc, xLen);
+		iRV = xNetSend(&sCtx, (u8_t *)sRpt.pcAlloc, xLen);
 		if (iRV >= erSUCCESS) {						/* message successfully sent? */
 			sCtx.maxTx = (iRV > sCtx.maxTx) ? iRV : sCtx.maxTx;	/* yes, update running stats */
 		} else {									/* no, close the connection */
@@ -174,11 +182,11 @@ static void IRAM_ATTR xvSyslogHost(report_t * psR, sl_vars_t * psV, const char *
 	}
 	#if (appLITTLEFS > 0)		/* HOST not accessible try send to LFS if available ***********/
 	if (iRV < erSUCCESS && halEventCheckDevice(devMASK_LFS)) {
-		if (psR->pcAlloc[xLen-1] != CHR_LF) {		// yes, if last character not a LF
-			psR->pcAlloc[xLen++] = CHR_LF;			// append LF for later fgets()
-			psR->pcAlloc[xLen] = CHR_NUL;			// and terminate
+		if (sRpt.pcAlloc[xLen-1] != CHR_LF) {		// yes, if last character not a LF
+			sRpt.pcAlloc[xLen++] = CHR_LF;			// append LF for later fgets()
+			sRpt.pcAlloc[xLen] = CHR_NUL;			// and terminate
 		}
-		xFileSysFileWrite(slFILENAME, "ax", psR->pcAlloc);	// open append exclusive
+		xFileSysFileWrite(slFILENAME, "ax", sRpt.pcAlloc);	// open append exclusive
 		FileBuffer = 1;
 	}
 	#endif
@@ -345,26 +353,20 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_l
 	sl_vars_t sPrv = sRpt;								// save previous repeat values for message creation
 	sRpt = sMsg;										// save as repeat test for next message
 	xRtosSemaphoreGive(&shSLvars);						// variable changes done, unlock and continue
-
-	// Step 5: prepare variable structure(s)
 	va_fake_t vaFake = { .pa = NULL };
-	report_t sRpt = {
-		.pcAlloc = &SLbuffer[sMsg.core][0],
-		.pcBuf = &SLbuffer[sMsg.core][0],
-		.Size = repSIZE_SET(sNONE,sgrANSI,0,slSIZEBUF)
-	 };
 
-	// step 6: handle console message(s)
+	// step 5: handle console message(s)
 	if (sPrv.count)										// repeated message
-		xvSyslogConsole(&sRpt, &sPrv, NULL, vaFake.va);
-	xvSyslogConsole(&sRpt, &sMsg, format, vaList);
+		xvSyslogConsole(&sPrv, NULL, vaFake.va);
+	xvSyslogConsole(&sMsg, format, vaList);
 
 	// step 6: handle host message(s)
-	if ((MsgPRI & 7) > xSyslogGetHostLevel())			// filter based on higher priorities
-		return;
-	if (sPrv.count)
-		xvSyslogHost(&sRpt, &sPrv, NULL, vaFake.va);
-	xvSyslogHost(&sRpt, &sMsg, format, vaList);
+	if ((MsgPRI & 7) <= xSyslogGetHostLevel()) {		// filter based on higher priorities
+		if (sPrv.count)
+			xvSyslogHost(&sPrv, NULL, vaFake.va);
+		xvSyslogHost(&sMsg, format, vaList);
+	}
+
 }
 
 void IRAM_ATTR vSyslog(int MsgPRI, const char *FuncID, const char *format, ...) {
