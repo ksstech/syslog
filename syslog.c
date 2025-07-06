@@ -162,8 +162,8 @@ static void IRAM_ATTR xvSyslogHost(sl_vars_t * psV, const char * format, va_list
 		.pcBuf = &SLbuffer[psV->core][0],
 		.Size = repSIZE_SET(sBUFFER,sgrNONE,0,0,slSIZEBUF)
 	 };
-	if (idSTA[0] == 0)								/* very early message, not WIFI yet */
-		strcpy((char*)idSTA, UNKNOWNMACAD);			/* insert MAC address placemaker */
+	if (idSTA[0] == 0)									/* very early message, not WIFI yet */
+		strcpy((char*)idSTA, UNKNOWNMACAD);				/* insert MAC address placemaker */
 	int xLen = xReport(&sRpt, formatPAPERTRAIL, psV->pri, psV->utc, idSTA, psV->task, psV->core, psV->func);
 	if (format)	xLen += xvReport(&sRpt, format, vaList);
 	else		xLen += xReport(&sRpt, formatREPEATED, psV->count);
@@ -173,18 +173,18 @@ static void IRAM_ATTR xvSyslogHost(sl_vars_t * psV, const char * format, va_list
 	if (xSyslogConnect() && xRtosSemaphoreTake(&shSLsock, pdMS_TO_TICKS(slMS_LOCK_WAIT)) == pdTRUE) {
 		xLen = xSyslogRemoveTerminators(sRpt.pcAlloc, xLen);
 		iRV = xNetSend(&sCtx, (u8_t *)sRpt.pcAlloc, xLen);
-		if (iRV >= erSUCCESS) {						/* message successfully sent? */
+		if (iRV >= erSUCCESS) {							/* message successfully sent? */
 			sCtx.maxTx = (iRV > sCtx.maxTx) ? iRV : sCtx.maxTx;	/* yes, update running stats */
-		} else {									/* no, close the connection */
-			xNetClose(&sCtx);						/* iRV already set for persisting */
+		} else {										/* no, close the connection */
+			xNetClose(&sCtx);							/* iRV already set for persisting */
 		}
 		xRtosSemaphoreGive(&shSLsock);
 	}
 	#if (appLITTLEFS > 0)		/* HOST not accessible try send to LFS if available ***********/
 	if (iRV < erSUCCESS && halEventCheckDevice(devMASK_LFS)) {
-		if (sRpt.pcAlloc[xLen-1] != CHR_LF) {		// yes, if last character not a LF
-			sRpt.pcAlloc[xLen++] = CHR_LF;			// append LF for later fgets()
-			sRpt.pcAlloc[xLen] = CHR_NUL;			// and terminate
+		if (sRpt.pcAlloc[xLen-1] != CHR_LF) {			// yes, if last character not a LF
+			sRpt.pcAlloc[xLen++] = CHR_LF;				// append LF for later fgets()
+			sRpt.pcAlloc[xLen] = CHR_NUL;				// and terminate
 		}
 		xFileSysFileWrite(slFILENAME, "ax", sRpt.pcAlloc);	// open append exclusive
 		FileBuffer = 1;
