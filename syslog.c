@@ -153,7 +153,8 @@ static void IRAM_ATTR xvSyslogConsole(sl_vars_t * psV, const char * format, va_l
 	if (format)	xLen += xvReport(&sRpt, format, vaList);
 	else		xLen += xReport(&sRpt, formatREPEATED, psV->count);
 	xLen += xReport(&sRpt, formatCONSOLE2, xpfCOL(attrRESET,0));
-	write(STDOUT_FILENO, sRpt.pcAlloc, xLen);			// low level unbuffered API
+	xLen = xSyslogRemoveTerminators(sRpt.pcAlloc, xLen);				// remove duplicated <newline> if any
+	write(STDOUT_FILENO, sRpt.pcAlloc, xLen);							// use low level unbuffered API
 }
 
 static void IRAM_ATTR xvSyslogHost(sl_vars_t * psV, const char * format, va_list vaList) {
