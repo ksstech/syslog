@@ -16,14 +16,16 @@
 */
 
 #include "hal_platform.h"
-#include "syslog.h"
-#include "certificates.h"
-#include "filesys.h"
 #include "hal_network.h"
 #include "hal_timer.h"
 #include "hal_usart.h"
-#include "socketsX.h"
+
+#include "syslog.h"
 #include "errors_events.h"
+#include "certificates.h"
+#include "filesys.h"
+#include "options.h"
+#include "socketsX.h"
 
 #include <errno.h>
 
