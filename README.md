@@ -1,18 +1,19 @@
 # Highly functional syslog module specifically for embedded systems
 
-Support for logging to console and syslog server.
+  Support for logging to console and syslog server. If IP L3 not established yet, any messages destined for the host will be persisted in file "syslog.txt" and sent once IP connection has been established.
+  Does not use dynamic memory allocation.
+  Suppress repetitive messages to minimise console output.
+  APP-NAME ~ Automatically detected calling FreeRTOS task name
+  PROCID ~ Automatically detected calling MCU Core#
+  MSGID ~ Application supplied but normally the calling function name
 
-Does not use dynamic memory allocation.
+# External components required
 
-Suppress repetitive messages to minimise console output.
-
-Automatically detect the calling FReeRTOS task and use the name thereof as ProcID in syslog message.
-
-Optimised to work with the enhanced and optimised printf module in repo ksstech/printf.
-
-Can be adapted to use normal printf library with minimal effort.
-
-Additional support added for ESP-IDF to integrate into the LOGx macros.
+  ESP-IDF log replacement (https://github.com/ksstech/log) to integrate into the LOGx macros.
+  Custom printf component (https://github.com/ksstech/printfx) providing expanded formatting. Can be adapted to use normal printf library with minimal effort.
+  Network abstraction component (https://github.com/ksstech/socketX) providing a higher level socket IO support
+  RTOS abstraction component (https://github.com/ksstech/rtos-support) providing a higher level of RTOS support
+  Options component (https://github.com/ksstech/options) providing APIs to support 1/2/3/4/8 bit sized option values controlling the syslog host selected as well as maximum console and host logging levels.
 
 ## Background on format
  SYSLOG-MSG = HEADER SP STRUCTURED-DATA [SP MSG]
