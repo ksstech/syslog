@@ -378,7 +378,8 @@ void IRAM_ATTR vSyslog(int MsgPRI, const char *FuncID, const char *format, ...) 
 }
 
 int IRAM_ATTR xSyslogError(const char *FuncID, int iRV) {
-	vSyslog(SL_SEV_ERROR, FuncID, "iRV=%d (%s)", iRV, pcStrError(iRV));
+	int SLpri = iRV < ESP_OK ? SL_SEV_ERROR : SL_SEV_NOTICE;
+	vSyslog(SLpri, FuncID, "iRV=%d (%s)", iRV, pcStrError(iRV));
 	return (iRV > 0) ? -iRV : iRV;
 }
 
