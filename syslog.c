@@ -132,7 +132,7 @@ exit:
 }
 
 #define formatREPEATED		DRAM_STR("Repeated %dx")
-#define formatCONSOLE1		DRAM_STR("%C%!.3R %d %s %s ")
+#define formatCONSOLE1		DRAM_STR("%C%!.3R %d %s %s ")	// 	ANSI colour, UTC, core#, task, function
 #define formatCONSOLE2		DRAM_STR("%C" strNL)
 #define formatPAPERTRAIL	DRAM_STR("<%u>1 %.3R %s %s/%d %s - - ")		/* papertrailapp.com "main/0/Devices" */
 #define formatRFC5424		DRAM_STR("<%d>1 %.3R %s %s %d %s - ")		/* RFC compliant "main 0 Devices" */
@@ -204,7 +204,7 @@ int xSyslogCheckDuplicates(int sock, struct sockaddr_in * addr) {
 }
 
 int xSyslogGetConsoleLevel(void) {
-#if (appOPTIONS == 1)
+#if (appOPTIONS > 0)
 	int iRV = xOptionGet(ioSLOGhi);
 	return iRV ? iRV : SL_LEV_CONSOLE;
 #else
@@ -213,7 +213,7 @@ int xSyslogGetConsoleLevel(void) {
 }
 
 int xSyslogGetHostLevel(void) {
-#if (appOPTIONS == 1)
+#if (appOPTIONS > 0)
 	int iRV = xOptionGet(ioSLhost);
 	return iRV ? iRV : SL_LEV_HOST;
 #else
@@ -224,7 +224,7 @@ int xSyslogGetHostLevel(void) {
 void vSyslogSetConsoleLevel(int Level) {
 	if (Level > SL_LEV_MAX)
 		Level = SL_LEV_MAX;
-#if (appOPTIONS == 1)
+#if (appOPTIONS > 0)
 	vOptionSet(ioSLOGhi, Level);
 #else
 	consoleLevel = Level;
@@ -239,7 +239,7 @@ void vSyslogSetConsoleLevel(int Level) {
 void vSyslogSetHostLevel(int Level) {
 	if (Level > SL_LEV_MAX)
 		Level = SL_LEV_MAX;
-#if (appOPTIONS == 1)
+#if (appOPTIONS > 0)
 	vOptionSet(ioSLhost, Level);
 #else
 	hostLevel = Level;
