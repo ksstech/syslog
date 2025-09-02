@@ -145,10 +145,13 @@ void xvSyslog(int MsgPRI, const char * FuncID, const char * format, va_list args
 void vSyslog(int MsgPRI, const char * FuncID, const char * format, ...);
 
 /**
- * @brief
+ * @brief		Report an error code as a syslog message
  * @param[in]	pcFN function where error occurred, invoking this handler
  * @param[in]	eCode error code to be mapped to a syslog message with pri ERROR
- * @return
+ * @return		negative error code if eCode < 0 else eCode
+ * @note		Logs an error code as a syslog message, severity level based on return value iRV.
+ * 				Format message with function identifier FuncID and error details.
+ * 				It returns the negated value of iRV if positive, or iRV otherwise.
  */
 int xSyslogError(const char * FuncID, int eCode);
 
