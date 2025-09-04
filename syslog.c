@@ -18,8 +18,8 @@
 #include "hal_platform.h"
 #include "hal_network.h"
 #include "hal_timer.h"
-#include "hal_usart.h"
 
+#include "stdioX.h"
 #include "syslog.h"
 #include "errors_events.h"
 #include "certificates.h"
@@ -155,7 +155,7 @@ static void IRAM_ATTR xvSyslogConsole(sl_vars_t * psV, const char * format, va_l
 	if (format)	xLen += xvReport(&sRpt, format, vaList);
 	else		xLen += xReport(&sRpt, formatREPEATED, psV->count);
 	xLen += xReport(&sRpt, formatCONSOLE2, xpfCOL(attrRESET,0));
-	write(STDOUT_FILENO, sRpt.pcAlloc, xLen);							// use low level unbuffered API
+	xStdioWrite(STDOUT_FILENO, sRpt.pcAlloc, xLen);		// use low level unbuffered API
 }
 
 static void IRAM_ATTR xvSyslogHost(sl_vars_t * psV, const char * format, va_list vaList) {
