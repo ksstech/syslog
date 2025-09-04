@@ -306,7 +306,6 @@ exit1:
 exit0:
 	xRtosSemaphoreGive(&shSLsock);
 }
-#endif
 
 void vSyslogFileCheckSize(void) {
 	ssize_t Size = xFileSysGetFileSize(slFILENAME);
@@ -316,6 +315,7 @@ void vSyslogFileCheckSize(void) {
 	}
 	FileBuffer = (Size > 0) ? 1 : 0;					// set flag if anything in file
 }
+#endif
 
 void IRAM_ATTR xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_list vaList) {
 	// step 0: check if anything in file that needs sending, do so ASAP
