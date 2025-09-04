@@ -188,7 +188,7 @@ static void IRAM_ATTR xvSyslogHost(sl_vars_t * psV, const char * format, va_list
 			sRpt.pcAlloc[xLen++] = CHR_LF;				// append LF for later fgets()
 			sRpt.pcAlloc[xLen] = CHR_NUL;				// and terminate
 		}
-		xFileSysFileWrite(slFILENAME, "ax", sRpt.pcAlloc);	// open append exclusive
+		xFileSysFileWrite(slFILENAME, O_WRONLY|O_APPEND, sRpt.pcAlloc, xLen);
 		FileBuffer = 1;
 	}
 	#endif
