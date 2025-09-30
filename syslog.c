@@ -358,17 +358,16 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_l
 	va_fake_t vaFake = { .pa = NULL };
 
 	// step 5: handle console message(s)
-	if (sPrv.count)										// repeated message
-		xvSyslogConsole(&sPrv, NULL, vaFake.va);
-	xvSyslogConsole(&sMsg, format, vaList);
+	if (sPrv.count)										// if previously repeated messages
+		xvSyslogConsole(&sPrv, NULL, vaFake.va);		// send repeated message warning to console
+	xvSyslogConsole(&sMsg, format, vaList);				// send current message to console	
 
 	// step 6: handle host message(s)
 	if ((MsgPRI & 7) <= xSyslogGetHostLevel()) {		// filter based on higher priorities
-		if (sPrv.count)
-			xvSyslogHost(&sPrv, NULL, vaFake.va);
-		xvSyslogHost(&sMsg, format, vaList);
+		if (sPrv.count)									// if previously repeated messages		
+			xvSyslogHost(&sPrv, NULL, vaFake.va);		// send repeated message warning to host
+		xvSyslogHost(&sMsg, format, vaList);			// send current message to host
 	}
-
 }
 
 void IRAM_ATTR vSyslog(int MsgPRI, const char *FuncID, const char *format, ...) {
