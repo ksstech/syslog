@@ -111,8 +111,8 @@ static bool IRAM_ATTR xSyslogConnect(void) {
 		sCtx.pHost = HostInfo[Idx].pName;
 		sCtx.sa_in.sin_port = htons(HostInfo[Idx].Port ? HostInfo[Idx].Port : IP_PORT_SYSLOG_UDP);
 	#else
-		sCtx.pHost = appDEFAULT_SL_HOST;				// options not part of application ?
-		sCtx.sa_in.sin_port = htons(appDEFAULT_SL_PORT);// get from app_config...
+		sCtx.pHost = slDEFAULT_HOST;				// options not part of application ?
+		sCtx.sa_in.sin_port = htons(slDEFAULT_PORT);// get from app_config...
 	#endif
 	sCtx.flags = SO_REUSEADDR;
 	sCtx.sa_in.sin_family = AF_INET;

@@ -56,8 +56,13 @@ extern "C" {
 // '<7>1 2021/10/21T12:34.567: cc50e38819ec_WROVERv4_5C9 #0 esp_timer halVARS_Report????? - '
 #define slSIZEBUF					512
 #define slFILESIZE					10204				// MAX history (at boot) size before truncation
-#define UNKNOWNMACAD				"#UnknownMAC#"		// MAC address marker in pre-wifi messages
+
+// Specify default SYSLOG destination
+#define	slDEFAULT_HOST				"logs5.papertrailapp.com"
+#define	slDEFAULT_PORT				28535
 #define slFILENAME					"/syslog.txt"		// default file name in root directory
+
+#define UNKNOWNMACAD				"#UnknownMAC#"		// MAC address marker in pre-wifi messages
 
 #define slMS_LOCK_WAIT				200					/* was 1000 */
 #define slMS_FILESEND_DLY			5
