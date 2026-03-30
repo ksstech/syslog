@@ -25,6 +25,13 @@
 #include "options.h"
 #include "socketsX.h"
 
+#if __has_include("certificates.h")
+	#include "certificates.h"		// ONLY include if we have access ie if IRMACS and/or options are used
+#endif
+#if __has_include("filesys.h")
+	#include "filesys.h"
+#endif
+
 #include <errno.h>
 
 #ifdef ESP_PLATFORM
