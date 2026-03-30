@@ -1,4 +1,4 @@
-// syslog.c - Copyright (c) 2014-25 Andre M. Maree / KSS Technologies (Pty) Ltd.
+// syslog.c - Copyright (c) 2014-26 Andre M. Maree / KSS Technologies (Pty) Ltd.
 
 /***************************************************************************************************
  * Theory of operation.
@@ -22,8 +22,6 @@
 #include "stdioX.h"
 #include "syslog.h"
 #include "errors_events.h"
-#include "certificates.h"
-#include "filesys.h"
 #include "options.h"
 #include "socketsX.h"
 
