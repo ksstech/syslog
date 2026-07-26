@@ -67,6 +67,8 @@ extern "C" {
 #define slMS_LOCK_WAIT				200					/* was 1000 */
 #define slMS_FILESEND_DLY			5
 
+#define SYSLOG_DEDUP_TEST			0					// bench-only: set 1 to enable vSyslogDedupTest() console test. NEVER ship as 1.
+
 // ############################## Syslog formatting/calling macros #################################
 
 #define SL_PRI(fac,sev)				(((fac)<<3) | ((sev)&7))
@@ -165,6 +167,14 @@ int xSyslogError(const char * FuncID, int eCode);
  * @param[in]	psR pointer to report structure
 */
 void vSyslogReport(report_t * psR);
+
+/**
+ * @brief	bench test: prove the dedup window correctly tracks distinct, interleaved, repeating
+ *			messages independently, and demonstrate its LRU-eviction capacity limit
+ */
+#if (SYSLOG_DEDUP_TEST > 0)
+void vSyslogDedupTest(void);
+#endif
 
 #ifdef __cplusplus
 }

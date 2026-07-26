@@ -238,7 +238,7 @@ int xSyslogGetHostLevel(void) {
 /**
  * @brief	repeat-suppression window, in seconds; 0 = disabled (every message displayed, no suppression)
  */
-int xSyslogGetDedupSecs(void) {
+static int xSyslogGetDedupSecs(void) {
 #if (appOPTIONS > 0)
 	return xOptionGet(ioSLdedupSecs);
 #else
@@ -362,7 +362,8 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_l
 	sMsg.utc = sTSZ.usecs;
 	sMsg.task = (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) ? DRAM_STR("preX") : pcTaskGetName(NULL);	
 
-	// step 3: calculate CRC for current message 
+	// step 3: calculate CRC for current message
+	sMsg.crc = 0;												// crcprintfx() accumulates onto *pCrc, must start clean
 	crcprintfx(&sMsg.crc, DRAM_STR("%s %s "), sMsg.task, sMsg.func);	// "Task Function "
 	vcrcprintfx(&sMsg.crc, format, vaList);					//  add message parameters etc"
 
@@ -432,6 +433,53 @@ void vSyslogReport(report_t * psR) {
 		TotalRpt += sMsgHist[i].count;
 	xReport(psR, "\tmaxTX=%zu  CurRpt=%lu" strNL, sCtx.maxTx, TotalRpt);
 }
+
+#if (SYSLOG_DEDUP_TEST > 0)					// ############# bench: dedup window test (console 'J') ##############
+/**
+ * @brief	Bench test: prove the slDEDUP_SIZE-slot dedup window correctly tracks several DISTINCT,
+ *			INTERLEAVED, repeating messages independently - the exact scenario the old single-slot
+ *			dedup could never handle (any interleaving broke it, since it only ever compared a new
+ *			message against the immediately preceding one). Phase 2 also demonstrates the accepted
+ *			LRU-eviction tradeoff once more than slDEDUP_SIZE distinct patterns are concurrently live.
+ * @note	Every test message below is a FIXED, literal string - deliberately NOT embedding a
+ *			changing loop/round counter into the text, since that would defeat the very dedup being
+ *			tested (the same reason halI2C_ErrorHandler needed its own throttle rather than relying
+ *			on this mechanism for lines that embed live counters).
+ */
+void vSyslogDedupTest(void) {
+	int OrigSecs = xSyslogGetDedupSecs();
+	vOptionSet(ioSLdedupSecs, 3);				// short window: makes suppress->flush observable in seconds
+	SL_NOT("DedupTest: START (window=3s, was %ds)", OrigSecs);
+
+	SL_NOT("DedupTest: Phase1 - 5 patterns interleaved, WITHIN window capacity (slDEDUP_SIZE=%d)", slDEDUP_SIZE);
+	for (int round = 0; round < 12; ++round) {
+		SL_WARN("DedupTest Pattern-A");
+		SL_WARN("DedupTest Pattern-B");
+		SL_WARN("DedupTest Pattern-C");
+		SL_WARN("DedupTest Pattern-D");
+		SL_WARN("DedupTest Pattern-E");
+		vTaskDelay(pdMS_TO_TICKS(500));		// 12 rounds x 500mS = 6s, crosses the 3s window ~twice
+	}
+
+	SL_NOT("DedupTest: Phase2 - 10 patterns interleaved, EXCEEDS window capacity (expect re-displays)");
+	for (int round = 0; round < 3; ++round) {
+		SL_WARN("DedupTest Item-1");
+		SL_WARN("DedupTest Item-2");
+		SL_WARN("DedupTest Item-3");
+		SL_WARN("DedupTest Item-4");
+		SL_WARN("DedupTest Item-5");
+		SL_WARN("DedupTest Item-6");
+		SL_WARN("DedupTest Item-7");
+		SL_WARN("DedupTest Item-8");
+		SL_WARN("DedupTest Item-9");
+		SL_WARN("DedupTest Item-10");
+		vTaskDelay(pdMS_TO_TICKS(200));
+	}
+
+	vOptionSet(ioSLdedupSecs, OrigSecs);
+	SL_NOT("DedupTest: END (window restored to %ds)", OrigSecs);
+}
+#endif
 
 // #################################### Test and benchmark routines ################################
 
