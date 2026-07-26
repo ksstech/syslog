@@ -56,7 +56,9 @@ typedef struct {
 		u8_t spare:4;
 	};
 	u32_t crc;
-	u64_t run, utc;
+	u64_t run, utc;			// timestamp of the MOST RECENT occurrence (refreshed every hit) - used for display
+	u64_t win;					// timestamp this suppression window opened - anchor for the threshold compare only,
+								//  frozen across suppressed hits so the window can't be pushed out indefinitely
 	const char *task, *func;
 } sl_vars_t;
 
@@ -73,7 +75,11 @@ static const char SyslogColors[8] = {
 	colourFG_CYAN,					// Debug
 };
 static netx_t sCtx = { 0 };
-static sl_vars_t sRpt = { 0 };
+
+#define slDEDUP_SIZE	8			// fixed window of recently-tracked distinct messages (macro, not runtime-sized:
+									//  a small fixed array keeps the search/eviction scan trivially cheap and bounded)
+static sl_vars_t sMsgHist[slDEDUP_SIZE] = { 0 };
+
 #if (appLITTLEFS == 1)
 	static bool FileBuffer = 0;
 #endif
@@ -81,6 +87,7 @@ static sl_vars_t sRpt = { 0 };
 #if (appOPTIONS == 0)
 	static u8_t hostLevel = SL_LEV_HOST;
 	static u8_t consoleLevel = SL_LEV_CONSOLE;
+	static u8_t dedupSecs = 0;		// 0 = suppression window disabled (every message displayed)
 #endif
 
 char SLbuffer[2][slSIZEBUF] = { 0 };
@@ -228,6 +235,17 @@ int xSyslogGetHostLevel(void) {
 #endif
 }
 
+/**
+ * @brief	repeat-suppression window, in seconds; 0 = disabled (every message displayed, no suppression)
+ */
+int xSyslogGetDedupSecs(void) {
+#if (appOPTIONS > 0)
+	return xOptionGet(ioSLdedupSecs);
+#else
+	return dedupSecs;
+#endif
+}
+
 void vSyslogSetConsoleLevel(int Level) {
 	if (Level > SL_LEV_MAX)
 		Level = SL_LEV_MAX;
@@ -340,25 +358,42 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_l
 	sMsg.count = 0;
 	sMsg.core = esp_cpu_get_core_id();
 	sMsg.run = halTIMER_ReadRunTime();
+	sMsg.win = sMsg.run;				// default window-anchor = now; only used if this becomes a fresh/displayed slot
 	sMsg.utc = sTSZ.usecs;
 	sMsg.task = (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) ? DRAM_STR("preX") : pcTaskGetName(NULL);	
 
 	// step 3: calculate CRC for current message 
 	crcprintfx(&sMsg.crc, DRAM_STR("%s %s "), sMsg.task, sMsg.func);	// "Task Function "
-	vcrcprintfx(&sMsg.crc, format, vaList);				//  add message parameters etc"
+	vcrcprintfx(&sMsg.crc, format, vaList);					//  add message parameters etc"
 
-	// step 4: semaphore protect all local variables
+	// step 4: search the last slDEDUP_SIZE distinct messages for a match; track the least-recently-used
+	// slot as the eviction candidate in the same pass (only used if no match is found below)
+	u64_t Threshold = (u64_t) xSyslogGetDedupSecs() * MICROS_IN_SECOND;
 	xRtosSemaphoreTake(&shSLvars, portMAX_DELAY);
-	if (sRpt.crc == sMsg.crc && sRpt.pri == sMsg.pri) {	// CRC & PRI same as previous message ?
-		u16_t Count = ++sRpt.count;						// Yes, increment the repeat counter
-		sRpt = sMsg;									// current message info now basis of next repeat
-		sRpt.count = Count;								// and update with incremented count
+	int MatchIdx = -1, LruIdx = 0;
+	for (int i = 0; i < slDEDUP_SIZE; ++i) {
+		if (sMsgHist[i].crc == sMsg.crc && sMsgHist[i].pri == sMsg.pri) {
+			MatchIdx = i;
+			break;
+		}
+		if (sMsgHist[i].run < sMsgHist[LruIdx].run)
+			LruIdx = i;
+	}
+	if (MatchIdx >= 0 && (sMsg.run - sMsgHist[MatchIdx].win) < Threshold) {	// recent repeat, within window ?
+		u64_t Win = sMsgHist[MatchIdx].win;				// window anchor stays frozen while suppressed...
+		u16_t Count = sMsgHist[MatchIdx].count + 1;			// ...only the repeat counter advances
+		sMsgHist[MatchIdx] = sMsg;						// refresh task/func/core/run/utc/crc/pri to "most recent"
+		sMsgHist[MatchIdx].win = Win;
+		sMsgHist[MatchIdx].count = Count;
 		xRtosSemaphoreGive(&shSLvars);					// variable changes done, unlock and return
 		return;
 	}
-	// Different CRC and/or PRI
-	sl_vars_t sPrv = sRpt;								// save previous repeat values for message creation
-	sRpt = sMsg;										// save as repeat test for next message
+	// Either a genuinely new message (no slot matched) or a tracked one whose suppression window has
+	// elapsed - display it. Either way the slot's PREVIOUS occupant (expired match, or evicted to make
+	// room) is flushed first if it had any pending suppressed count, same as the original single-slot logic.
+	int UseIdx = (MatchIdx >= 0) ? MatchIdx : LruIdx;
+	sl_vars_t sPrv = sMsgHist[UseIdx];						// save previous repeat values for message creation
+	sMsgHist[UseIdx] = sMsg;								// fresh window starts now (sMsg.win == sMsg.run == now)
 	xRtosSemaphoreGive(&shSLvars);						// variable changes done, unlock and continue
 	va_fake_t vaFake = { .pa = NULL };
 
@@ -392,7 +427,10 @@ void vSyslogReport(report_t * psR) {
 	if (sCtx.sd <= 0)
 		return;
 	xNetReport(psR, &sCtx, "SLOG", 0, 0, 0);
-	xReport(psR, "\tmaxTX=%zu  CurRpt=%lu" strNL, sCtx.maxTx, sRpt.count);
+	u32_t TotalRpt = 0;
+	for (int i = 0; i < slDEDUP_SIZE; ++i)
+		TotalRpt += sMsgHist[i].count;
+	xReport(psR, "\tmaxTX=%zu  CurRpt=%lu" strNL, sCtx.maxTx, TotalRpt);
 }
 
 // #################################### Test and benchmark routines ################################
