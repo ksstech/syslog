@@ -18,6 +18,7 @@
 #include "hal_platform.h"
 #include "hal_network.h"
 #include "hal_timer.h"
+#include "hal_usart.h"
 
 #include "stdioX.h"
 #include "syslog.h"
@@ -167,7 +168,13 @@ static void IRAM_ATTR xvSyslogConsole(sl_vars_t * psV, const char * format, va_l
 	if (format)	xLen += xvReport(&sRpt, format, vaList);
 	else		xLen += xReport(&sRpt, formatREPEATED, psV->count);
 	xLen += xReport(&sRpt, formatCONSOLE2, xpfCOL(attrRESET,0));
+	/* Serialised against printfx()/xReport() on the same shUARTmux. Without this the buffer drain's
+	 * own PXL() and a syslog line from the other core shred each other, which is the c764 signature:
+	 * "[xUBu" + "2:38:32.903 0 i2c_v2 ds248xReset". The path already holds/releases shSLvars above, so
+	 * a second BOUNDED take here is no new exposure. */
+	BaseType_t btRV = halUartLockOnce(WPFX_TIMEOUT);
 	xStdioWrite(STDOUT_FILENO, sRpt.pcAlloc, xLen);		// use low level unbuffered API
+	halUartUnLockOnce(btRV);
 }
 
 static void IRAM_ATTR xvSyslogHost(sl_vars_t * psV, const char * format, va_list vaList) {
