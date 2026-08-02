@@ -17,6 +17,7 @@
 
 #include "hal_platform.h"
 #include "hal_network.h"
+#include "hal_stdio.h"
 #include "hal_timer.h"
 #include "hal_usart.h"
 
@@ -91,8 +92,6 @@ static sl_vars_t sMsgHist[slDEDUP_SIZE] = { 0 };
 	static u8_t dedupSecs = 0;		// 0 = suppression window disabled (every message displayed)
 #endif
 
-char SLbuffer[2][slSIZEBUF] = { 0 };
-
 // ###################################### Global variables #########################################
 
 SemaphoreHandle_t shSLsock = 0, shSLvars = 0;
@@ -159,30 +158,47 @@ static int IRAM_ATTR xSyslogRemoveTerminators(char * pBuf, int xLen) {
 }
 
 static void IRAM_ATTR xvSyslogConsole(sl_vars_t * psV, const char * format, va_list vaList) {
-	report_t sRpt = {
-		.pcAlloc = &SLbuffer[psV->core][0],
-		.pcBuf = &SLbuffer[psV->core][0],
-		.Size = repSIZE_SET(sBUFFER,sgrANSI,0,0,slSIZEBUF)
-	 };
-	int xLen = xReport(&sRpt, formatCONSOLE1, xpfCOL(SyslogColors[psV->pri&7],0), psV->run, psV->core, psV->task, psV->func);
-	if (format)	xLen += xvReport(&sRpt, format, vaList);
-	else		xLen += xReport(&sRpt, formatREPEATED, psV->count);
-	xLen += xReport(&sRpt, formatCONSOLE2, xpfCOL(attrRESET,0));
-	/* Serialised against printfx()/xReport() on the same shUARTmux. Without this the buffer drain's
-	 * own PXL() and a syslog line from the other core shred each other, which is the c764 signature:
-	 * "[xUBu" + "2:38:32.903 0 i2c_v2 ds248xReset". The path already holds/releases shSLvars above, so
-	 * a second BOUNDED take here is no new exposure. */
-	BaseType_t btRV = halUartLockOnce(WPFX_TIMEOUT);
-	xStdioWrite(STDOUT_FILENO, sRpt.pcAlloc, xLen);		// use low level unbuffered API
-	halUartUnLockOnce(btRV);
+	/* The staging buffer is taken under its OWN lock, which also closes a pre-existing same-core
+	 * corruption window: shSLvars is released before this call, so two tasks on one core could both
+	 * be formatting into the old (unlocked) SLbuffer[core] at the same time. The index is handed
+	 * back to the give, so a task migrating cores mid-message still releases the right mutex. */
+	int Idx;
+	char * pcBuf = pcStdStageTake(&Idx, WPFX_TIMEOUT);
+	if (pcBuf) {										// STAGED: format first, then ONE block write
+		report_t sRpt = { .pcAlloc = pcBuf, .pcBuf = pcBuf,
+			.Size = repSIZE_SET(sBUFFER,sgrANSI,0,0,xStdStageSize()) };
+		int xLen = xReport(&sRpt, formatCONSOLE1, xpfCOL(SyslogColors[psV->pri&7],0), psV->run, psV->core, psV->task, psV->func);
+		if (format)	xLen += xvReport(&sRpt, format, vaList);
+		else		xLen += xReport(&sRpt, formatREPEATED, psV->count);
+		xLen += xReport(&sRpt, formatCONSOLE2, xpfCOL(attrRESET,0));
+		/* Serialised against printfx()/xReport() on the same shUARTmux. Without this the buffer drain's
+		 * own PXL() and a syslog line from the other core shred each other, which is the c764 signature:
+		 * "[xUBu" + "2:38:32.903 0 i2c_v2 ds248xReset". */
+		BaseType_t btRV = halUartLockOnce(WPFX_TIMEOUT);
+		xStdioWrite(STDOUT_FILENO, pcBuf, xLen);		// use low level unbuffered API
+		halUartUnLockOnce(btRV);
+		vStdStageGive(Idx);
+	} else {											// UNSTAGED: nested, or stage busy past the timeout
+		/* Never drop the message. Fall back to the old direct-to-console route, holding the console
+		 * lock across all three calls (sLO -> sNL -> sUL) so the line still emits atomically. */
+		report_t sRpt = { .uSGR = sgrANSI, .XLock = sLO };
+		xReport(&sRpt, formatCONSOLE1, xpfCOL(SyslogColors[psV->pri&7],0), psV->run, psV->core, psV->task, psV->func);
+		if (format)	xvReport(&sRpt, format, vaList);
+		else		xReport(&sRpt, formatREPEATED, psV->count);
+		sRpt.XLock = sUL;
+		xReport(&sRpt, formatCONSOLE2, xpfCOL(attrRESET,0));
+	}
 }
 
 static void IRAM_ATTR xvSyslogHost(sl_vars_t * psV, const char * format, va_list vaList) {
-	report_t sRpt = {
-		.pcAlloc = &SLbuffer[psV->core][0],
-		.pcBuf = &SLbuffer[psV->core][0],
-		.Size = repSIZE_SET(sBUFFER,sgrNONE,0,0,slSIZEBUF)
-	 };
+	/* Same staging buffer as the console path. If it cannot be taken there is nowhere to build the
+	 * message, so this one IS dropped - unlike the console it has no unbuffered alternative. */
+	int Idx;
+	char * pcBuf = pcStdStageTake(&Idx, WPFX_TIMEOUT);
+	if (pcBuf == NULL)
+		return;
+	report_t sRpt = { .pcAlloc = pcBuf, .pcBuf = pcBuf,
+		.Size = repSIZE_SET(sBUFFER,sgrNONE,0,0,xStdStageSize()) };
 	if (idSTA[0] == 0)									/* very early message, not WIFI yet */
 		strcpy((char*)idSTA, UNKNOWNMACAD);				/* insert MAC address placemaker */
 	int xLen = xReport(&sRpt, formatPAPERTRAIL, psV->pri, psV->utc, idSTA, psV->task, psV->core, psV->func);
@@ -211,6 +227,7 @@ static void IRAM_ATTR xvSyslogHost(sl_vars_t * psV, const char * format, va_list
 		FileBuffer = 1;
 	}
 	#endif
+	vStdStageGive(Idx);
 }
 
 // ###################################### Public functions #########################################
