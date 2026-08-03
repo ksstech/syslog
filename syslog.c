@@ -131,7 +131,7 @@ static bool xSyslogConnect(void) {
 	sCtx.c.type = SOCK_DGRAM;
 	sCtx.c.NoSyslog = 1;								// mark as syslog port, so as not to recurse in xNetSyslog
 
-	// step 5: before openng, close any zombie sockets
+	// step 5: before opening, close any zombie sockets
 	xNetCloseDuplicates(sCtx.sa_in.sin_port);
 
 	// step 6: open socket connection... AMM check if blocking really required!!!
