@@ -103,7 +103,7 @@ SemaphoreHandle_t shSLsock = 0, shSLvars = 0;
  * @return	1 if successful else 0
  * @note	can only return 1 if scheduler running & L3 connected, 
 */
-static bool IRAM_ATTR xSyslogConnect(void) {
+static bool xSyslogConnect(void) {
 	// step 1: If scheduler not running or L2+3 not ready, fail
 	if ((xTaskGetSchedulerState() != taskSCHEDULER_RUNNING) || halEventCheckStatus(flagLX_STA) == 0)
 		return 0;
@@ -151,13 +151,13 @@ exit:
 #define formatPAPERTRAIL	DRAM_STR("<%u>1 %.3R %s %s/%d %s - - ")		/* papertrailapp.com "main/0/Devices" */
 #define formatRFC5424		DRAM_STR("<%d>1 %.3R %s %s %d %s - ")		/* RFC compliant "main 0 Devices" */
 
-static int IRAM_ATTR xSyslogRemoveTerminators(char * pBuf, int xLen) {
+static int xSyslogRemoveTerminators(char * pBuf, int xLen) {
 	while  (isspace((int) pBuf[xLen - 1]) != 0)
 		pBuf[--xLen] = CHR_NUL;							// remove terminating white space character(s)
 	return xLen;
 }
 
-static void IRAM_ATTR xvSyslogConsole(sl_vars_t * psV, const char * format, va_list vaList) {
+static void xvSyslogConsole(sl_vars_t * psV, const char * format, va_list vaList) {
 	/* The staging buffer is taken under its OWN lock, which also closes a pre-existing same-core
 	 * corruption window: shSLvars is released before this call, so two tasks on one core could both
 	 * be formatting into the old (unlocked) SLbuffer[core] at the same time. The index is handed
@@ -190,7 +190,7 @@ static void IRAM_ATTR xvSyslogConsole(sl_vars_t * psV, const char * format, va_l
 	}
 }
 
-static void IRAM_ATTR xvSyslogHost(sl_vars_t * psV, const char * format, va_list vaList) {
+static void xvSyslogHost(sl_vars_t * psV, const char * format, va_list vaList) {
 	/* Same staging buffer as the console path. If it cannot be taken there is nowhere to build the
 	 * message, so this one IS dropped - unlike the console it has no unbuffered alternative. */
 	int Idx;
@@ -364,7 +364,7 @@ void vSyslogFileCheckSize(void) {
 }
 #endif
 
-void IRAM_ATTR xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_list vaList) {
+void xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_list vaList) {
 	// step 0: check if anything in file that needs sending, do so ASAP
 	#if (appLITTLEFS == 1)
 	if (FileBuffer)
@@ -435,14 +435,29 @@ void IRAM_ATTR xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_l
 	}
 }
 
-void IRAM_ATTR vSyslog(int MsgPRI, const char *FuncID, const char *format, ...) {
+/* NOT IRAM_ATTR - this whole module deliberately is not. It used to be, on all seven functions,
+ * which cost ~1,526 bytes of a 63 KB IRAM budget to claim a property it could never deliver:
+ * every callee is in flash - xReport, xvReport, xPrintFX, xStdioWrite, xUBufWrite, pcStdStageTake,
+ * crcprintfx, pcTaskGetName. The first call out of IRAM faults if the cache is disabled, so the
+ * annotation only ever gave false assurance. Recorded as S50.2, restated as S71.
+ *
+ * Verified before removing:
+ *  - nothing ISR-reachable calls SL_* or vSyslog (all 11 IRAM/ISR-reachable functions checked)
+ *  - the one IRAM caller, esp_log_writev(), is itself task-context only - IDF does not mark its
+ *    own esp_log_write[v] IRAM_ATTR, and routes constrained logging via ESP_EARLY_LOGx /
+ *    ESP_DRAM_LOGx straight to esp_rom_printf. See z-comp/log/log.c.
+ *
+ * To log from a genuinely cache-disabled context use IRP()/IF_IRP() (printfx.h), which is ROM code
+ * with a DRAM_STR format. Do NOT re-add IRAM_ATTR here - it cannot be made to work without moving
+ * the entire printfx/report/ubuf chain into IRAM, which is >8 KB. */
+void vSyslog(int MsgPRI, const char *FuncID, const char *format, ...) {
 	va_list vaList;
 	va_start(vaList, format);
 	xvSyslog(MsgPRI, FuncID, format, vaList);
 	va_end(vaList);
 }
 
-int IRAM_ATTR xSyslogError(const char *FuncID, int iRV) {
+int xSyslogError(const char *FuncID, int iRV) {
 	int SLpri = iRV < ESP_OK ? SL_SEV_ERROR : SL_SEV_NOTICE;
 	vSyslog(SLpri, FuncID, "iRV=%d (%s)", iRV, pcStrError(iRV));
 	return (iRV > 0) ? -iRV : iRV;
