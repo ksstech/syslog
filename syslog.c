@@ -371,8 +371,9 @@ void xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_list vaList
 		vSyslogFileSend();
 	#endif
 
-	// step 1: check if message priority outside console threshold
-	if ((MsgPRI & 7) > xSyslogGetConsoleLevel())
+	// step 1: drop only if outside BOTH thresholds; console and host each filter below
+	int Sev = MsgPRI & 7;
+	if (Sev > xSyslogGetConsoleLevel() && Sev > xSyslogGetHostLevel())
 		return;
 
 	// step 2: handle state of scheduler and obtain the task name
@@ -423,12 +424,14 @@ void xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_list vaList
 	va_fake_t vaFake = { .pa = NULL };
 
 	// step 5: handle console message(s)
-	if (sPrv.count)										// if previously repeated messages
-		xvSyslogConsole(&sPrv, NULL, vaFake.va);		// send repeated message warning to console
-	xvSyslogConsole(&sMsg, format, vaList);				// send current message to console	
+	if (Sev <= xSyslogGetConsoleLevel()) {
+		if (sPrv.count)									// if previously repeated messages
+			xvSyslogConsole(&sPrv, NULL, vaFake.va);	// send repeated message warning to console
+		xvSyslogConsole(&sMsg, format, vaList);			// send current message to console
+	}
 
 	// step 6: handle host message(s)
-	if ((MsgPRI & 7) <= xSyslogGetHostLevel()) {		// filter based on higher priorities
+	if (Sev <= xSyslogGetHostLevel()) {					// filter based on higher priorities
 		if (sPrv.count)									// if previously repeated messages		
 			xvSyslogHost(&sPrv, NULL, vaFake.va);		// send repeated message warning to host
 		xvSyslogHost(&sMsg, format, vaList);			// send current message to host
