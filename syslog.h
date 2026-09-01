@@ -60,6 +60,15 @@ extern "C" {
 // Specify default SYSLOG destination
 #define	slDEFAULT_HOST				"logs5.papertrailapp.com"
 #define	slDEFAULT_PORT				28535
+
+/* Destination wire format. SWO/Papertrail parses the RFC5424 header but DISCARDS the TIMESTAMP
+ * field - probed 2026-09-01, compliant "Z" and "+02:00" both ignored, event time is always the
+ * receipt time at whole-second resolution - so under slFORMAT_PAPERTRAIL the mote's mS timestamp
+ * leads the MSG instead, the one field preserved verbatim. NILVALUE in the header parses fine
+ * there. Anything speaking real RFC5424 should use slFORMAT_RFC5424. */
+#define	slFORMAT_RFC5424			0				// TIMESTAMP in the header, MSG unprefixed
+#define	slFORMAT_PAPERTRAIL			1				// TIMESTAMP = NILVALUE, mote time leads the MSG
+#define	slFORMAT					slFORMAT_PAPERTRAIL
 #define slFILENAME					"/syslog.txt"		// default file name in root directory
 
 #define UNKNOWNMACAD				"#UnknownMAC#"		// MAC address marker in pre-wifi messages

@@ -152,8 +152,18 @@ exit:
 #define formatREPEATED		DRAM_STR("Repeated %dx")
 #define formatCONSOLE1		DRAM_STR("%C%!.3R %d %s %s ")	// 	ANSI colour, UTC, core#, task, function
 #define formatCONSOLE2		DRAM_STR("%C" strNL)
-#define formatPAPERTRAIL	DRAM_STR("<%u>1 %.3R %s %s/%d %s - - ")		/* papertrailapp.com "main/0/Devices" */
+/* Format and argument ORDER are selected together - the timestamp moves between header and MSG. */
+#define formatPAPERTRAIL	DRAM_STR("<%u>1 - %s %s/%d %s - - %.3R ")	/* papertrailapp.com "main/0/Devices" */
+#define argsPAPERTRAIL		psV->pri, idSTA, psV->task, psV->core, psV->func, psV->utc
 #define formatRFC5424		DRAM_STR("<%d>1 %.3R %s %s %d %s - ")		/* RFC compliant "main 0 Devices" */
+#define argsRFC5424			psV->pri, psV->utc, idSTA, psV->task, psV->core, psV->func
+#if (slFORMAT == slFORMAT_PAPERTRAIL)
+	#define formatHOST		formatPAPERTRAIL
+	#define argsHOST		argsPAPERTRAIL
+#else
+	#define formatHOST		formatRFC5424
+	#define argsHOST		argsRFC5424
+#endif
 
 static int xSyslogRemoveTerminators(char * pBuf, int xLen) {
 	while  (isspace((int) pBuf[xLen - 1]) != 0)
@@ -205,7 +215,7 @@ static void xvSyslogHost(sl_vars_t * psV, const char * format, va_list vaList) {
 		.Size = repSIZE_SET(sBUFFER,sgrNONE,0,0,xStdStageSize()) };
 	if (idSTA[0] == 0)									/* very early message, not WIFI yet */
 		strcpy((char*)idSTA, UNKNOWNMACAD);				/* insert MAC address placemaker */
-	int xLen = xReport(&sRpt, formatPAPERTRAIL, psV->pri, psV->utc, idSTA, psV->task, psV->core, psV->func);
+	int xLen = xReport(&sRpt, formatHOST, argsHOST);
 	if (format)	xLen += xvReport(&sRpt, format, vaList);
 	else		xLen += xReport(&sRpt, formatREPEATED, psV->count);
 
