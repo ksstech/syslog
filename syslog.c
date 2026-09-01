@@ -84,6 +84,10 @@ static sl_vars_t sMsgHist[slDEDUP_SIZE] = { 0 };
 
 #if (appLITTLEFS == 1)
 	static bool FileBuffer = 0;
+	/* slFILESIZE was only ever enforced at boot (vSyslogFileCheckSize, main.cpp), so with the
+	 * queue working again an offline mote in a log storm would fill LittleFS. Track the queued
+	 * bytes and stop appending at the same limit. */
+	static size_t FileBytes = 0;
 #endif
 
 #if (appOPTIONS == 0)
@@ -218,13 +222,20 @@ static void xvSyslogHost(sl_vars_t * psV, const char * format, va_list vaList) {
 		xRtosSemaphoreGive(&shSLsock);
 	}
 	#if (appLITTLEFS > 0)		/* HOST not accessible try send to LFS if available ***********/
-	if (iRV < erSUCCESS && halEventCheckDevice(devMASK_LFS)) {
+	if (iRV < erSUCCESS && halEventCheckDevice(devMASK_LFS) && FileBytes < slFILESIZE) {
 		if (sRpt.pcAlloc[xLen-1] != CHR_LF) {			// yes, if last character not a LF
 			sRpt.pcAlloc[xLen++] = CHR_LF;				// append LF for later fgets()
 			sRpt.pcAlloc[xLen] = CHR_NUL;				// and terminate
 		}
-		xFileSysFileWrite(slFILENAME, O_WRONLY|O_APPEND, sRpt.pcAlloc, xLen);
-		FileBuffer = 1;
+		/* O_CREAT is not optional: vSyslogFileSend() unlinks the file after every successful
+		 * flush, so without it the queue works once per device then silently drops everything.
+		 * Lost in the "ax" -> POSIX flags conversion (e0fba65, 2025-09-04), dead fleet-wide
+		 * since. The result MUST be honoured - flagging work that was never queued is what made
+		 * the failure both silent and permanent. */
+		if (xFileSysFileWrite(slFILENAME, O_WRONLY|O_APPEND|O_CREAT, sRpt.pcAlloc, xLen) > 0) {
+			FileBytes += xLen;
+			FileBuffer = 1;
+		}
 	}
 	#endif
 	vStdStageGive(Idx);
@@ -304,8 +315,10 @@ void vSyslogFileSend(void) {
 	if (xSyslogConnect() == 0)
 		return;
 	// step 2: check if anything there to send
-	if (xFileSysGetFileSize(slFILENAME) <= 0)
+	if (xFileSysGetFileSize(slFILENAME) <= 0) {
+		FileBuffer = 0, FileBytes = 0;					// nothing queued: stop re-testing every message
 		return;
+	}
 	// step 3: protect the whole operation
 	if (xRtosSemaphoreTake(&shSLsock, slMS_LOCK_WAIT) == pdFALSE)	/* semaphore taken? */
 		return;														/* no, return for now */
@@ -329,8 +342,8 @@ void vSyslogFileSend(void) {
 		// step 6b: trim extra terminators from the end
 		int xLen = strlen(pBuf);
 		xLen = xSyslogRemoveTerminators(pBuf, xLen);	// remove terminating [CR]LF
-		if (xLen == 0)									// if nothing left to send (was just terminators...)
-			break;
+		if (xLen == 0)									// blank line: skip it, do NOT abandon the rest
+			continue;									//  a break here unlinks every line after it
 
 		// step 6c: send whatever remains of message (if any)
 		iRV = xNetSend(&sCtx, (u8_t *)pBuf, xLen);		// send contents of buffer
@@ -345,7 +358,7 @@ void vSyslogFileSend(void) {
 	// step 7: close the file and delete if successfully sent (add EOF and error checks to make sure?)
 	fclose(fp);											// always close the file
 	if (iRV >= erSUCCESS) {								// if last send was successful
-		FileBuffer = 0;									// clear flag used to check for sending
+		FileBuffer = 0, FileBytes = 0;					// clear flag used to check for sending
 		unlink(slFILENAME);								// delete the file
 	}
 exit1:
@@ -361,6 +374,7 @@ void vSyslogFileCheckSize(void) {
 		Size = 0;										// discard content
 	}
 	FileBuffer = (Size > 0) ? 1 : 0;					// set flag if anything in file
+	FileBytes = (Size > 0) ? Size : 0;				// and resume the growth budget where it left off
 }
 #endif
 
