@@ -146,9 +146,9 @@ void vSyslogFileCheckSize(void);
  * @param[in]	MsgPRI PRIority (combined FACility & SEVerity)
  * @param[in]	FuncID originating function name
  * @param[in]	format string and parameters as per normal printf()
- * @return		number of characters displayed(if only to console) or send(if to server)
+ * @return		1 if the message reached the host or the offline queue, else 0
 */
-void xvSyslog(int MsgPRI, const char * FuncID, const char * format, va_list args);
+int xvSyslog(int MsgPRI, const char * FuncID, const char * format, va_list args);
 
 /**
  * @brief		writes an RFC formatted message to stdout & syslog host (if up and running)
@@ -156,9 +156,9 @@ void xvSyslog(int MsgPRI, const char * FuncID, const char * format, va_list args
  * @param[in]	FuncID originating function name
  * @param[in]	format string and parameters as per normal printf()
  * @param[in]	varargs variable number of arguments
- * @return		number of characters displayed(if only to console) or send(if to server)
+ * @return		1 if the message reached the host or the offline queue, else 0
 */
-void vSyslog(int MsgPRI, const char * FuncID, const char * format, ...);
+int vSyslog(int MsgPRI, const char * FuncID, const char * format, ...);
 
 /**
  * @brief		Report an error code as a syslog message

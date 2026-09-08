@@ -204,13 +204,14 @@ static void xvSyslogConsole(sl_vars_t * psV, const char * format, va_list vaList
 	}
 }
 
-static void xvSyslogHost(sl_vars_t * psV, const char * format, va_list vaList) {
+static int xvSyslogHost(sl_vars_t * psV, const char * format, va_list vaList) {
 	/* Same staging buffer as the console path. If it cannot be taken there is nowhere to build the
-	 * message, so this one IS dropped - unlike the console it has no unbuffered alternative. */
+	 * message, so this one IS dropped - unlike the console it has no unbuffered alternative.
+	 * Returns 1 if the message reached the host OR the offline queue (which drains), else 0. */
 	int Idx;
 	char * pcBuf = pcStdStageTake(&Idx, WPFX_TIMEOUT);
 	if (pcBuf == NULL)
-		return;
+		return 0;
 	report_t sRpt = { .pcAlloc = pcBuf, .pcBuf = pcBuf,
 		.Size = repSIZE_SET(sBUFFER,sgrNONE,0,0,xStdStageSize()) };
 	if (idSTA[0] == 0)									/* very early message, not WIFI yet */
@@ -220,12 +221,13 @@ static void xvSyslogHost(sl_vars_t * psV, const char * format, va_list vaList) {
 	else		xLen += xReport(&sRpt, formatREPEATED, psV->count);
 
 	// If check scheduler and LxSTA, take semaphore and if all ok, send the message
-	int iRV = erFAILURE;
+	int iRV = erFAILURE, Sent = 0;
 	if (xSyslogConnect() && xRtosSemaphoreTake(&shSLsock, pdMS_TO_TICKS(slMS_LOCK_WAIT)) == pdTRUE) {
 		xLen = xSyslogRemoveTerminators(sRpt.pcAlloc, xLen);
 		iRV = xNetSend(&sCtx, (u8_t *)sRpt.pcAlloc, xLen);
 		if (iRV >= erSUCCESS) {							/* message successfully sent? */
 			sCtx.maxTx = (iRV > sCtx.maxTx) ? iRV : sCtx.maxTx;	/* yes, update running stats */
+			Sent = 1;
 		} else {										/* no, close the connection */
 			xNetClose(&sCtx);							/* iRV already set for persisting */
 		}
@@ -245,10 +247,12 @@ static void xvSyslogHost(sl_vars_t * psV, const char * format, va_list vaList) {
 		if (xFileSysFileWrite(slFILENAME, O_WRONLY|O_APPEND|O_CREAT, sRpt.pcAlloc, xLen) > 0) {
 			FileBytes += xLen;
 			FileBuffer = 1;
+			Sent = 1;									// queued: vSyslogFileSend() drains once connected
 		}
 	}
 	#endif
 	vStdStageGive(Idx);
+	return Sent;
 }
 
 // ###################################### Public functions #########################################
@@ -388,7 +392,7 @@ void vSyslogFileCheckSize(void) {
 }
 #endif
 
-void xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_list vaList) {
+int xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_list vaList) {
 	// step 0: check if anything in file that needs sending, do so ASAP
 	#if (appLITTLEFS == 1)
 	if (FileBuffer)
@@ -398,7 +402,7 @@ void xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_list vaList
 	// step 1: drop only if outside BOTH thresholds; console and host each filter below
 	int Sev = MsgPRI & 7;
 	if (Sev > xSyslogGetConsoleLevel() && Sev > xSyslogGetHostLevel())
-		return;
+		return 0;
 
 	// step 2: handle state of scheduler and obtain the task name
 	sl_vars_t sMsg;
@@ -436,7 +440,7 @@ void xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_list vaList
 		sMsgHist[MatchIdx].win = Win;
 		sMsgHist[MatchIdx].count = Count;
 		xRtosSemaphoreGive(&shSLvars);					// variable changes done, unlock and return
-		return;
+		return 0;										// suppressed as a duplicate, nothing sent
 	}
 	// Either a genuinely new message (no slot matched) or a tracked one whose suppression window has
 	// elapsed - display it. Either way the slot's PREVIOUS occupant (expired match, or evicted to make
@@ -455,11 +459,13 @@ void xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_list vaList
 	}
 
 	// step 6: handle host message(s)
+	int Sent = 0;
 	if (Sev <= xSyslogGetHostLevel()) {					// filter based on higher priorities
-		if (sPrv.count)									// if previously repeated messages		
-			xvSyslogHost(&sPrv, NULL, vaFake.va);		// send repeated message warning to host
-		xvSyslogHost(&sMsg, format, vaList);			// send current message to host
+		if (sPrv.count)									// if previously repeated messages
+			xvSyslogHost(&sPrv, NULL, vaFake.va);		// repeat-warning, not the caller's message
+		Sent = xvSyslogHost(&sMsg, format, vaList);		// send current message to host
 	}
+	return Sent;
 }
 
 /* NOT IRAM_ATTR - this whole module deliberately is not. It used to be, on all seven functions,
@@ -477,11 +483,12 @@ void xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_list vaList
  * To log from a genuinely cache-disabled context use IRP()/IF_IRP() (printfx.h), which is ROM code
  * with a DRAM_STR format. Do NOT re-add IRAM_ATTR here - it cannot be made to work without moving
  * the entire printfx/report/ubuf chain into IRAM, which is >8 KB. */
-void vSyslog(int MsgPRI, const char *FuncID, const char *format, ...) {
+int vSyslog(int MsgPRI, const char *FuncID, const char *format, ...) {
 	va_list vaList;
 	va_start(vaList, format);
-	xvSyslog(MsgPRI, FuncID, format, vaList);
+	int iRV = xvSyslog(MsgPRI, FuncID, format, vaList);
 	va_end(vaList);
+	return iRV;
 }
 
 int xSyslogError(const char *FuncID, int iRV) {
