@@ -1,0 +1,18 @@
+# Normalise every text file to LF in the repository AND the working tree,
+# on every platform, regardless of the local core.autocrlf setting.
+* text=auto eol=lf
+
+# Git only samples the first 8000 bytes to decide text-vs-binary and misfires on
+# these; force them binary so EOL conversion can never corrupt them.
+*.pdf binary
+*.rtf binary
+*.doc binary
+*.docx binary
+*.xls binary
+*.xlsx binary
+*.ppt binary
+*.pptx binary
+*.odt binary
+*.ods binary
+*.pcm binary
+*.ppm binary
