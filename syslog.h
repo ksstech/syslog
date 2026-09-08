@@ -83,7 +83,7 @@ extern "C" {
 #define SL_PRI(fac,sev)				(((fac)<<3) | ((sev)&7))
 #define SL_LOG(pri, f, ...) 		do { 												\
 										if (((pri)&7) <= SL_LEV_MAX) {					\
-											 vSyslog(pri,__FUNCTION__,f,##__VA_ARGS__);	\
+											 xSyslog(pri,__FUNCTION__,f,##__VA_ARGS__);	\
 										} 												\
 									} while(0)
 
@@ -158,7 +158,7 @@ int xvSyslog(int MsgPRI, const char * FuncID, const char * format, va_list args)
  * @param[in]	varargs variable number of arguments
  * @return		1 if the message reached the host or the offline queue, else 0
 */
-int vSyslog(int MsgPRI, const char * FuncID, const char * format, ...);
+int xSyslog(int MsgPRI, const char * FuncID, const char * format, ...);
 
 /**
  * @brief		Report an error code as a syslog message

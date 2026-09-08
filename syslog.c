@@ -475,7 +475,7 @@ int xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_list vaList)
  * annotation only ever gave false assurance. Recorded as S50.2, restated as S71.
  *
  * Verified before removing:
- *  - nothing ISR-reachable calls SL_* or vSyslog (all 11 IRAM/ISR-reachable functions checked)
+ *  - nothing ISR-reachable calls SL_* or xSyslog (all 11 IRAM/ISR-reachable functions checked)
  *  - the one IRAM caller, esp_log_writev(), is itself task-context only - IDF does not mark its
  *    own esp_log_write[v] IRAM_ATTR, and routes constrained logging via ESP_EARLY_LOGx /
  *    ESP_DRAM_LOGx straight to esp_rom_printf. See z-comp/log/log.c.
@@ -483,7 +483,7 @@ int xvSyslog(int MsgPRI, const char *FuncID, const char *format, va_list vaList)
  * To log from a genuinely cache-disabled context use IRP()/IF_IRP() (printfx.h), which is ROM code
  * with a DRAM_STR format. Do NOT re-add IRAM_ATTR here - it cannot be made to work without moving
  * the entire printfx/report/ubuf chain into IRAM, which is >8 KB. */
-int vSyslog(int MsgPRI, const char *FuncID, const char *format, ...) {
+int xSyslog(int MsgPRI, const char *FuncID, const char *format, ...) {
 	va_list vaList;
 	va_start(vaList, format);
 	int iRV = xvSyslog(MsgPRI, FuncID, format, vaList);
@@ -493,7 +493,7 @@ int vSyslog(int MsgPRI, const char *FuncID, const char *format, ...) {
 
 int xSyslogError(const char *FuncID, int iRV) {
 	int SLpri = iRV < ESP_OK ? SL_SEV_ERROR : SL_SEV_NOTICE;
-	vSyslog(SLpri, FuncID, "iRV=%d (%s)", iRV, pcStrError(iRV));
+	xSyslog(SLpri, FuncID, "iRV=%d (%s)", iRV, pcStrError(iRV));
 	return (iRV > 0) ? -iRV : iRV;
 }
 
