@@ -76,14 +76,6 @@ extern "C" {
 #define slMS_LOCK_WAIT				200					/* was 1000 */
 #define slMS_FILESEND_DLY			5
 
-/* Console sink (additive, 2026-10-16): with slCONSOLE_SINK=1 a project can register a function that takes every console line
- * (plain text: run time, core, task, function, message; no ANSI colour, no newline) instead of the stdout write. Default 0:
- * nothing changes. The host (UDP) path, the level gate and the dedup logic are untouched. First user: esp-hw-test, which
- * carries its log inside a CREMS envelope (ate-esp-testbed, 99-TO-CURSOR Proposal 110 item 2). */
-#ifndef slCONSOLE_SINK
-	#define slCONSOLE_SINK				0
-#endif
-#define slSINK_STACK				160					// unstaged sink line: stack buffer size (a line is cut to fit)
 #define SYSLOG_DEDUP_TEST			0					// bench-only: set 1 to enable vSyslogDedupTest() console test. NEVER ship as 1.
 
 // ############################## Syslog formatting/calling macros #################################
@@ -143,16 +135,6 @@ int xSyslogGetHostLevel(void);
  */
 void vSyslogSetConsoleLevel(int Level);
 void vSyslogSetHostLevel(int Level);
-
-#if (slCONSOLE_SINK > 0)
-/**
- * @brief		register the console sink: every console line (plain, NUL-terminated, no newline) goes to it instead of stdout
- * @param[in]	pfSink the sink (pri = the message priority; len = line length); NULL = back to the stdout write
- * @note		called from the logging task with no syslog lock held; it may block (the sink's own transport)
- */
-typedef int (*sl_sink_t)(int pri, const char * pcLine, int len);
-void vSyslogSetConsoleSink(sl_sink_t pfSink);
-#endif
 
 /**
  * @brief	Check size of slFILENAME, if bigger than slFILESIZE will unlink/delete the file to make space

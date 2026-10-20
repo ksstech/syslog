@@ -152,11 +152,6 @@ exit:
 #define formatREPEATED		DRAM_STR("Repeated %dx")
 #define formatCONSOLE1		DRAM_STR("%C%!.3R %d %s %s ")	// 	ANSI colour, UTC, core#, task, function
 #define formatCONSOLE2		DRAM_STR("%C" strNL)
-#if (slCONSOLE_SINK > 0)
-	#define formatSINK1		DRAM_STR("%!.3R %d %s %s ")	// the console header without colour; the sink gets no newline
-	static sl_sink_t s_sink;
-	void vSyslogSetConsoleSink(sl_sink_t pfSink) { s_sink = pfSink; }
-#endif
 /* Format and argument ORDER are selected together - the timestamp moves between header and MSG. */
 #define formatPAPERTRAIL	DRAM_STR("<%u>1 - %s %s/%d %s - - %.3R ")	/* papertrailapp.com "main/0/Devices" */
 #define argsPAPERTRAIL		psV->pri, idSTA, psV->task, psV->core, psV->func, psV->utc
@@ -177,27 +172,6 @@ static int xSyslogRemoveTerminators(char * pBuf, int xLen) {
 }
 
 static void xvSyslogConsole(sl_vars_t * psV, const char * format, va_list vaList) {
-	#if (slCONSOLE_SINK > 0)
-	if (s_sink) {
-		/* SINK: the plain line (no colour, no newline) formatted once and handed over as ONE unit. The staging buffer is
-		 * used when free, else a stack buffer. shUARTmux is never taken here: the sink may wait on it itself. */
-		int Idx;
-		char * pcStage = pcStdStageTake(&Idx, WPFX_TIMEOUT);
-		char caLine[slSINK_STACK];
-		char * pcBuf = pcStage ? pcStage : caLine;
-		size_t Size = pcStage ? xStdStageSize() : sizeof(caLine);
-		report_t sRpt = { .pcAlloc = pcBuf, .pcBuf = pcBuf, .Size = repSIZE_SET(sBUFFER,sgrNONE,0,0,Size) };
-		int xLen = xReport(&sRpt, formatSINK1, psV->run, psV->core, psV->task, psV->func);
-		if (format)	xLen += xvReport(&sRpt, format, vaList);
-		else		xLen += xReport(&sRpt, formatREPEATED, psV->count);
-		if (xLen > (int) Size - 1) xLen = (int) Size - 1;
-		if (xLen > 0) xLen = xSyslogRemoveTerminators(pcBuf, xLen);
-		pcBuf[xLen] = CHR_NUL;
-		s_sink(psV->pri, pcBuf, xLen);
-		if (pcStage) vStdStageGive(Idx);
-		return;
-	}
-	#endif
 	/* The staging buffer is taken under its OWN lock, which also closes a pre-existing same-core
 	 * corruption window: shSLvars is released before this call, so two tasks on one core could both
 	 * be formatting into the old (unlocked) SLbuffer[core] at the same time. The index is handed
