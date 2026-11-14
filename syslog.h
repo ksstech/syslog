@@ -57,9 +57,15 @@ extern "C" {
 #define slSIZEBUF					512
 #define slFILESIZE					10204				// MAX history (at boot) size before truncation
 
-// Specify default SYSLOG destination
-#define	slDEFAULT_HOST				"logs5.papertrailapp.com"
-#define	slDEFAULT_PORT				28535
+/* Default SYSLOG destination, used when the app has no ioHostSLOG option. app_config.h may override either; an EMPTY
+ * host ("") means no remote syslog at all (console only) - for apps that must not send logs off-site by default
+ * (ate-psu-ext6ch, 2026-11-13). */
+#ifndef	slDEFAULT_HOST
+	#define	slDEFAULT_HOST			"logs5.papertrailapp.com"
+#endif
+#ifndef	slDEFAULT_PORT
+	#define	slDEFAULT_PORT			28535
+#endif
 
 /* Destination wire format. SWO/Papertrail parses the RFC5424 header but DISCARDS the TIMESTAMP
  * field - probed 2026-09-01, compliant "Z" and "+02:00" both ignored, event time is always the

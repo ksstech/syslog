@@ -90,9 +90,37 @@ static sl_vars_t sMsgHist[slDEDUP_SIZE] = { 0 };
 	static size_t FileBytes = 0;
 #endif
 
-#if (appOPTIONS == 0)
+/* Each setting comes from its option when the application defines that option name (app_options.h), else from a
+ * local variable. Was one switch on appOPTIONS, which made every options-using app also need the syslog host table
+ * (HostInfo, confidential) and all four names. irmacs and the test jig define all of them: unchanged there. */
+#if (appOPTIONS > 0) && defined(ioHostSLOG)	// host from HostInfo[ioHostSLOG]
+	#define	slOPT_HOST		1
+#else
+	#define	slOPT_HOST		0
+#endif
+#if (appOPTIONS > 0) && defined(ioSLOGhi)
+	#define	slOPT_CONSOLE		1
+#else
+	#define	slOPT_CONSOLE		0
+#endif
+#if (appOPTIONS > 0) && defined(ioSLhost)
+	#define	slOPT_HOSTLEV		1
+#else
+	#define	slOPT_HOSTLEV		0
+#endif
+#if (appOPTIONS > 0) && defined(ioSLdedupSecs)
+	#define	slOPT_DEDUP		1
+#else
+	#define	slOPT_DEDUP		0
+#endif
+
+#if !slOPT_HOSTLEV
 	static u8_t hostLevel = SL_LEV_HOST;
+#endif
+#if !slOPT_CONSOLE
 	static u8_t consoleLevel = SL_LEV_CONSOLE;
+#endif
+#if !slOPT_DEDUP
 	static u8_t dedupSecs = 0;		// 0 = suppression window disabled (every message displayed)
 #endif
 
@@ -111,6 +139,10 @@ static bool xSyslogConnect(void) {
 	// step 1: If scheduler not running or L2+3 not ready, fail
 	if ((xTaskGetSchedulerState() != taskSCHEDULER_RUNNING) || halEventCheckStatus(flagLX_STA) == 0)
 		return 0;
+	#if !slOPT_HOST
+	if (slDEFAULT_HOST[0] == 0)							// app_config.h: no remote syslog
+		return 0;
+	#endif
 
 	// step 2: If unable to take the semaphore, fail
 	if (xRtosSemaphoreTake(&shSLsock, slMS_LOCK_WAIT) == pdFALSE)
@@ -122,7 +154,7 @@ static bool xSyslogConnect(void) {
 		goto exit;
 
 	// step 4: setup basic parameters for syslog connection
-	#if (appOPTIONS > 0)
+	#if slOPT_HOST
 		int Idx = xOptionGet(ioHostSLOG);				// if WL connected, NVS vars must be initialized (in stage 2.0/1)
 		sCtx.pHost = HostInfo[Idx].pName;
 		sCtx.sa_in.sin_port = htons(HostInfo[Idx].Port ? HostInfo[Idx].Port : IP_PORT_SYSLOG_UDP);
@@ -267,7 +299,7 @@ int xSyslogCheckDuplicates(int sock, struct sockaddr_in * addr) {
 }
 
 int xSyslogGetConsoleLevel(void) {
-#if (appOPTIONS > 0)
+#if slOPT_CONSOLE
 	int iRV = xOptionGet(ioSLOGhi);
 	return iRV ? iRV : SL_LEV_CONSOLE;
 #else
@@ -276,7 +308,7 @@ int xSyslogGetConsoleLevel(void) {
 }
 
 int xSyslogGetHostLevel(void) {
-#if (appOPTIONS > 0)
+#if slOPT_HOSTLEV
 	int iRV = xOptionGet(ioSLhost);
 	return iRV ? iRV : SL_LEV_HOST;
 #else
@@ -288,7 +320,7 @@ int xSyslogGetHostLevel(void) {
  * @brief	repeat-suppression window, in seconds; 0 = disabled (every message displayed, no suppression)
  */
 static int xSyslogGetDedupSecs(void) {
-#if (appOPTIONS > 0)
+#if slOPT_DEDUP
 	return xOptionGet(ioSLdedupSecs);
 #else
 	return dedupSecs;
@@ -298,7 +330,7 @@ static int xSyslogGetDedupSecs(void) {
 void vSyslogSetConsoleLevel(int Level) {
 	if (Level > SL_LEV_MAX)
 		Level = SL_LEV_MAX;
-#if (appOPTIONS > 0)
+#if slOPT_CONSOLE
 	vOptionSet(ioSLOGhi, Level);
 #else
 	consoleLevel = Level;
@@ -313,7 +345,7 @@ void vSyslogSetConsoleLevel(int Level) {
 void vSyslogSetHostLevel(int Level) {
 	if (Level > SL_LEV_MAX)
 		Level = SL_LEV_MAX;
-#if (appOPTIONS > 0)
+#if slOPT_HOSTLEV
 	vOptionSet(ioSLhost, Level);
 #else
 	hostLevel = Level;
